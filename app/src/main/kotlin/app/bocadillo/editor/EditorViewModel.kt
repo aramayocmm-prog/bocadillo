@@ -1,8 +1,11 @@
 package app.bocadillo.editor
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -12,18 +15,36 @@ import app.bocadillo.core.imaging.PipelineRenderer
 import app.bocadillo.core.imaging.PixelBuffer
 import app.bocadillo.core.imaging.RenderContext
 import app.bocadillo.core.imaging.Resample
+import app.bocadillo.core.imaging.objects.StickerDef
 import app.bocadillo.core.imaging.ops.Geometry
 import app.bocadillo.core.imaging.ops.ImageOp
 import app.bocadillo.core.imaging.ops.TransformOps
+import app.bocadillo.core.model.Arrange
+import app.bocadillo.core.model.BalloonObject
+import app.bocadillo.core.model.BalloonShape
+import app.bocadillo.core.model.CanvasObject
 import app.bocadillo.core.model.Document
 import app.bocadillo.core.model.History
 import app.bocadillo.core.model.MaskData
+import app.bocadillo.core.model.ObjectTransform
 import app.bocadillo.core.model.OpInstance
 import app.bocadillo.core.model.ParamSpec
 import app.bocadillo.core.model.Params
 import app.bocadillo.core.model.ProjectBundle
+import app.bocadillo.core.model.StickerObject
+import app.bocadillo.core.model.TextObject
+import app.bocadillo.core.model.TextStyle
+import app.bocadillo.core.model.addObject
+import app.bocadillo.core.model.arrangeObject
 import app.bocadillo.core.model.defaults
+import app.bocadillo.core.model.duplicateObject
+import app.bocadillo.core.model.newObjectId
+import app.bocadillo.core.model.objectById
+import app.bocadillo.core.model.referencedAssets
+import app.bocadillo.core.model.removeObject
+import app.bocadillo.core.model.updateObject
 import app.bocadillo.data.ImageIo
+import app.bocadillo.render.ObjectRenderer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -38,6 +59,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.CancellationException
 import kotlin.coroutines.coroutineContext
 import kotlin.math.max
@@ -57,6 +82,14 @@ sealed interface ToolState {
     data object Orient : ToolState
     data object Resize : ToolState
     data object Export : ToolState
+
+    /** Text ("title") editor working on a draft; [isNew] = not yet in the document. */
+    data class EditText(val draft: TextObject, val isNew: Boolean) : ToolState
+    data class EditBalloon(val draft: BalloonObject, val isNew: Boolean) : ToolState
+    /** Sticker catalogue; [replaceId] set when replacing the selected sticker. */
+    data class PickSticker(val replaceId: String?) : ToolState
+    /** Sticker colours / outline / opacity. */
+    data class StyleSticker(val draft: StickerObject) : ToolState
 }
 
 sealed interface UiMessage {
@@ -79,7 +112,29 @@ data class EditorUiState(
     val outputHeight: Int = 0,
     val sourceHasAlpha: Boolean = false,
     val exporting: Boolean = false,
-)
+    /** Overlay objects as currently shown (committed, or live while dragging). */
+    val objects: List<CanvasObject> = emptyList(),
+    val selectedId: String? = null,
+    /** Corner handle stretches instead of scale/rotate ("Stretch Tool"). */
+    val stretchMode: Boolean = false,
+    /** Bumped whenever project assets (fonts, imported stickers) change. */
+    val assetsVersion: Int = 0,
+    /** Capture date from EXIF (ms), for "Insert date and time". */
+    val photoDate: Long? = null,
+) {
+    /** Objects to draw: drafts of the open object tool replace (or are added to) the list. */
+    fun displayObjects(): List<CanvasObject> {
+        val draft: CanvasObject = when (val t = tool) {
+            is ToolState.EditText -> t.draft
+            is ToolState.EditBalloon -> t.draft
+            is ToolState.StyleSticker -> t.draft
+            else -> return objects
+        }
+        return if (objects.any { it.id == draft.id }) objects.map { if (it.id == draft.id) draft else it } else objects + draft
+    }
+
+    val selected: CanvasObject? get() = selectedId?.let { id -> objects.firstOrNull { it.id == id } }
+}
 
 /** Share requests are one-off events delivered to the screen. */
 data class ShareRequest(val uri: Uri, val mimeType: String)
@@ -115,6 +170,8 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     private lateinit var history: History<Document>
     private lateinit var sourceBytes: ByteArray
     private var masks: Map<String, MaskData> = emptyMap()
+    /** Fonts and imported stickers of this project (path → bytes). */
+    private val assets = HashMap<String, ByteArray>()
     private lateinit var proxy: PixelBuffer
     private var proxyScale = 1f
     private var lastPreview: PixelBuffer? = null
@@ -133,6 +190,9 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
 
     private val doc: Document get() = history.current
 
+    /** Snapshot of the project assets for the UI renderer. */
+    fun assetsSnapshot(): Map<String, ByteArray> = HashMap(assets)
+
     // ------------------------------------------------------------------ loading
 
     private suspend fun load() {
@@ -140,6 +200,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
             val bundle = repo.load(projectId)
             sourceBytes = bundle.sourceBytes
             masks = bundle.masks
+            assets.putAll(bundle.assets)
             val d = bundle.document
             history = History(d, "opened")
             val decoded = withContext(Dispatchers.Default) {
@@ -154,8 +215,9 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
             if (decoded.fullWidth.toLong() * decoded.fullHeight > d.source.width.toLong() * d.source.height) {
                 _messages.send(UiMessage.Res(R.string.picture_scaled, listOf(d.source.width, d.source.height)))
             }
+            val photoDate = withContext(Dispatchers.IO) { exifDate(sourceBytes) }
             repo.markOpen(projectId)
-            _state.update { it.copy(loading = false, title = d.title, sourceHasAlpha = d.source.hasAlpha) }
+            _state.update { it.copy(loading = false, title = d.title, sourceHasAlpha = d.source.hasAlpha, photoDate = photoDate, assetsVersion = it.assetsVersion + 1) }
             syncHistoryState()
             requestRender()
         } catch (e: CancellationException) {
@@ -164,6 +226,12 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
             _state.update { it.copy(loading = false, fatalError = UiMessage.Res(R.string.error_load, listOf(e.message ?: e.javaClass.simpleName))) }
         }
     }
+
+    private fun exifDate(bytes: ByteArray): Long? = runCatching {
+        val exif = ExifInterface(bytes.inputStream())
+        val s = exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) ?: exif.getAttribute(ExifInterface.TAG_DATETIME) ?: return null
+        SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US).parse(s)?.time
+    }.getOrNull()
 
     // ------------------------------------------------------------------ rendering
 
@@ -202,7 +270,11 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     private fun syncHistoryState() {
         val (w, h) = outputSize(doc.ops)
         _state.update {
-            it.copy(canUndo = history.canUndo, canRedo = history.canRedo, historyStep = history.index, outputWidth = w, outputHeight = h, title = doc.title)
+            val sel = it.selectedId?.takeIf { id -> doc.objectById(id) != null }
+            it.copy(
+                canUndo = history.canUndo, canRedo = history.canRedo, historyStep = history.index,
+                outputWidth = w, outputHeight = h, title = doc.title, objects = doc.objects, selectedId = sel,
+            )
         }
     }
 
@@ -229,6 +301,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
 
     fun restoreOriginal() {
         if (doc.ops.isEmpty() && doc.objects.isEmpty()) return
+        _state.update { it.copy(selectedId = null) }
         commit(doc.resetToOriginal(now()), "restore_original")
     }
 
@@ -236,7 +309,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
 
     fun openTool(op: ImageOp) {
         if (op.id == TransformOps.Crop.id) { openCrop(); return }
-        _state.update { it.copy(tool = ToolState.Adjust(op, op.params.defaults()), before = it.preview) }
+        _state.update { it.copy(tool = ToolState.Adjust(op, op.params.defaults()), before = it.preview, selectedId = null) }
         requestRender()
     }
 
@@ -259,6 +332,9 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
                 if (!t.op.isIdentity(t.params)) commit(doc.withOp(OpInstance.create(t.op.id, t.params), now()), t.op.id) else requestRender()
             }
             is ToolState.Crop -> applyCrop(t)
+            is ToolState.EditText -> applyObjectDraft(t.draft, t.isNew, blank = t.draft.text.isBlank(), label = "text")
+            is ToolState.EditBalloon -> applyObjectDraft(t.draft, t.isNew, blank = false, label = "balloon")
+            is ToolState.StyleSticker -> applyObjectDraft(t.draft, isNew = false, blank = false, label = "sticker_style")
             else -> closeTool()
         }
     }
@@ -294,7 +370,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     // ------------------------------------------------------------------ crop & straighten
 
     private fun openCrop() {
-        _state.update { it.copy(tool = ToolState.Crop(floatArrayOf(0f, 0f, 1f, 1f), 0f, Geometry.CropPreset.FREEFORM, null), before = null) }
+        _state.update { it.copy(tool = ToolState.Crop(floatArrayOf(0f, 0f, 1f, 1f), 0f, Geometry.CropPreset.FREEFORM, null), before = null, selectedId = null) }
         requestRender()
     }
 
@@ -351,11 +427,193 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         viewModelScope.launch(Dispatchers.Default) { val b = renderBefore(); _state.update { it.copy(before = b) } }
     }
 
+    // ------------------------------------------------------------------ objects: selection & gestures
+
+    fun selectObject(id: String?) {
+        if (_state.value.tool != null) return
+        _state.update { it.copy(selectedId = id) }
+    }
+
+    /** Live update while dragging (no history step yet). */
+    fun liveObject(o: CanvasObject) {
+        _state.update { s -> s.copy(objects = s.objects.map { if (it.id == o.id) o else it }) }
+    }
+
+    /** End of a gesture: one undoable step for the whole drag. */
+    fun commitLive(label: String) {
+        val objs = _state.value.objects
+        if (objs != doc.objects) commit(doc.copy(objects = objs, modifiedAt = now()), label)
+    }
+
+    fun toggleStretchMode() { _state.update { it.copy(stretchMode = !it.stretchMode) } }
+
+    private fun selected(): CanvasObject? = _state.value.selectedId?.let { doc.objectById(it) }
+
+    fun duplicateSelected() {
+        val o = selected() ?: return
+        val (d, newId) = doc.duplicateObject(o.id, now())
+        _state.update { it.copy(selectedId = newId) }
+        commit(d, "duplicate")
+    }
+
+    fun deleteSelected() {
+        val o = selected() ?: return
+        _state.update { it.copy(selectedId = null) }
+        commit(doc.removeObject(o.id, now()), "delete")
+    }
+
+    fun arrangeSelected(how: Arrange) {
+        val o = selected() ?: return
+        commit(doc.arrangeObject(o.id, how, now()), "arrange")
+    }
+
+    fun flipSelected(horizontal: Boolean) {
+        val o = selected() ?: return
+        val t = o.transform
+        commit(doc.updateObject(o.withTransform(if (horizontal) t.copy(flipH = !t.flipH) else t.copy(flipV = !t.flipV)), now()), "flip")
+    }
+
+    fun resetTransformSelected() {
+        val o = selected() ?: return
+        commit(doc.updateObject(o.withTransform(o.transform.reset()), now()), "transform_reset")
+    }
+
+    fun setOpacityLive(value: Float) { _state.value.selected?.let { liveObject(it.withOpacity(value)) } }
+
+    // ------------------------------------------------------------------ objects: create & edit
+
+    private fun center(): ObjectTransform = ObjectTransform(0.5f, 0.5f)
+
+    fun newText(text: String = "") {
+        val draft = TextObject(newObjectId(), center(), text, TextStyle())
+        _state.update { it.copy(tool = ToolState.EditText(draft, true), selectedId = null) }
+    }
+
+    fun newBalloon(shape: BalloonShape = BalloonShape.SPEECH) {
+        val draft = BalloonObject(newObjectId(), ObjectTransform(0.5f, 0.35f), shape)
+        _state.update { it.copy(tool = ToolState.EditBalloon(draft, true), selectedId = null) }
+    }
+
+    fun openStickerPicker(replace: Boolean = false) {
+        _state.update { it.copy(tool = ToolState.PickSticker(if (replace) it.selectedId else null)) }
+    }
+
+    /** Opens the editor that fits the selected object. */
+    fun editSelected() {
+        when (val o = selected()) {
+            is TextObject -> _state.update { it.copy(tool = ToolState.EditText(o, false)) }
+            is BalloonObject -> _state.update { it.copy(tool = ToolState.EditBalloon(o, false)) }
+            is StickerObject -> _state.update { it.copy(tool = ToolState.StyleSticker(o)) }
+            null -> Unit
+        }
+    }
+
+    fun updateDraft(o: CanvasObject) {
+        _state.update { s ->
+            s.copy(tool = when (val t = s.tool) {
+                is ToolState.EditText -> if (o is TextObject) t.copy(draft = o) else t
+                is ToolState.EditBalloon -> if (o is BalloonObject) t.copy(draft = o) else t
+                is ToolState.StyleSticker -> if (o is StickerObject) t.copy(draft = o) else t
+                else -> t
+            })
+        }
+    }
+
+    private fun applyObjectDraft(draft: CanvasObject, isNew: Boolean, blank: Boolean, label: String) {
+        closeTool(render = false)
+        if (blank) return
+        ensureFontAsset(draft)
+        val d = if (isNew || doc.objectById(draft.id) == null) doc.addObject(draft, now()) else doc.updateObject(draft, now())
+        _state.update { it.copy(selectedId = draft.id) }
+        commit(d, label)
+    }
+
+    /** Embeds imported library fonts in the project so it stays portable. */
+    private fun ensureFontAsset(o: CanvasObject) {
+        val font = when (o) { is TextObject -> o.style.font; is BalloonObject -> o.style.font; else -> return }
+        if (!font.startsWith("asset:")) return
+        val path = font.removePrefix("asset:")
+        if (path !in assets) app.fonts.libraryBytes(font)?.let { assets[path] = it; bumpAssets() }
+    }
+
+    fun pickSticker(def: StickerDef) {
+        val t = _state.value.tool as? ToolState.PickSticker
+        val replace = t?.replaceId?.let { doc.objectById(it) as? StickerObject }
+        closeTool(render = false)
+        if (replace != null) {
+            commit(doc.updateObject(replace.copy(source = "builtin:${def.id}", aspect = def.aspect, colors = emptyList()), now()), "replace")
+        } else {
+            val o = StickerObject(newObjectId(), center(), "builtin:${def.id}", aspect = def.aspect)
+            _state.update { it.copy(selectedId = o.id) }
+            commit(doc.addObject(o, now()), "sticker")
+        }
+    }
+
+    /** Imports a picture (ideally a transparent PNG) as a sticker. */
+    fun importStickerImage(uri: Uri) {
+        val replaceId = (_state.value.tool as? ToolState.PickSticker)?.replaceId
+        closeTool(render = false)
+        viewModelScope.launch {
+            try {
+                val (png, aspect) = withContext(Dispatchers.IO) {
+                    val imported = ImageIo.read(app.contentResolver, uri)
+                    val dec = ImageIo.decode(imported.bytes, maxSide = 1024)
+                    val aspect = dec.bitmap.width.toFloat() / dec.bitmap.height
+                    val out = ByteArrayOutputStream()
+                    dec.bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                    dec.bitmap.recycle()
+                    out.toByteArray() to aspect
+                }
+                val path = "stickers/${UUID.randomUUID()}.png"
+                assets[path] = png
+                bumpAssets()
+                val replace = replaceId?.let { doc.objectById(it) as? StickerObject }
+                if (replace != null) {
+                    commit(doc.updateObject(replace.copy(source = "asset:$path", aspect = aspect, colors = emptyList()), now()), "replace")
+                } else {
+                    val o = StickerObject(newObjectId(), center(), "asset:$path", aspect = aspect)
+                    _state.update { it.copy(selectedId = o.id) }
+                    commit(doc.addObject(o, now()), "sticker")
+                }
+            } catch (e: Exception) {
+                _messages.send(UiMessage.Res(R.string.error_import))
+            }
+        }
+    }
+
+    /** Imports a TTF/OTF into the font library. Returns the font reference via [onDone]. */
+    fun importFont(uri: Uri, onDone: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val ref = withContext(Dispatchers.IO) {
+                    val f = ImageIo.read(app.contentResolver, uri)
+                    app.fonts.import(f.displayName, f.bytes).also { r -> assets[r.removePrefix("asset:")] = f.bytes }
+                }
+                bumpAssets()
+                onDone(ref)
+            } catch (e: Exception) {
+                _messages.send(UiMessage.Res(R.string.font_import_failed))
+            }
+        }
+    }
+
+    private fun bumpAssets() { _state.update { it.copy(assetsVersion = it.assetsVersion + 1) } }
+
     // ------------------------------------------------------------------ saving
 
     private fun scheduleAutosave() {
         autosaveJob?.cancel()
         autosaveJob = viewModelScope.launch { delay(1200); saveNow() }
+    }
+
+    /** Draws [objects] over [base] with a private renderer (safe off the UI thread). */
+    private fun composite(base: PixelBuffer, objects: List<CanvasObject>): Bitmap {
+        val bmp = ImageIo.toMutableBitmap(base)
+        if (objects.isNotEmpty()) {
+            val r = ObjectRenderer(app.fonts, app.stickers).also { it.assets = HashMap(assets) }
+            r.drawAll(Canvas(bmp), objects, bmp.width.toFloat(), bmp.height.toFloat())
+        }
+        return bmp
     }
 
     /** Persists the project. Safe to call from any lifecycle callback. */
@@ -364,9 +622,10 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         saveMutex.withLock {
             if (!dirty) return
             val d = history.current
-            val thumb = lastPreview?.let { withContext(Dispatchers.Default) { ImageIo.thumbnail(it) } }
+            val thumb = lastPreview?.let { p -> withContext(Dispatchers.Default) { runCatching { ImageIo.thumbnail(composite(p, d.objects)) }.getOrNull() } }
             try {
-                repo.save(ProjectBundle(d, sourceBytes, masks, thumb))
+                val used = d.referencedAssets()
+                repo.save(ProjectBundle(d, sourceBytes, masks, thumb, assets.filterKeys { it in used }))
                 dirty = false
             } catch (e: Exception) {
                 _messages.trySend(UiMessage.Res(R.string.error_save, listOf(e.message ?: "")))
@@ -401,7 +660,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
                     val s = options.scalePercent.coerceIn(1, 100) / 100f
                     val src = if (s < 1f) Resample.resize(full, max(1, (full.width * s).roundToInt()), max(1, (full.height * s).roundToInt())) else full
                     val out = PipelineRenderer(registry, cacheSize = 1).render(src, "export", d.ops, masks, RenderContext(scale = s))
-                    ImageIo.encode(out, fmt, quality, options.jpegBackground)
+                    ImageIo.encodeBitmap(composite(out, d.objects), fmt, quality, options.jpegBackground)
                 }
                 val name = app.exports.suggestedName(d.title, fmt.extension)
                 when (target) {

@@ -122,9 +122,19 @@ object ImageIo {
      * Encodes [buffer]. JPEG has no alpha, so translucent pixels are composited over
      * [jpegBackground]; PNG keeps transparency.
      */
-    fun encode(buffer: PixelBuffer, format: Format, quality: Int, jpegBackground: Int): ByteArray {
-        val src = toBitmap(buffer)
-        val out = ByteArrayOutputStream(buffer.size / 4)
+    fun encode(buffer: PixelBuffer, format: Format, quality: Int, jpegBackground: Int): ByteArray =
+        encodeBitmap(toBitmap(buffer), format, quality, jpegBackground)
+
+    /** Mutable ARGB copy of [buffer] that objects can be drawn onto. */
+    fun toMutableBitmap(buffer: PixelBuffer): Bitmap =
+        Bitmap.createBitmap(buffer.width, buffer.height, Bitmap.Config.ARGB_8888).apply {
+            setPixels(buffer.pixels, 0, buffer.width, 0, 0, buffer.width, buffer.height)
+        }
+
+    /** Encodes and recycles [src]. */
+    fun encodeBitmap(src: Bitmap, format: Format, quality: Int, jpegBackground: Int): ByteArray {
+        val buffer = src
+        val out = ByteArrayOutputStream(buffer.width * buffer.height / 4)
         when (format) {
             Format.PNG -> src.compress(Bitmap.CompressFormat.PNG, 100, out)
             Format.JPEG -> {
@@ -139,8 +149,11 @@ object ImageIo {
     }
 
     /** Small JPEG used for the gallery grid and stored in the project file. */
-    fun thumbnail(buffer: PixelBuffer, maxSide: Int = 360): ByteArray {
-        val bmp = toBitmap(buffer)
+    fun thumbnail(buffer: PixelBuffer, maxSide: Int = 360): ByteArray = thumbnail(toBitmap(buffer), maxSide)
+
+    /** Thumbnail from a bitmap (recycled afterwards). */
+    fun thumbnail(bmp: Bitmap, maxSide: Int = 360): ByteArray {
+        val buffer = bmp
         val k = minOf(1f, maxSide.toFloat() / max(buffer.width, buffer.height))
         val scaled = if (k < 1f) Bitmap.createScaledBitmap(bmp, max(1, (buffer.width * k).roundToInt()), max(1, (buffer.height * k).roundToInt()), true) else bmp
         val flat = Bitmap.createBitmap(scaled.width, scaled.height, Bitmap.Config.ARGB_8888)

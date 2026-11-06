@@ -79,12 +79,4 @@ data class Document(
     }
 }
 
-/**
- * Overlay objects drawn above the picture. Stage 3 adds the concrete kinds (text, balloon,
- * sticker); the document format already stores the list so projects stay forward compatible.
- */
-sealed interface CanvasObject {
-    val id: String
-}
-
 internal fun newId(): String = UUID.randomUUID().toString()

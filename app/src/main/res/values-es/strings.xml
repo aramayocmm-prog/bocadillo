@@ -114,4 +114,107 @@
     <string name="export_done_file">Imagen guardada</string>
     <string name="export_failed">Error al exportar: %1$s</string>
     <string name="share_chooser">Compartir imagen</string>
+    <string name="color_custom">Personalizar…</string>
+    <string name="color_less">Menos</string>
+    <string name="color_hue">Tono</string>
+    <string name="color_saturation">Saturación</string>
+    <string name="color_brightness">Brillo</string>
+    <string name="opacity">Opacidad</string>
+    <string name="title_new">Nuevo texto</string>
+    <string name="title_edit">Editar texto</string>
+    <string name="hint_text">Escribe tu texto aquí</string>
+    <string name="insert_phrase">Frases frecuentes</string>
+    <string name="insert_datetime">Fecha y hora</string>
+    <string name="tab_styles">Estilos</string>
+    <string name="tab_font">Fuente</string>
+    <string name="tab_color">Color</string>
+    <string name="tab_outline">Contorno</string>
+    <string name="tab_shadow">Sombra</string>
+    <string name="tab_layout">Diseño</string>
+    <string name="tab_balloon">Globo</string>
+    <string name="tab_text">Texto</string>
+    <string name="bold">Negrita</string>
+    <string name="italic">Cursiva</string>
+    <string name="text_color">Color del texto</string>
+    <string name="background_box">Recuadro de fondo</string>
+    <string name="outline_width">Grosor del contorno</string>
+    <string name="outline_color">Color del contorno</string>
+    <string name="shadow">Sombra</string>
+    <string name="shadow_color">Color de la sombra</string>
+    <string name="shadow_x">Sombra X</string>
+    <string name="shadow_y">Sombra Y</string>
+    <string name="shadow_blur">Desenfoque de la sombra</string>
+    <string name="text_size">Tamaño del texto</string>
+    <string name="align_left">Izquierda</string>
+    <string name="align_center">Centro</string>
+    <string name="align_right">Derecha</string>
+    <string name="line_height">Altura de línea</string>
+    <string name="letter_spacing">Espaciado entre letras</string>
+    <string name="circular_wrap">Curvar texto</string>
+    <string name="preset_classic">Clásico</string>
+    <string name="preset_comic">Cómic</string>
+    <string name="preset_clean">Limpio</string>
+    <string name="preset_soft_shadow">Sombra suave</string>
+    <string name="preset_neon">Neón</string>
+    <string name="preset_label">Etiqueta</string>
+    <string name="preset_impact">Impacto</string>
+    <string name="preset_elegant">Elegante</string>
+    <string name="preset_typewriter">Máquina de escribir</string>
+    <string name="preset_pastel">Pastel</string>
+    <string name="import_font">Importar fuente (.ttf / .otf)…</string>
+    <string name="fonts_system">Fuentes del sistema</string>
+    <string name="fonts_bundled">Fuentes incluidas</string>
+    <string name="fonts_imported">Tus fuentes</string>
+    <string name="font_import_failed">Este archivo no es una fuente válida.</string>
+    <string name="phrases_title">Frases</string>
+    <string name="edit">Editar</string>
+    <string name="phrase_new">Nueva frase</string>
+    <string name="phrase_edit">Editar frase</string>
+    <string name="date_photo">Fecha de la foto</string>
+    <string name="date_today">Hoy</string>
+    <string name="date_custom">Elegir fecha…</string>
+    <string name="balloon_speech">Diálogo</string>
+    <string name="balloon_thought">Pensamiento</string>
+    <string name="balloon_scream">Grito</string>
+    <string name="balloon_whisper">Susurro</string>
+    <string name="balloon_rectangle">Rectangular</string>
+    <string name="balloon_rounded">Redondeado</string>
+    <string name="wordballoon_new">Nuevo globo</string>
+    <string name="wordballoon_edit">Editar globo</string>
+    <string name="fill_color">Color de relleno</string>
+    <string name="balloon_pointer">Puntero</string>
+    <string name="pointer_width">Ancho del puntero</string>
+    <string name="balloon_tail_hint">Consejo: arrastra el punto verde sobre la imagen para mover el puntero.</string>
+    <string name="sticker_new">Nuevo sticker</string>
+    <string name="sticker_replace">Sustituir sticker</string>
+    <string name="sticker_import_png">Importar imagen (PNG transparente)…</string>
+    <string name="sticker_set_style">Estilo del sticker</string>
+    <string name="color_main">Color principal</string>
+    <string name="color_secondary">Color secundario</string>
+    <string name="outline_size">Tamaño del contorno</string>
+    <string name="reset_colors">Restablecer colores</string>
+    <string name="replace">Sustituir</string>
+    <string name="bring_to_front">Al frente</string>
+    <string name="bring_forward">Adelante</string>
+    <string name="send_backward">Atrás</string>
+    <string name="send_to_back">Al fondo</string>
+    <string name="transform_stretch">Estirar</string>
+    <string name="transform_reset">Restablecer</string>
+    <string name="done">Listo</string>
+    <string name="menu_text">Texto</string>
+    <string name="menu_balloon">Globo</string>
+    <string name="menu_sticker">Sticker</string>
+    <string-array name="default_phrases">
+        <item>Te quiero</item>
+        <item>Ojalá estuvieras aquí</item>
+        <item>¡Estás invitado!</item>
+        <item>Saludos desde</item>
+        <item>Que te mejores</item>
+        <item>Te extraño</item>
+        <item>¡Feliz cumpleaños!</item>
+        <item>Gracias</item>
+        <item>Feliz Navidad</item>
+        <item>Feliz Año Nuevo</item>
+        <item>¡Felicidades!</item>
+    </string-array>
 </resources>

@@ -28,6 +28,8 @@ class ProjectBundle(
     val sourceBytes: ByteArray,
     val masks: Map<String, MaskData> = emptyMap(),
     val thumbnailJpeg: ByteArray? = null,
+    /** Files referenced by objects, keyed by path, e.g. "fonts/x.ttf", "stickers/y.png". */
+    val assets: Map<String, ByteArray> = emptyMap(),
 )
 
 /**
@@ -36,6 +38,7 @@ class ProjectBundle(
  *  - document.json      see [DocumentJson]
  *  - source/<fileName>  original picture bytes
  *  - masks/<id>.mask    "BMSK" + int width + int height + raw coverage bytes
+ *  - assets/<path>      fonts and imported stickers used by objects
  *  - thumbnail.jpg      optional preview for the gallery
  */
 object ProjectArchive {
@@ -54,6 +57,10 @@ object ProjectArchive {
             for ((id, mask) in bundle.masks) {
                 if (id !in used) continue
                 zip.entry("masks/${safeName(id)}.mask", encodeMask(mask))
+            }
+            val usedAssets = doc.referencedAssets()
+            for ((path, bytes) in bundle.assets) {
+                if (path in usedAssets) zip.entry("assets/${safePath(path)}", bytes)
             }
             bundle.thumbnailJpeg?.let { zip.entry("thumbnail.jpg", it) }
         }
@@ -88,7 +95,10 @@ object ProjectArchive {
             if (mask.width != ref.width || mask.height != ref.height) throw ProjectFormatException("Mask ${ref.id} size mismatch")
             ref.id to mask
         }
-        return ProjectBundle(doc, source, masks, files["thumbnail.jpg"])
+        val assets = doc.referencedAssets().associateWith { path ->
+            files["assets/${safePath(path)}"] ?: throw ProjectFormatException("Asset $path missing")
+        }
+        return ProjectBundle(doc, source, masks, files["thumbnail.jpg"], assets)
     }
 
     fun encodeMask(mask: MaskData): ByteArray {
@@ -111,6 +121,9 @@ object ProjectArchive {
     }
 
     private fun safeName(name: String): String = name.replace(Regex("[^A-Za-z0-9._-]"), "_")
+
+    /** Like [safeName] but keeps one level of folders ("fonts/a.ttf"). */
+    private fun safePath(path: String): String = path.split('/').filter { it.isNotEmpty() && it != ".." }.joinToString("/") { safeName(it) }
 
     private fun ZipOutputStream.entry(name: String, bytes: ByteArray) {
         putNextEntry(ZipEntry(name))

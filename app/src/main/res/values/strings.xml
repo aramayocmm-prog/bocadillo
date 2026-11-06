@@ -114,4 +114,107 @@
     <string name="export_done_file">Picture saved</string>
     <string name="export_failed">Export failed: %1$s</string>
     <string name="share_chooser">Share picture</string>
+    <string name="color_custom">Custom…</string>
+    <string name="color_less">Less</string>
+    <string name="color_hue">Hue</string>
+    <string name="color_saturation">Saturation</string>
+    <string name="color_brightness">Brightness</string>
+    <string name="opacity">Opacity</string>
+    <string name="title_new">New text</string>
+    <string name="title_edit">Edit text</string>
+    <string name="hint_text">Type your text here</string>
+    <string name="insert_phrase">Common phrases</string>
+    <string name="insert_datetime">Date and time</string>
+    <string name="tab_styles">Styles</string>
+    <string name="tab_font">Font</string>
+    <string name="tab_color">Color</string>
+    <string name="tab_outline">Outline</string>
+    <string name="tab_shadow">Shadow</string>
+    <string name="tab_layout">Layout</string>
+    <string name="tab_balloon">Balloon</string>
+    <string name="tab_text">Text</string>
+    <string name="bold">Bold</string>
+    <string name="italic">Italic</string>
+    <string name="text_color">Text color</string>
+    <string name="background_box">Background box</string>
+    <string name="outline_width">Outline width</string>
+    <string name="outline_color">Outline color</string>
+    <string name="shadow">Shadow</string>
+    <string name="shadow_color">Shadow color</string>
+    <string name="shadow_x">Shadow X</string>
+    <string name="shadow_y">Shadow Y</string>
+    <string name="shadow_blur">Shadow blur</string>
+    <string name="text_size">Text size</string>
+    <string name="align_left">Left</string>
+    <string name="align_center">Center</string>
+    <string name="align_right">Right</string>
+    <string name="line_height">Line height</string>
+    <string name="letter_spacing">Letter spacing</string>
+    <string name="circular_wrap">Circular wrap</string>
+    <string name="preset_classic">Classic</string>
+    <string name="preset_comic">Comic</string>
+    <string name="preset_clean">Clean</string>
+    <string name="preset_soft_shadow">Soft shadow</string>
+    <string name="preset_neon">Neon</string>
+    <string name="preset_label">Label</string>
+    <string name="preset_impact">Impact</string>
+    <string name="preset_elegant">Elegant</string>
+    <string name="preset_typewriter">Typewriter</string>
+    <string name="preset_pastel">Pastel</string>
+    <string name="import_font">Import font (.ttf / .otf)…</string>
+    <string name="fonts_system">System fonts</string>
+    <string name="fonts_bundled">Included fonts</string>
+    <string name="fonts_imported">Your fonts</string>
+    <string name="font_import_failed">This file is not a valid font.</string>
+    <string name="phrases_title">Phrases</string>
+    <string name="edit">Edit</string>
+    <string name="phrase_new">New phrase</string>
+    <string name="phrase_edit">Edit phrase</string>
+    <string name="date_photo">Photo date</string>
+    <string name="date_today">Today</string>
+    <string name="date_custom">Choose date…</string>
+    <string name="balloon_speech">Speech</string>
+    <string name="balloon_thought">Thought</string>
+    <string name="balloon_scream">Scream</string>
+    <string name="balloon_whisper">Whisper</string>
+    <string name="balloon_rectangle">Rectangle</string>
+    <string name="balloon_rounded">Rounded</string>
+    <string name="wordballoon_new">New balloon</string>
+    <string name="wordballoon_edit">Edit balloon</string>
+    <string name="fill_color">Fill color</string>
+    <string name="balloon_pointer">Pointer</string>
+    <string name="pointer_width">Pointer width</string>
+    <string name="balloon_tail_hint">Tip: drag the green dot on the picture to move the pointer.</string>
+    <string name="sticker_new">New sticker</string>
+    <string name="sticker_replace">Replace sticker</string>
+    <string name="sticker_import_png">Import picture (transparent PNG)…</string>
+    <string name="sticker_set_style">Sticker style</string>
+    <string name="color_main">Main color</string>
+    <string name="color_secondary">Secondary color</string>
+    <string name="outline_size">Outline size</string>
+    <string name="reset_colors">Reset colors</string>
+    <string name="replace">Replace</string>
+    <string name="bring_to_front">To front</string>
+    <string name="bring_forward">Forward</string>
+    <string name="send_backward">Backward</string>
+    <string name="send_to_back">To back</string>
+    <string name="transform_stretch">Stretch</string>
+    <string name="transform_reset">Reset</string>
+    <string name="done">Done</string>
+    <string name="menu_text">Text</string>
+    <string name="menu_balloon">Balloon</string>
+    <string name="menu_sticker">Sticker</string>
+    <string-array name="default_phrases">
+        <item>I love you</item>
+        <item>Wish you were here</item>
+        <item>You\'re invited!</item>
+        <item>Greetings from</item>
+        <item>Get well soon</item>
+        <item>Miss you</item>
+        <item>Happy birthday!</item>
+        <item>Thank you</item>
+        <item>Merry Christmas</item>
+        <item>Happy New Year</item>
+        <item>Congratulations!</item>
+    </string-array>
 </resources>

@@ -20,7 +20,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Transform
@@ -61,12 +64,21 @@ import app.bocadillo.R
 import app.bocadillo.core.imaging.ops.ImageOp
 import app.bocadillo.core.imaging.ops.OpCategory
 import app.bocadillo.core.imaging.ops.TransformOps
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.compose.runtime.mutableIntStateOf
+import app.bocadillo.core.model.BalloonObject
+import app.bocadillo.core.model.BalloonShape
+import app.bocadillo.core.model.TextObject
 import app.bocadillo.data.ImageIo
+import app.bocadillo.render.ObjectRenderer
 
 private enum class Menu(val label: Int, val icon: ImageVector) {
     ADJUST(R.string.menu_adjust, Icons.Filled.Tune),
     COLOR(R.string.menu_color, Icons.Filled.Palette),
     TRANSFORM(R.string.menu_transform, Icons.Filled.Transform),
+    TEXT(R.string.menu_text, Icons.Filled.TextFields),
+    BALLOON(R.string.menu_balloon, Icons.Filled.ChatBubble),
+    STICKER(R.string.menu_sticker, Icons.Filled.EmojiEmotions),
     MORE(R.string.menu_more, Icons.Filled.MoreHoriz),
 }
 
@@ -107,6 +119,32 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
         val o = pendingExport; if (uri != null && o != null) vm.export(o, ExportTarget.DOCUMENT, uri)
     }
 
+    // Objects renderer shared by the canvas and the pickers (UI thread only).
+    val objRenderer = remember { ObjectRenderer(app.fonts, app.stickers) }
+    remember(state.assetsVersion) { objRenderer.assets = vm.assetsSnapshot(); 0 }
+    val fonts = remember(state.assetsVersion) { app.fonts.all() }
+    val typeface = { ref: String -> app.fonts.typeface(ref, false, false, objRenderer.assets) }
+    var phrasesVersion by remember { mutableIntStateOf(0) }
+    val fontPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) vm.importFont(uri) { ref ->
+            when (val t = vm.state.value.tool) {
+                is ToolState.EditText -> vm.updateDraft(t.draft.copy(style = t.draft.style.copy(font = ref)))
+                is ToolState.EditBalloon -> vm.updateDraft(t.draft.copy(style = t.draft.style.copy(font = ref)))
+                else -> Unit
+            }
+        }
+    }
+    val stickerImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) vm.importStickerImage(uri)
+    }
+    val phraseOps = remember {
+        PhraseOps(
+            add = { p -> app.phrases.add(p).also { phrasesVersion++ } },
+            update = { i, p -> app.phrases.update(i, p).also { phrasesVersion++ } },
+            remove = { i -> app.phrases.remove(i).also { phrasesVersion++ } },
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -130,7 +168,21 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                     crop = state.tool as? ToolState.Crop,
                     cropPixelSize = state.outputWidth to state.outputHeight,
                     onCropRect = vm::setCropRect,
-                )
+                ) { zoom ->
+                    ObjectLayer(
+                        objects = state.displayObjects(),
+                        selectedId = state.selectedId,
+                        renderer = objRenderer,
+                        assetsVersion = state.assetsVersion,
+                        zoom = zoom,
+                        interactive = state.tool == null,
+                        stretchMode = state.stretchMode,
+                        onSelect = vm::selectObject,
+                        onLive = vm::liveObject,
+                        onCommit = vm::commitLive,
+                        onTapSelected = vm::editSelected,
+                    )
+                }
                 if (state.loading || state.exporting) CircularProgressIndicator(Modifier.align(Alignment.Center))
                 state.fatalError?.let { Text(it.text(context), Modifier.align(Alignment.Center).padding(24.dp), color = MaterialTheme.colorScheme.error) }
             }
@@ -142,7 +194,34 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                         }
                         is ToolState.Crop -> CropPanel(t, vm::setCropPreset, vm::setStraighten, vm::applyTool, vm::cancelTool)
                         ToolState.Orient -> OrientPanel(vm::orient, vm::cancelTool)
-                        else -> MainMenu(menu, { menu = it }, app.registry.all, onTool = { op ->
+                        is ToolState.EditText -> TextEditorPanel(
+                            t, fonts, typeface, state.photoDate, phrases = { app.phrases.list() }, onPhrasesChanged = {}, phraseOps = phraseOps,
+                            onChange = vm::updateDraft, onImportFont = { fontPicker.launch(arrayOf("font/*", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream")) },
+                            onApply = vm::applyTool, onCancel = vm::cancelTool,
+                        )
+                        is ToolState.EditBalloon -> BalloonEditorPanel(
+                            t, fonts, typeface, onChange = vm::updateDraft,
+                            onImportFont = { fontPicker.launch(arrayOf("font/*", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream")) },
+                            onApply = vm::applyTool, onCancel = vm::cancelTool,
+                        )
+                        is ToolState.PickSticker -> StickerPickerPanel(app.stickers, objRenderer, t.replaceId != null, onPick = vm::pickSticker,
+                            onImport = { stickerImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, onCancel = vm::cancelTool)
+                        is ToolState.StyleSticker -> StickerStylePanel(t, app.stickers, onChange = vm::updateDraft, onApply = vm::applyTool, onCancel = vm::cancelTool)
+                        else -> state.selected?.let { sel ->
+                            ObjectMenu(sel, state.stretchMode, ObjectActions(
+                                edit = vm::editSelected, duplicate = vm::duplicateSelected, delete = vm::deleteSelected,
+                                arrange = vm::arrangeSelected, flip = vm::flipSelected, reset = vm::resetTransformSelected,
+                                toggleStretch = vm::toggleStretchMode, replace = { vm.openStickerPicker(replace = true) },
+                                opacityLive = vm::setOpacityLive, opacityCommit = { vm.commitLive("opacity") }, done = { vm.selectObject(null) },
+                            ))
+                        } ?: MainMenu(menu, { m ->
+                            menu = m
+                            when (m) {
+                                Menu.TEXT -> vm.newText()
+                                Menu.STICKER -> vm.openStickerPicker()
+                                else -> Unit
+                            }
+                        }, app.registry.all, onBalloon = vm::newBalloon, onTool = { op ->
                             when (op.id) {
                                 TransformOps.Orient.id -> vm.openPanel(ToolState.Orient)
                                 TransformOps.Resize.id -> vm.openPanel(ToolState.Resize)
@@ -178,7 +257,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun MainMenu(menu: Menu, onMenu: (Menu) -> Unit, ops: List<ImageOp>, onTool: (ImageOp) -> Unit, onRestore: () -> Unit) {
+private fun MainMenu(menu: Menu, onMenu: (Menu) -> Unit, ops: List<ImageOp>, onBalloon: (BalloonShape) -> Unit, onTool: (ImageOp) -> Unit, onRestore: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val tools: List<ImageOp> = when (menu) {
@@ -186,11 +265,15 @@ private fun MainMenu(menu: Menu, onMenu: (Menu) -> Unit, ops: List<ImageOp>, onT
                 Menu.COLOR -> ops.filter { it.category == OpCategory.COLOR }
                 Menu.TRANSFORM -> ops.filter { it.category == OpCategory.TRANSFORM }
                 Menu.MORE -> ops.filter { it.category == OpCategory.MODERN }
+                Menu.TEXT, Menu.BALLOON, Menu.STICKER -> emptyList()
+            }
+            if (menu == Menu.BALLOON) for (shape in BalloonShape.entries) {
+                AssistChip(onClick = { onBalloon(shape) }, label = { Text(stringResource(balloonShapeLabel(shape))) })
             }
             if (menu == Menu.MORE) AssistChip(onClick = onRestore, label = { Text(stringResource(R.string.restore_original)) })
             for (op in tools) AssistChip(onClick = { onTool(op) }, label = { Text(stringResource(Labels.op(op.id))) })
         }
-        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
             for (m in Menu.entries) {
                 val selected = m == menu
                 Column(

@@ -59,7 +59,7 @@ object DocumentJson {
                 if (op.maskInverted) put("maskInverted", true)
             })
         })
-        put("objects", JsonArray(emptyList()))
+        put("objects", ObjectJson.encodeAll(doc.objects))
         put("masks", buildJsonArray {
             for (m in doc.masks) add(buildJsonObject {
                 put("id", m.id); put("width", m.width); put("height", m.height)
@@ -73,8 +73,7 @@ object DocumentJson {
             throw ProjectFormatException("Project format $version is newer than supported ${Document.FORMAT_VERSION}")
         }
         val src = o.req("source").jsonObject
-        val objects = o["objects"]?.jsonArray ?: JsonArray(emptyList())
-        if (objects.isNotEmpty()) throw ProjectFormatException("Overlay objects are not supported by this version")
+        val objects = (o["objects"]?.jsonArray ?: JsonArray(emptyList())).map { ObjectJson.decode(it.jsonObject) }
         return Document(
             id = o.str("id"),
             title = o.str("title"),
@@ -97,6 +96,7 @@ object DocumentJson {
                     maskInverted = op["maskInverted"]?.jsonPrimitive?.booleanOrNull ?: false,
                 )
             },
+            objects = objects,
             masks = (o["masks"]?.jsonArray ?: JsonArray(emptyList())).map { e ->
                 val m = e.jsonObject
                 MaskRef(m.str("id"), m.req("width").jsonPrimitive.int, m.req("height").jsonPrimitive.int)

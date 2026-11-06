@@ -47,6 +47,8 @@ fun EditorCanvas(
     cropPixelSize: Pair<Int, Int>,
     onCropRect: (FloatArray) -> Unit,
     modifier: Modifier = Modifier,
+    /** Drawn above the picture inside the zoomed box (objects layer); receives the zoom factor. */
+    overlay: @Composable (zoom: Float) -> Unit = {},
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
@@ -101,7 +103,7 @@ fun EditorCanvas(
                     contentScale = ContentScale.FillBounds,
                     filterQuality = FilterQuality.High,
                 )
-                if (crop != null) CropOverlay(crop, cropPixelSize, onCropRect)
+                if (crop != null) CropOverlay(crop, cropPixelSize, onCropRect) else overlay(scale)
             }
         }
     }
