@@ -66,12 +66,18 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
         val save = canvas.save()
         canvas.concat(m)
         if (o.opacity < 0.999f) canvas.saveLayerAlpha(null, (o.opacity * 255).toInt().coerceIn(0, 255))
-        when (o) {
-            is TextObject -> drawText(canvas, o, u)
-            is BalloonObject -> drawBalloon(canvas, o, u)
-            is StickerObject -> drawSticker(canvas, o, u)
+        try {
+            when (o) {
+                is TextObject -> drawText(canvas, o, u)
+                is BalloonObject -> drawBalloon(canvas, o, u)
+                is StickerObject -> drawSticker(canvas, o, u)
+            }
+        } catch (e: Exception) {
+            // a broken object must never take the whole editor down
+            android.util.Log.w("ObjectRenderer", "Cannot draw object ${o.id}", e)
+        } finally {
+            canvas.restoreToCount(save)
         }
-        canvas.restoreToCount(save)
     }
 
     /** Half extents of the object's box in local px (before its transform). */
@@ -260,9 +266,7 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
     private fun drawSticker(c: Canvas, o: StickerObject, u: Float) {
         val (bw, bh) = stickerSize(o, u)
         if (o.source.startsWith("noto:")) {
-            val id = o.source.removePrefix("noto:")
-            val svg = notoSvgs.get(id) ?: noto.load(id)?.also { notoSvgs.put(id, it) } ?: return
-            svg.renderToCanvas(c, RectF(-bw / 2, -bh / 2, bw / 2, bh / 2))
+            drawNoto(c, o, bw, bh)
         } else if (o.isVector) {
             val def = catalog[o.source.removePrefix("builtin:")] ?: return
             val s = min(bw / def.width, bh / def.height)
@@ -286,6 +290,45 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
             } ?: return
             c.drawBitmap(bmp, null, RectF(-bw / 2, -bh / 2, bw / 2, bh / 2), bmpPaint)
         }
+    }
+
+    /**
+     * Noto Emoji. On hardware-accelerated (screen) canvases the SVG is rasterized into a cached
+     * software bitmap first — AndroidSVG is only drawn directly on software canvases (export,
+     * thumbnails). Any failure draws nothing instead of crashing the app.
+     */
+    private fun drawNoto(c: Canvas, o: StickerObject, bw: Float, bh: Float) {
+        val id = o.source.removePrefix("noto:")
+        val dst = RectF(-bw / 2, -bh / 2, bw / 2, bh / 2)
+        try {
+            if (!c.isHardwareAccelerated) {
+                val svg = notoSvgs.get(id) ?: noto.load(id)?.also { notoSvgs.put(id, it) } ?: return
+                svg.renderToCanvas(c, dst)
+                return
+            }
+            // resolution of the on-screen box (object scale included), in 64 px steps, capped
+            val t = o.transform
+            val longest = max(bw, bh) * abs(t.scale) * max(abs(t.stretchX), abs(t.stretchY))
+            val px = (ceil(longest / 64f) * 64f).toInt().coerceIn(64, 1024)
+            val key = "$id@$px"
+            val bmp = notoBitmaps.get(key) ?: run {
+                val svg = noto.load(id) ?: return
+                val w = if (bw >= bh) px else max(1, (px * bw / bh).toInt())
+                val h = if (bh >= bw) px else max(1, (px * bh / bw).toInt())
+                Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { b ->
+                    svg.renderToCanvas(Canvas(b), RectF(0f, 0f, w.toFloat(), h.toFloat()))
+                    notoBitmaps.put(key, b)
+                }
+            }
+            c.drawBitmap(bmp, null, dst, bmpPaint)
+        } catch (e: Throwable) {
+            if (e is OutOfMemoryError) notoBitmaps.evictAll()
+            android.util.Log.w("ObjectRenderer", "Cannot draw emoji $id", e)
+        }
+    }
+
+    private val notoBitmaps = object : LruCache<String, Bitmap>(32 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: Bitmap) = value.byteCount
     }
 
     /** Draws a catalogue sticker into a w×h box (for the picker grid). */
