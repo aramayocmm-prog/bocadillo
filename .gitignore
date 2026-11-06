@@ -6,5 +6,6 @@ local.properties
 captures/
 .cxx/
 *.keystore
+!app/debug.keystore
 *.jks
 keystore.properties

@@ -19,6 +19,13 @@ android {
     }
 
     signingConfigs {
+        // Fixed debug key (not secret) so every CI build can be installed over the previous one.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         // Release signing is configured from keystore.properties (never committed). See docs/BUILD.md.
         val propsFile = rootProject.file("keystore.properties")
         if (propsFile.exists()) {
