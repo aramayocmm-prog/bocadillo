@@ -227,4 +227,7 @@
     <string name="noto_credit">Emoji: Noto Emoji © Google, Apache License 2.0</string>
     <string name="about">About</string>
     <string name="licenses">Licenses and credits</string>
+    <string name="crash_title">The app closed because of an error</string>
+    <string name="crash_message">Share this report so the error can be fixed. It stays on your phone unless you share it.</string>
+    <string name="crash_share">Share report</string>
 </resources>

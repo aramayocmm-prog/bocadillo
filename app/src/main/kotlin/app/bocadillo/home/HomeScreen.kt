@@ -94,6 +94,8 @@ fun HomeScreen(vm: HomeViewModel, onOpen: (String) -> Unit) {
     var cameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     val untitled = stringResource(R.string.untitled)
     var aboutOpen by remember { mutableStateOf(false) }
+    // Crash report from the previous run, if any (read once, then deleted).
+    var crash by remember { mutableStateOf(runCatching { app.crashFile.takeIf { it.exists() }?.readText() }.getOrNull()) }
 
     LaunchedEffect(vm) { vm.openProject.collect { onOpen(it) } }
     LaunchedEffect(vm) { vm.messages.collect { snackbar.showSnackbar(it.text(context)) } }
@@ -174,6 +176,26 @@ fun HomeScreen(vm: HomeViewModel, onOpen: (String) -> Unit) {
             text = { Text(stringResource(R.string.delete_confirm_message)) },
             confirmButton = { TextButton(onClick = { vm.delete(id); deleteId = null }) { Text(stringResource(R.string.action_delete)) } },
             dismissButton = { TextButton(onClick = { deleteId = null }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+    crash?.let { report ->
+        AlertDialog(
+            onDismissRequest = { crash = null; app.crashFile.delete() },
+            title = { Text(stringResource(R.string.crash_title)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.crash_message), style = MaterialTheme.typography.bodyMedium)
+                    Text(report, Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState()).padding(top = 8.dp), style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                        .putExtra(android.content.Intent.EXTRA_TEXT, report)
+                    context.startActivity(android.content.Intent.createChooser(send, null))
+                }) { Text(stringResource(R.string.crash_share)) }
+            },
+            dismissButton = { TextButton(onClick = { crash = null; app.crashFile.delete() }) { Text(stringResource(R.string.close)) } },
         )
     }
     if (aboutOpen) {
