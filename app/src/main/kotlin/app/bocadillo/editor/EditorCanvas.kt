@@ -4,6 +4,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -49,6 +54,8 @@ fun EditorCanvas(
     modifier: Modifier = Modifier,
     /** Drawn above the picture inside the zoomed box (objects layer); receives the zoom factor. */
     overlay: @Composable (zoom: Float) -> Unit = {},
+    /** Drawing tools active: one finger draws (handled by the overlay), two fingers zoom/pan. */
+    twoFingerNavigation: Boolean = false,
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
@@ -73,14 +80,29 @@ fun EditorCanvas(
         Box(
             Modifier
                 .fillMaxSize()
-                .pointerInput(cropping) {
-                    if (!cropping) detectTransformGestures { centroid, pan, zoom, _ ->
+                .pointerInput(cropping, twoFingerNavigation) {
+                    fun applyGesture(centroid: Offset, pan: Offset, zoom: Float) {
                         val newScale = (scale * zoom).coerceIn(1f, 12f)
                         val z = newScale / scale
                         val c = centroid - Offset(boxW / 2f, boxH / 2f)
                         offset = clampOffset((offset - c) * z + c + pan, newScale)
                         scale = newScale
                     }
+                    if (cropping) return@pointerInput
+                    if (twoFingerNavigation) {
+                        // ignores single-finger moves (those draw) and the drawing layer's consumption
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            while (true) {
+                                val ev = awaitPointerEvent()
+                                if (ev.changes.none { it.pressed }) break
+                                if (ev.changes.count { it.pressed } >= 2) {
+                                    applyGesture(ev.calculateCentroid(useCurrent = true), ev.calculatePan(), ev.calculateZoom())
+                                    ev.changes.forEach { it.consume() }
+                                }
+                            }
+                        }
+                    } else detectTransformGestures { centroid, pan, zoom, _ -> applyGesture(centroid, pan, zoom) }
                 }
                 .pointerInput(Unit) {
                     detectTapGestures(onDoubleTap = { scale = 1f; offset = Offset.Zero })

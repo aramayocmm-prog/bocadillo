@@ -20,6 +20,8 @@ object Labels {
         "orient" -> R.string.op_orient
         "rotate" -> R.string.op_rotate
         "restore_original" -> R.string.restore_original
+        "paint" -> R.string.brush
+        "history_paint" -> R.string.history_paint
         "opened" -> R.string.history_opened
         else -> R.string.untitled
     }

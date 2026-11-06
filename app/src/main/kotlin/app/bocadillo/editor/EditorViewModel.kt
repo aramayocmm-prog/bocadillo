@@ -18,7 +18,13 @@ import app.bocadillo.core.imaging.Resample
 import app.bocadillo.core.imaging.objects.StickerDef
 import app.bocadillo.core.imaging.ops.Geometry
 import app.bocadillo.core.imaging.ops.ImageOp
+import app.bocadillo.core.imaging.ops.MaskParams
+import app.bocadillo.core.imaging.ops.PaintOps
 import app.bocadillo.core.imaging.ops.TransformOps
+import app.bocadillo.core.imaging.paint.Stroke
+import app.bocadillo.core.imaging.paint.StrokeCodec
+import app.bocadillo.core.imaging.paint.StrokeMode
+import app.bocadillo.core.imaging.paint.StrokeRasterizer
 import app.bocadillo.core.model.Arrange
 import app.bocadillo.core.model.BalloonObject
 import app.bocadillo.core.model.BalloonShape
@@ -89,7 +95,43 @@ sealed interface ToolState {
     data class PickSticker(val replaceId: String?) : ToolState
     /** Sticker colours / outline / opacity. */
     data class StyleSticker(val draft: StickerObject) : ToolState
+
+    /** Brush, Marker, Eraser (make transparent) or History Paint; strokes are pending until Apply. */
+    data class Draw(
+        val kind: DrawKind,
+        val strokes: List<Stroke> = emptyList(),
+        val redo: List<Stroke> = emptyList(),
+        val brush: BrushSettings = BrushSettings(),
+        /** History Paint: number of document ops whose result is painted back (0 = opened picture). */
+        val stage: Int = 0,
+        val eyedropper: Boolean = false,
+    ) : ToolState
+
+    /** "Paint Mask / Selection": paint where the next effect applies, then pick the effect. */
+    data class Mask(
+        val protect: Boolean,
+        val strokes: List<Stroke> = emptyList(),
+        val redo: List<Stroke> = emptyList(),
+        val brush: BrushSettings = BrushSettings(size = 0.08f, hardness = 0.7f),
+        val erasing: Boolean = false,
+        val feather: Float = 0.01f,
+        val invert: Boolean = false,
+        /** true once the user tapped "Next": choosing the effect. */
+        val choosingEffect: Boolean = false,
+    ) : ToolState
 }
+
+enum class DrawKind { BRUSH, MARKER, ERASER, HISTORY }
+
+/** Brush settings; [size] is the diameter in u (fraction of the picture's smaller side). */
+data class BrushSettings(
+    val size: Float = 0.03f,
+    val hardness: Float = 0.8f,
+    val opacity: Float = 1f,
+    val color: Int = 0xFFE53935.toInt(),
+    val pressureSize: Boolean = true,
+    val pressureOpacity: Boolean = false,
+)
 
 sealed interface UiMessage {
     data class Res(val id: Int, val args: List<Any> = emptyList()) : UiMessage
@@ -122,6 +164,8 @@ data class EditorUiState(
     val photoDate: Long? = null,
     /** Bumped when "My stickers" changes. */
     val libraryVersion: Int = 0,
+    /** Red/green overlay showing the mask being painted. */
+    val maskOverlay: ImageBitmap? = null,
 ) {
     /** Objects to draw: drafts of the open object tool replace (or are added to) the list. */
     fun displayObjects(): List<CanvasObject> {
@@ -244,6 +288,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
             is ToolState.Adjust -> base + OpInstance(PENDING_UID, t.op.id, t.params)
             // While cropping we show the straightened full frame; the overlay draws the rect.
             is ToolState.Crop -> if (t.angle != 0f) base + OpInstance(PENDING_UID, TransformOps.Crop.id, Params.of("angle" to t.angle.toDouble())) else base
+            is ToolState.Draw -> if (t.strokes.isEmpty()) base else base + OpInstance(PENDING_UID, drawOpId(t), drawParams(t))
             else -> base
         }
     }
@@ -322,7 +367,10 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
 
     fun resetParams() {
         val t = _state.value.tool as? ToolState.Adjust ?: return
-        _state.update { it.copy(tool = t.copy(params = t.op.params.defaults())) }
+        // keep an attached mask when resetting the effect's own values
+        var p = t.op.params.defaults()
+        for (k in listOf(MaskParams.STROKES, MaskParams.MODE, MaskParams.INVERT, MaskParams.FEATHER)) t.params.raw(k)?.let { v -> p = Params.of(p.asMap() + (k to v)) }
+        _state.update { it.copy(tool = t.copy(params = p)) }
         requestRender()
     }
 
@@ -336,6 +384,11 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
             is ToolState.EditText -> applyObjectDraft(t.draft, t.isNew, blank = t.draft.text.isBlank(), label = "text")
             is ToolState.EditBalloon -> applyObjectDraft(t.draft, t.isNew, blank = false, label = "balloon")
             is ToolState.StyleSticker -> applyObjectDraft(t.draft, isNew = false, blank = false, label = "sticker_style")
+            is ToolState.Draw -> {
+                closeTool(render = false)
+                if (t.strokes.isNotEmpty()) commit(doc.withOp(OpInstance.create(drawOpId(t), drawParams(t)), now()), drawOpId(t)) else requestRender()
+            }
+            is ToolState.Mask -> if (!t.choosingEffect) _state.update { it.copy(tool = t.copy(choosingEffect = true)) } else Unit
             else -> closeTool()
         }
     }
@@ -343,7 +396,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     fun cancelTool() = closeTool()
 
     private fun closeTool(render: Boolean = true) {
-        _state.update { it.copy(tool = null, before = null) }
+        _state.update { it.copy(tool = null, before = null, maskOverlay = null) }
         if (render) requestRender()
     }
 
@@ -640,6 +693,169 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     }
 
     private fun bumpAssets() { _state.update { it.copy(assetsVersion = it.assetsVersion + 1) } }
+
+    // ------------------------------------------------------------------ drawing
+
+    private fun drawOpId(t: ToolState.Draw) = if (t.kind == DrawKind.HISTORY) PaintOps.HistoryPaint.id else PaintOps.Paint.id
+
+    private fun drawParams(t: ToolState.Draw): Params {
+        val p = Params.EMPTY.with("strokes", StrokeCodec.encode(t.strokes))
+        return if (t.kind == DrawKind.HISTORY) p.with("stage", t.stage) else p
+    }
+
+    fun openDraw(kind: DrawKind) {
+        val previous = (_state.value.tool as? ToolState.Draw)?.brush ?: lastBrush
+        _state.update { it.copy(tool = ToolState.Draw(kind, brush = previous, stage = historyStages().lastOrNull()?.first ?: 0), selectedId = null) }
+        requestRender()
+    }
+
+    private var lastBrush = BrushSettings()
+
+    fun setDrawKind(kind: DrawKind) {
+        val t = _state.value.tool as? ToolState.Draw ?: return
+        if (t.strokes.isNotEmpty() && (kind == DrawKind.HISTORY) != (t.kind == DrawKind.HISTORY)) {
+            // paint and history-paint are different operations: apply what was drawn first
+            applyTool(); openDraw(kind); return
+        }
+        _state.update { it.copy(tool = t.copy(kind = kind, eyedropper = false)) }
+    }
+
+    fun setBrush(b: BrushSettings) {
+        lastBrush = b
+        _state.update { s ->
+            when (val t = s.tool) {
+                is ToolState.Draw -> s.copy(tool = t.copy(brush = b))
+                is ToolState.Mask -> s.copy(tool = t.copy(brush = b))
+                else -> s
+            }
+        }
+    }
+
+    /** Adds a finished stroke (normalized points x,y,pressure) from the canvas. */
+    fun addStroke(points: FloatArray) {
+        when (val t = _state.value.tool) {
+            is ToolState.Draw -> {
+                val b = t.brush
+                val mode = when (t.kind) { DrawKind.MARKER -> StrokeMode.MARKER; DrawKind.ERASER -> StrokeMode.ERASE; else -> StrokeMode.PAINT }
+                val color = if (t.kind == DrawKind.MARKER) (b.color and 0x00FFFFFF) or 0xFF000000.toInt() else b.color
+                val opacity = if (t.kind == DrawKind.MARKER) b.opacity * 0.6f else b.opacity
+                val s = Stroke(points, b.size, b.hardness, opacity, color, mode, b.pressureSize, b.pressureOpacity)
+                _state.update { it.copy(tool = t.copy(strokes = t.strokes + s, redo = emptyList())) }
+                requestRender()
+            }
+            is ToolState.Mask -> {
+                val b = t.brush
+                val s = Stroke(points, b.size, b.hardness, 1f, 0xFFFFFFFF.toInt(), if (t.erasing) StrokeMode.ERASE else StrokeMode.PAINT, b.pressureSize, false)
+                _state.update { it.copy(tool = t.copy(strokes = t.strokes + s, redo = emptyList())) }
+                updateMaskOverlay()
+            }
+            else -> Unit
+        }
+    }
+
+    fun undoStroke() {
+        _state.update { s ->
+            when (val t = s.tool) {
+                is ToolState.Draw -> if (t.strokes.isEmpty()) s else s.copy(tool = t.copy(strokes = t.strokes.dropLast(1), redo = t.redo + t.strokes.last()))
+                is ToolState.Mask -> if (t.strokes.isEmpty()) s else s.copy(tool = t.copy(strokes = t.strokes.dropLast(1), redo = t.redo + t.strokes.last()))
+                else -> s
+            }
+        }
+        if (_state.value.tool is ToolState.Mask) updateMaskOverlay() else requestRender()
+    }
+
+    fun redoStroke() {
+        _state.update { s ->
+            when (val t = s.tool) {
+                is ToolState.Draw -> if (t.redo.isEmpty()) s else s.copy(tool = t.copy(strokes = t.strokes + t.redo.last(), redo = t.redo.dropLast(1)))
+                is ToolState.Mask -> if (t.redo.isEmpty()) s else s.copy(tool = t.copy(strokes = t.strokes + t.redo.last(), redo = t.redo.dropLast(1)))
+                else -> s
+            }
+        }
+        if (_state.value.tool is ToolState.Mask) updateMaskOverlay() else requestRender()
+    }
+
+    fun setEyedropper(on: Boolean) {
+        val t = _state.value.tool as? ToolState.Draw ?: return
+        _state.update { it.copy(tool = t.copy(eyedropper = on)) }
+    }
+
+    /** Eyedropper: samples the preview at normalized (x, y). */
+    fun sampleColor(x: Float, y: Float) {
+        val t = _state.value.tool as? ToolState.Draw ?: return
+        val p = lastPreview ?: return
+        val px = (x * p.width).toInt().coerceIn(0, p.width - 1); val py = (y * p.height).toInt().coerceIn(0, p.height - 1)
+        val c = p.pixels[py * p.width + px] or 0xFF000000.toInt()
+        lastBrush = t.brush.copy(color = c)
+        _state.update { it.copy(tool = t.copy(brush = lastBrush, eyedropper = false)) }
+    }
+
+    /**
+     * Earlier stages available to History Paint: (number of ops, label of the last op), only
+     * those with the same size as the current picture (as in the original).
+     */
+    fun historyStages(): List<Pair<Int, String>> {
+        val ops = doc.ops
+        val target = outputSize(ops)
+        return (0 until ops.size).filter { k -> outputSize(ops.subList(0, k)) == target }
+            .map { k -> k to (if (k == 0) "opened" else ops[k - 1].opId) }
+            .reversed()
+    }
+
+    fun setHistoryStage(stage: Int) {
+        val t = _state.value.tool as? ToolState.Draw ?: return
+        _state.update { it.copy(tool = t.copy(stage = stage)) }
+        requestRender()
+    }
+
+    // ------------------------------------------------------------------ masks
+
+    fun openMask(protect: Boolean) {
+        _state.update { it.copy(tool = ToolState.Mask(protect), selectedId = null) }
+        updateMaskOverlay()
+    }
+
+    fun updateMask(transform: (ToolState.Mask) -> ToolState.Mask) {
+        val t = _state.value.tool as? ToolState.Mask ?: return
+        _state.update { it.copy(tool = transform(t)) }
+        updateMaskOverlay()
+    }
+
+    private var overlayJob: Job? = null
+
+    /** Renders the mask as a translucent red (protected) / green (selected) overlay. */
+    private fun updateMaskOverlay() {
+        val t = _state.value.tool as? ToolState.Mask ?: return
+        val p = lastPreview ?: return
+        overlayJob?.cancel()
+        overlayJob = viewModelScope.launch(Dispatchers.Default) {
+            val w = p.width; val h = p.height
+            var m = StrokeRasterizer.maskCoverage(t.strokes, w, h, if (t.protect) 1f else 0f)
+            m = StrokeRasterizer.feather(m, w, h, (t.feather * minOf(w, h)).roundToInt())
+            val tint = if (t.protect) 0xE53935 else 0x43A047
+            val px = IntArray(w * h) { i ->
+                val v = if (t.invert) 1f - m[i] else m[i]
+                (((v * 0.55f) * 255).toInt().coerceIn(0, 255) shl 24) or tint
+            }
+            val bmp = Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888).asImageBitmap()
+            _state.update { it.copy(maskOverlay = bmp) }
+        }
+    }
+
+    /** Params carrying the painted mask, attached to the effect picked next. */
+    private fun maskParams(t: ToolState.Mask): Params = Params.EMPTY
+        .with(MaskParams.MODE, if (t.protect) "protect" else "select")
+        .with(MaskParams.STROKES, StrokeCodec.encode(t.strokes))
+        .with(MaskParams.INVERT, t.invert)
+        .with(MaskParams.FEATHER, t.feather)
+
+    /** Second step of the mask tool: open [op] with the painted mask attached. */
+    fun applyEffectWithMask(op: ImageOp) {
+        val t = _state.value.tool as? ToolState.Mask ?: return
+        val params = Params.of(op.params.defaults().asMap() + maskParams(t).asMap())
+        _state.update { it.copy(tool = ToolState.Adjust(op, params), before = it.preview, maskOverlay = null) }
+        requestRender()
+    }
 
     // ------------------------------------------------------------------ saving
 

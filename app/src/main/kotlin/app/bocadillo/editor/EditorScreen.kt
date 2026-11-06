@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.IosShare
@@ -79,6 +80,7 @@ private enum class Menu(val label: Int, val icon: ImageVector) {
     TEXT(R.string.menu_text, Icons.Filled.TextFields),
     BALLOON(R.string.menu_balloon, Icons.Filled.ChatBubble),
     STICKER(R.string.menu_sticker, Icons.Filled.EmojiEmotions),
+    DRAW(R.string.menu_draw, Icons.Filled.Brush),
     MORE(R.string.menu_more, Icons.Filled.MoreHoriz),
 }
 
@@ -169,6 +171,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                     crop = state.tool as? ToolState.Crop,
                     cropPixelSize = state.outputWidth to state.outputHeight,
                     onCropRect = vm::setCropRect,
+                    twoFingerNavigation = state.tool is ToolState.Draw || state.tool is ToolState.Mask,
                 ) { zoom ->
                     ObjectLayer(
                         objects = state.displayObjects(),
@@ -183,6 +186,17 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                         onCommit = vm::commitLive,
                         onTapSelected = vm::editSelected,
                     )
+                    when (val t = state.tool) {
+                        is ToolState.Draw -> DrawLayer(
+                            t.brush.size, androidx.compose.ui.graphics.Color(if (t.kind == DrawKind.ERASER) 0x88FFFFFF.toInt() else (t.brush.color and 0x00FFFFFF) or 0xAA000000.toInt()),
+                            t.eyedropper, null, vm::addStroke, vm::sampleColor,
+                        )
+                        is ToolState.Mask -> if (!t.choosingEffect) DrawLayer(
+                            t.brush.size, androidx.compose.ui.graphics.Color(if (t.protect) 0x88E53935.toInt() else 0x8843A047.toInt()),
+                            false, state.maskOverlay, vm::addStroke, { _, _ -> },
+                        )
+                        else -> Unit
+                    }
                 }
                 if (state.loading || state.exporting) CircularProgressIndicator(Modifier.align(Alignment.Center))
                 state.fatalError?.let { Text(it.text(context), Modifier.align(Alignment.Center).padding(24.dp), color = MaterialTheme.colorScheme.error) }
@@ -210,6 +224,17 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                             onPick = vm::pickSticker, onPickNoto = vm::pickNoto, onPickLibrary = { vm.placeLibrarySticker(it) }, onDeleteLibrary = vm::deleteLibrarySticker,
                             onImport = { stickerImages.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, onCancel = vm::cancelTool,
                         )
+                        is ToolState.Draw -> DrawPanel(
+                            t, vm.historyStages(), { id -> context.getString(Labels.op(id)) },
+                            onKind = vm::setDrawKind, onBrush = vm::setBrush, onStage = vm::setHistoryStage, onEyedropper = vm::setEyedropper,
+                            onUndo = vm::undoStroke, onRedo = vm::redoStroke, onApply = vm::applyTool, onCancel = vm::cancelTool,
+                        )
+                        is ToolState.Mask -> MaskPanel(
+                            t, app.registry.all.filter { (it.category == OpCategory.ADJUST || it.category == OpCategory.COLOR) && !it.geometric },
+                            { op -> context.getString(Labels.op(op.id)) },
+                            onUpdate = vm::updateMask, onBrush = vm::setBrush, onUndo = vm::undoStroke, onRedo = vm::redoStroke,
+                            onNext = vm::applyTool, onEffect = vm::applyEffectWithMask, onCancel = vm::cancelTool,
+                        )
                         is ToolState.StyleSticker -> StickerStylePanel(t, app.stickers, onChange = vm::updateDraft, onApply = vm::applyTool, onCancel = vm::cancelTool)
                         else -> state.selected?.let { sel ->
                             ObjectMenu(sel, state.stretchMode, ObjectActions(
@@ -225,7 +250,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                                 Menu.STICKER -> vm.openStickerPicker()
                                 else -> Unit
                             }
-                        }, app.registry.all, objRenderer, onBalloon = vm::newBalloon, onTool = { op ->
+                        }, app.registry.all, objRenderer, onBalloon = vm::newBalloon, onDraw = vm::openDraw, onMask = { vm.openMask(protect = false) }, onTool = { op ->
                             when (op.id) {
                                 TransformOps.Orient.id -> vm.openPanel(ToolState.Orient)
                                 TransformOps.Resize.id -> vm.openPanel(ToolState.Resize)
@@ -261,7 +286,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun MainMenu(menu: Menu, onMenu: (Menu) -> Unit, ops: List<ImageOp>, renderer: ObjectRenderer, onBalloon: (BalloonShape) -> Unit, onTool: (ImageOp) -> Unit, onRestore: () -> Unit) {
+private fun MainMenu(menu: Menu, onMenu: (Menu) -> Unit, ops: List<ImageOp>, renderer: ObjectRenderer, onBalloon: (BalloonShape) -> Unit, onDraw: (DrawKind) -> Unit, onMask: () -> Unit, onTool: (ImageOp) -> Unit, onRestore: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         if (menu == Menu.BALLOON) BalloonShapeRow(null, renderer, onBalloon)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -270,7 +295,12 @@ private fun MainMenu(menu: Menu, onMenu: (Menu) -> Unit, ops: List<ImageOp>, ren
                 Menu.COLOR -> ops.filter { it.category == OpCategory.COLOR }
                 Menu.TRANSFORM -> ops.filter { it.category == OpCategory.TRANSFORM }
                 Menu.MORE -> ops.filter { it.category == OpCategory.MODERN }
-                Menu.TEXT, Menu.BALLOON, Menu.STICKER -> emptyList()
+                Menu.TEXT, Menu.BALLOON, Menu.STICKER, Menu.DRAW -> emptyList()
+            }
+            if (menu == Menu.DRAW) {
+                for ((k, label) in listOf(DrawKind.BRUSH to R.string.brush, DrawKind.MARKER to R.string.marker, DrawKind.ERASER to R.string.eraser_transparent, DrawKind.HISTORY to R.string.history_paint))
+                    AssistChip(onClick = { onDraw(k) }, label = { Text(stringResource(label)) })
+                AssistChip(onClick = onMask, label = { Text(stringResource(R.string.mask_title)) })
             }
             if (menu == Menu.MORE) AssistChip(onClick = onRestore, label = { Text(stringResource(R.string.restore_original)) })
             for (op in tools) AssistChip(onClick = { onTool(op) }, label = { Text(stringResource(Labels.op(op.id))) })

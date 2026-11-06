@@ -6,7 +6,7 @@ import app.bocadillo.core.model.ParamSpec
 import app.bocadillo.core.model.Params
 
 /** Menu families. [ORIGINAL_*] mirror PicSay menus; [MODERN] holds added tools kept apart. */
-enum class OpCategory { ADJUST, TRANSFORM, COLOR, DISTORT, ARTISTIC, PHOTO, FRAMES, MISC, MODERN }
+enum class OpCategory { ADJUST, TRANSFORM, COLOR, DISTORT, ARTISTIC, PHOTO, FRAMES, MISC, DRAW, MODERN }
 
 /**
  * A raster operation. Implementations must be pure: never mutate [src] and return a new
@@ -54,7 +54,7 @@ class OpRegistry(ops: List<ImageOp>) {
     fun inCategory(c: OpCategory): List<ImageOp> = all.filter { it.category == c }
 
     companion object {
-        /** All ops implemented so far (stage 1–2: transforms + colour adjustments). */
-        fun default(): OpRegistry = OpRegistry(TransformOps.all + ColorOps.all)
+        /** All ops implemented so far (transforms, colour adjustments, painting). */
+        fun default(): OpRegistry = OpRegistry(TransformOps.all + ColorOps.all + PaintOps.all)
     }
 }
