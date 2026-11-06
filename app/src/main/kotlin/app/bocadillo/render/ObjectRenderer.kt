@@ -23,7 +23,10 @@ import app.bocadillo.core.model.StickerObject
 import app.bocadillo.core.model.TextAlign
 import app.bocadillo.core.model.TextObject
 import app.bocadillo.core.model.TextStyle
+import android.util.LruCache
 import app.bocadillo.data.FontRepository
+import app.bocadillo.data.NotoStickers
+import com.caverock.androidsvg.SVG
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
@@ -36,7 +39,7 @@ import kotlin.math.min
  *
  * All sizes derive from the canvas size: u = min(w, h).
  */
-class ObjectRenderer(private val fonts: FontRepository, private val catalog: StickerCatalog) {
+class ObjectRenderer(private val fonts: FontRepository, private val catalog: StickerCatalog, private val noto: NotoStickers) {
 
     /** Fonts and imported stickers of the open project. */
     var assets: Map<String, ByteArray> = emptyMap()
@@ -50,6 +53,8 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND }
     private val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    /** Parsed Noto SVGs, private to this renderer (SVG objects are not shared across threads). */
+    private val notoSvgs = LruCache<String, SVG>(48)
 
     fun drawAll(canvas: Canvas, objects: List<CanvasObject>, w: Float, h: Float) {
         for (o in objects) draw(canvas, o, w, h)
@@ -254,7 +259,11 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
 
     private fun drawSticker(c: Canvas, o: StickerObject, u: Float) {
         val (bw, bh) = stickerSize(o, u)
-        if (o.isVector) {
+        if (o.source.startsWith("noto:")) {
+            val id = o.source.removePrefix("noto:")
+            val svg = notoSvgs.get(id) ?: noto.load(id)?.also { notoSvgs.put(id, it) } ?: return
+            svg.renderToCanvas(c, RectF(-bw / 2, -bh / 2, bw / 2, bh / 2))
+        } else if (o.isVector) {
             val def = catalog[o.source.removePrefix("builtin:")] ?: return
             val s = min(bw / def.width, bh / def.height)
             c.save()

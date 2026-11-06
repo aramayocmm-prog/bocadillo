@@ -606,6 +606,23 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         _state.update { it.copy(libraryVersion = it.libraryVersion + 1) }
     }
 
+    /** Places (or replaces the selected sticker with) a Noto Emoji sticker. */
+    fun pickNoto(id: String) {
+        val replaceId = (_state.value.tool as? ToolState.PickSticker)?.replaceId
+        closeTool(render = false)
+        viewModelScope.launch {
+            val aspect = withContext(Dispatchers.Default) { app.noto.aspect(id) }
+            val replace = replaceId?.let { doc.objectById(it) as? StickerObject }
+            if (replace != null) {
+                commit(doc.updateObject(replace.copy(source = "noto:$id", aspect = aspect, colors = emptyList()), now()), "replace")
+            } else {
+                val o = StickerObject(newObjectId(), center(), "noto:$id", aspect = aspect)
+                _state.update { it.copy(selectedId = o.id) }
+                commit(doc.addObject(o, now()), "sticker")
+            }
+        }
+    }
+
     /** Imports a TTF/OTF into the font library. Returns the font reference via [onDone]. */
     fun importFont(uri: Uri, onDone: (String) -> Unit) {
         viewModelScope.launch {
@@ -635,7 +652,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     private fun composite(base: PixelBuffer, objects: List<CanvasObject>): Bitmap {
         val bmp = ImageIo.toMutableBitmap(base)
         if (objects.isNotEmpty()) {
-            val r = ObjectRenderer(app.fonts, app.stickers).also { it.assets = HashMap(assets) }
+            val r = ObjectRenderer(app.fonts, app.stickers, app.noto).also { it.assets = HashMap(assets) }
             r.drawAll(Canvas(bmp), objects, bmp.width.toFloat(), bmp.height.toFloat())
         }
         return bmp

@@ -1,0 +1,9 @@
+Emoji stickers: Noto Emoji, Copyright 2013 Google LLC.
+Licensed under the Apache License, Version 2.0 (LICENSE-APACHE-2.0.txt).
+https://github.com/googlefonts/noto-emoji
+Changes: SVG files were minified (whitespace/metadata removed, coordinates rounded to 2 decimals).
+
+Country flags: region-flags (via noto-emoji third_party), public domain or exempt from copyright
+(LICENSE-region-flags.txt).
+
+Emoji grouping/shortcodes: googlefonts/emoji-metadata, Apache License 2.0.

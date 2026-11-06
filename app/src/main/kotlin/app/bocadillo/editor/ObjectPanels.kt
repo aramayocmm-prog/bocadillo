@@ -84,6 +84,7 @@ import app.bocadillo.core.model.CanvasObject
 import app.bocadillo.core.model.StickerObject
 import app.bocadillo.core.model.TextAlign
 import app.bocadillo.data.FontOption
+import app.bocadillo.data.NotoStickers
 import app.bocadillo.render.ObjectRenderer
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -159,28 +160,64 @@ fun BalloonEditorPanel(
 @Composable
 fun StickerPickerPanel(
     catalog: StickerCatalog, renderer: ObjectRenderer, replacing: Boolean,
-    library: List<File>, onPick: (StickerDef) -> Unit, onPickLibrary: (File) -> Unit, onDeleteLibrary: (File) -> Unit,
+    library: List<File>, noto: NotoStickers,
+    onPick: (StickerDef) -> Unit, onPickNoto: (String) -> Unit, onPickLibrary: (File) -> Unit, onDeleteLibrary: (File) -> Unit,
     onImport: () -> Unit, onCancel: () -> Unit,
 ) {
-    // tab 0 = "My stickers", then the built-in categories
-    var cat by rememberSaveable { mutableIntStateOf(1) }
+    // tabs: 0 = My stickers · 1..n = built-in categories · then the Noto Emoji groups
+    val builtin = catalog.categories.size
+    var tab by rememberSaveable { mutableIntStateOf(1) }
+    var query by rememberSaveable { mutableStateOf("") }
     val lang = Locale.getDefault().language
     Column(Modifier.fillMaxWidth()) {
         PanelHeader(stringResource(if (replacing) R.string.sticker_replace else R.string.sticker_new), onCancel, onCancel)
-        TextButton(onClick = onImport, modifier = Modifier.padding(start = 8.dp)) { Text(stringResource(R.string.sticker_import_png)) }
-        ScrollableTabRow(selectedTabIndex = cat, edgePadding = 8.dp) {
-            Tab(cat == 0, { cat = 0 }, text = { Text(stringResource(R.string.my_stickers)) })
-            catalog.categories.forEachIndexed { i, c -> Tab(cat == i + 1, { cat = i + 1 }, text = { Text(c.name(lang)) }) }
+        Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                query, { query = it }, Modifier.weight(1f), singleLine = true,
+                placeholder = { Text(stringResource(R.string.sticker_search)) },
+            )
+            TextButton(onClick = onImport) { Text(stringResource(R.string.sticker_import_short)) }
         }
-        if (cat == 0) LibraryGrid(library, onPickLibrary, onDeleteLibrary)
-        else LazyVerticalGrid(GridCells.Adaptive(72.dp), Modifier.fillMaxWidth().height(260.dp).padding(8.dp)) {
-            items(catalog.categories[cat - 1].stickers, key = { it.id }) { def ->
-                Canvas(
-                    Modifier.padding(4.dp).aspectRatio(1f)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
-                        .clickable { onPick(def) }
-                        .padding(6.dp),
-                ) { drawIntoCanvas { renderer.drawStickerPreview(it.nativeCanvas, def, size.width, size.height) } }
+        val results = remember(query) { noto.search(query) }
+        if (query.trim().length >= 2) {
+            if (results.isEmpty()) Text(stringResource(R.string.sticker_search_none), Modifier.padding(16.dp))
+            else NotoGrid(results.map { it.id }, noto, onPickNoto)
+            return@Column
+        }
+        ScrollableTabRow(selectedTabIndex = tab, edgePadding = 8.dp) {
+            Tab(tab == 0, { tab = 0 }, text = { Text(stringResource(R.string.my_stickers)) })
+            catalog.categories.forEachIndexed { i, c -> Tab(tab == i + 1, { tab = i + 1 }, text = { Text(c.name(lang)) }) }
+            noto.groups.forEachIndexed { i, g -> Tab(tab == builtin + 1 + i, { tab = builtin + 1 + i }, text = { Text("😀 " + g.name(lang)) }) }
+        }
+        when {
+            tab == 0 -> LibraryGrid(library, onPickLibrary, onDeleteLibrary)
+            tab <= builtin -> LazyVerticalGrid(GridCells.Adaptive(72.dp), Modifier.fillMaxWidth().height(260.dp).padding(8.dp)) {
+                items(catalog.categories[tab - 1].stickers, key = { it.id }) { def ->
+                    Canvas(
+                        Modifier.padding(4.dp).aspectRatio(1f)
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
+                            .clickable { onPick(def) }
+                            .padding(6.dp),
+                    ) { drawIntoCanvas { renderer.drawStickerPreview(it.nativeCanvas, def, size.width, size.height) } }
+                }
+            }
+            else -> NotoGrid(noto.groups[tab - builtin - 1].items.map { it.id }, noto, onPickNoto)
+        }
+        Text(stringResource(R.string.noto_credit), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp))
+    }
+}
+
+/** Grid of Noto Emoji; thumbnails are rendered off the main thread and cached. */
+@Composable
+private fun NotoGrid(ids: List<String>, noto: NotoStickers, onPick: (String) -> Unit) {
+    val px = with(androidx.compose.ui.platform.LocalDensity.current) { 56.dp.roundToPx() }
+    LazyVerticalGrid(GridCells.Adaptive(64.dp), Modifier.fillMaxWidth().height(260.dp).padding(8.dp)) {
+        items(ids, key = { it }) { id ->
+            val bmp by produceState<ImageBitmap?>(null, id) {
+                value = withContext(Dispatchers.Default) { noto.thumbnail(id, px)?.asImageBitmap() }
+            }
+            Box(Modifier.padding(4.dp).aspectRatio(1f).clip(RoundedCornerShape(10.dp)).clickable { onPick(id) }.padding(4.dp)) {
+                bmp?.let { Image(it, null, Modifier.fillMaxWidth().aspectRatio(1f)) }
             }
         }
     }

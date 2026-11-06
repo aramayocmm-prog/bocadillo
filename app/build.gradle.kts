@@ -70,6 +70,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons)
     implementation(libs.androidx.exifinterface)
+    implementation(libs.androidsvg) // Apache 2.0 — renders the Noto Emoji SVG stickers
     implementation(libs.kotlinx.coroutines.android)
     debugImplementation(libs.androidx.compose.ui.tooling)
 

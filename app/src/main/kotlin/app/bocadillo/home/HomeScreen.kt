@@ -26,6 +26,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.CropFree
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -88,6 +93,7 @@ fun HomeScreen(vm: HomeViewModel, onOpen: (String) -> Unit) {
     var deleteId by remember { mutableStateOf<String?>(null) }
     var cameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     val untitled = stringResource(R.string.untitled)
+    var aboutOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(vm) { vm.openProject.collect { onOpen(it) } }
     LaunchedEffect(vm) { vm.messages.collect { snackbar.showSnackbar(it.text(context)) } }
@@ -101,7 +107,12 @@ fun HomeScreen(vm: HomeViewModel, onOpen: (String) -> Unit) {
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.app_name)) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.app_name)) },
+                actions = { IconButton(onClick = { aboutOpen = true }) { Icon(Icons.Filled.Info, stringResource(R.string.licenses)) } },
+            )
+        },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
@@ -163,6 +174,20 @@ fun HomeScreen(vm: HomeViewModel, onOpen: (String) -> Unit) {
             text = { Text(stringResource(R.string.delete_confirm_message)) },
             confirmButton = { TextButton(onClick = { vm.delete(id); deleteId = null }) { Text(stringResource(R.string.action_delete)) } },
             dismissButton = { TextButton(onClick = { deleteId = null }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+    if (aboutOpen) {
+        val text = remember {
+            listOf("fonts/CREDITS.txt", "noto/NOTICE.txt").joinToString("\n\n") { path ->
+                runCatching { context.assets.open(path).bufferedReader().use { it.readText() } }.getOrDefault("")
+            } + "\n\nAndroidSVG (com.caverock:androidsvg) — Apache License 2.0.\n" +
+                "Full license texts: assets/fonts/OFL.txt, assets/noto/LICENSE-APACHE-2.0.txt, assets/noto/LICENSE-region-flags.txt."
+        }
+        AlertDialog(
+            onDismissRequest = { aboutOpen = false },
+            title = { Text(stringResource(R.string.licenses)) },
+            text = { Text(text, Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), style = MaterialTheme.typography.bodySmall) },
+            confirmButton = { TextButton(onClick = { aboutOpen = false }) { Text(stringResource(R.string.close)) } },
         )
     }
     if (blankDialog) BlankDialog(onDismiss = { blankDialog = false }) { w, h, c ->

@@ -120,7 +120,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
     }
 
     // Objects renderer shared by the canvas and the pickers (UI thread only).
-    val objRenderer = remember { ObjectRenderer(app.fonts, app.stickers) }
+    val objRenderer = remember { ObjectRenderer(app.fonts, app.stickers, app.noto) }
     remember(state.assetsVersion) { objRenderer.assets = vm.assetsSnapshot(); 0 }
     val fonts = remember(state.assetsVersion) { app.fonts.all() }
     val typeface = { ref: String -> app.fonts.typeface(ref, false, false, objRenderer.assets) }
@@ -206,8 +206,8 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                             onApply = vm::applyTool, onCancel = vm::cancelTool,
                         )
                         is ToolState.PickSticker -> StickerPickerPanel(
-                            app.stickers, objRenderer, t.replaceId != null, library,
-                            onPick = vm::pickSticker, onPickLibrary = { vm.placeLibrarySticker(it) }, onDeleteLibrary = vm::deleteLibrarySticker,
+                            app.stickers, objRenderer, t.replaceId != null, library, app.noto,
+                            onPick = vm::pickSticker, onPickNoto = vm::pickNoto, onPickLibrary = { vm.placeLibrarySticker(it) }, onDeleteLibrary = vm::deleteLibrarySticker,
                             onImport = { stickerImages.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, onCancel = vm::cancelTool,
                         )
                         is ToolState.StyleSticker -> StickerStylePanel(t, app.stickers, onChange = vm::updateDraft, onApply = vm::applyTool, onCancel = vm::cancelTool)

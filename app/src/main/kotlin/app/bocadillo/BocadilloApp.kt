@@ -5,6 +5,7 @@ import app.bocadillo.core.imaging.ops.OpRegistry
 import app.bocadillo.core.imaging.objects.StickerCatalog
 import app.bocadillo.data.ExportRepository
 import app.bocadillo.data.FontRepository
+import app.bocadillo.data.NotoStickers
 import app.bocadillo.data.PhraseRepository
 import app.bocadillo.data.ProjectRepository
 import app.bocadillo.data.StickerLibrary
@@ -24,6 +25,8 @@ class BocadilloApp : Application() {
         private set
     lateinit var stickerLibrary: StickerLibrary
         private set
+    lateinit var noto: NotoStickers
+        private set
     val registry: OpRegistry by lazy { OpRegistry.default() }
 
     /** Built-in vector stickers (assets/stickers/catalog.json). */
@@ -41,5 +44,6 @@ class BocadilloApp : Application() {
         fonts = FontRepository(this)
         phrases = PhraseRepository(this)
         stickerLibrary = StickerLibrary(this)
+        noto = NotoStickers(this)
     }
 }

@@ -221,4 +221,10 @@
     <string name="my_stickers_empty">Import pictures (transparent PNG works best) to build your own sticker collection. You can pick many at once.</string>
     <string name="my_stickers_delete">Delete this sticker from My stickers?</string>
     <string name="stickers_imported">%1$d stickers added to My stickers</string>
+    <string name="sticker_search">Search emoji (English: cat, heart…)</string>
+    <string name="sticker_import_short">Import…</string>
+    <string name="sticker_search_none">No emoji found</string>
+    <string name="noto_credit">Emoji: Noto Emoji © Google, Apache License 2.0</string>
+    <string name="about">About</string>
+    <string name="licenses">Licenses and credits</string>
 </resources>
