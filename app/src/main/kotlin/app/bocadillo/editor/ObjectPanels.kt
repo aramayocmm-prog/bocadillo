@@ -204,10 +204,10 @@ class ObjectActions(
 fun ObjectMenu(o: CanvasObject, stretchMode: Boolean, a: ObjectActions) {
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Chip(Icons.Filled.Edit, R.string.edit, a.edit)
-            if (o is StickerObject) Chip(Icons.Filled.SwapHoriz, R.string.replace, a.replace)
-            Chip(Icons.Filled.ContentCopy, R.string.action_duplicate, a.duplicate)
-            Chip(Icons.Filled.Delete, R.string.action_delete, a.delete)
+            Chip(Icons.Filled.Edit, R.string.edit, onClick = a.edit)
+            if (o is StickerObject) Chip(Icons.Filled.SwapHoriz, R.string.replace, onClick = a.replace)
+            Chip(Icons.Filled.ContentCopy, R.string.action_duplicate, onClick = a.duplicate)
+            Chip(Icons.Filled.Delete, R.string.action_delete, onClick = a.delete)
             Chip(Icons.Filled.FlipToFront, R.string.bring_to_front) { a.arrange(Arrange.FRONT) }
             Chip(Icons.Filled.KeyboardArrowUp, R.string.bring_forward) { a.arrange(Arrange.FORWARD) }
             Chip(Icons.Filled.KeyboardArrowDown, R.string.send_backward) { a.arrange(Arrange.BACKWARD) }
@@ -215,7 +215,7 @@ fun ObjectMenu(o: CanvasObject, stretchMode: Boolean, a: ObjectActions) {
             Chip(Icons.Filled.Flip, R.string.flip_h) { a.flip(true) }
             Chip(Icons.Filled.Flip, R.string.flip_v, rotate = true) { a.flip(false) }
             FilterChip(stretchMode, a.toggleStretch, label = { Text(stringResource(R.string.transform_stretch)) }, leadingIcon = { Icon(Icons.Filled.OpenInFull, null) })
-            Chip(Icons.Filled.Restore, R.string.transform_reset, a.reset)
+            Chip(Icons.Filled.Restore, R.string.transform_reset, onClick = a.reset)
             TextButton(onClick = a.done) { Text(stringResource(R.string.done)) }
         }
         Row(Modifier.padding(horizontal = 16.dp)) {
