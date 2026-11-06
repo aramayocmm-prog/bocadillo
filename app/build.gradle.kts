@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -20,7 +22,7 @@ android {
         // Release signing is configured from keystore.properties (never committed). See docs/BUILD.md.
         val propsFile = rootProject.file("keystore.properties")
         if (propsFile.exists()) {
-            val props = java.util.Properties().apply { propsFile.inputStream().use { load(it) } }
+            val props = Properties().apply { propsFile.inputStream().use { load(it) } }
             create("release") {
                 storeFile = rootProject.file(props.getProperty("storeFile"))
                 storePassword = props.getProperty("storePassword")
