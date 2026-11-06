@@ -14,8 +14,8 @@ android {
         applicationId = "app.bocadillo"
         minSdk = 29          // Android 10
         targetSdk = 35       // Android 15
-        versionCode = 1
-        versionName = "0.2.0-stage2"
+        versionCode = 4
+        versionName = "0.3.1-stage3"
     }
 
     signingConfigs {

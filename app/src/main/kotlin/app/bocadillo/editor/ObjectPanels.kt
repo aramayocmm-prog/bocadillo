@@ -189,10 +189,15 @@ fun StickerPickerPanel(
             catalog.categories.forEachIndexed { i, c -> Tab(tab == i + 1, { tab = i + 1 }, text = { Text(c.name(lang)) }) }
             noto.groups.forEachIndexed { i, g -> Tab(tab == builtin + 1 + i, { tab = builtin + 1 + i }, text = { Text("😀 " + g.name(lang)) }) }
         }
+        // Resolve the list here, not inside the lazy grid: the grid's content lambda can be
+        // re-evaluated with the new tab index before it leaves the composition.
+        val current = tab
+        val builtinList = if (current in 1..builtin) catalog.categories[current - 1].stickers else emptyList()
+        val notoIds = noto.groups.getOrNull(current - builtin - 1)?.items?.map { it.id } ?: emptyList()
         when {
-            tab == 0 -> LibraryGrid(library, onPickLibrary, onDeleteLibrary)
-            tab <= builtin -> LazyVerticalGrid(GridCells.Adaptive(72.dp), Modifier.fillMaxWidth().height(260.dp).padding(8.dp)) {
-                items(catalog.categories[tab - 1].stickers, key = { it.id }) { def ->
+            current == 0 -> LibraryGrid(library, onPickLibrary, onDeleteLibrary)
+            current <= builtin -> LazyVerticalGrid(GridCells.Adaptive(72.dp), Modifier.fillMaxWidth().height(260.dp).padding(8.dp)) {
+                items(builtinList, key = { it.id }) { def ->
                     Canvas(
                         Modifier.padding(4.dp).aspectRatio(1f)
                             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
@@ -201,7 +206,7 @@ fun StickerPickerPanel(
                     ) { drawIntoCanvas { renderer.drawStickerPreview(it.nativeCanvas, def, size.width, size.height) } }
                 }
             }
-            else -> NotoGrid(noto.groups[tab - builtin - 1].items.map { it.id }, noto, onPickNoto)
+            else -> NotoGrid(notoIds, noto, onPickNoto)
         }
         Text(stringResource(R.string.noto_credit), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp))
     }
