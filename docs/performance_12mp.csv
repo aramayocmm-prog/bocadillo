@@ -1,0 +1,16 @@
+op;ms (JVM, 2 cores)
+crop;262;3200x2400
+resize;0;300x150
+orient;52;3000x4000
+rotate;491;4893x4409
+brightness;82;4000x3000
+exposure_contrast;45;4000x3000
+saturation;92;4000x3000
+temperature_tint;45;4000x3000
+hue;97;4000x3000
+colorize;158;4000x3000
+invert;82;4000x3000
+sepia;80;4000x3000
+lanczos_downscale_4000x3000_to_2000x1500;431;2000x1500
+lanczos_preview_proxy_to_1000x750;324
+pipeline_8_colour_ops_preview_1000x750;32

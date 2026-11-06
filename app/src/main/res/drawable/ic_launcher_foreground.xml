@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- balloon body + tail -->
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M34,32h40a10,10 0 0 1 10,10v22a10,10 0 0 1 -10,10H52l-12,10l2,-10h-8a10,10 0 0 1 -10,-10V42a10,10 0 0 1 10,-10z" />
+    <!-- picture inside the balloon: sun and hills -->
+    <path android:fillColor="#FFFFB020" android:pathData="M68,46m-5,0a5,5 0 1 0 10,0a5,5 0 1 0 -10,0" />
+    <path android:fillColor="#FF1F6FEB"
+        android:pathData="M30,66l12,-14l9,10l7,-7l14,11v0a4,4 0 0 1 -4,4H34a4,4 0 0 1 -4,-4z" />
+</vector>
