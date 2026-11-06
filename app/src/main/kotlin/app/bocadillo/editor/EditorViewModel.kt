@@ -59,7 +59,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.UUID
@@ -121,6 +120,8 @@ data class EditorUiState(
     val assetsVersion: Int = 0,
     /** Capture date from EXIF (ms), for "Insert date and time". */
     val photoDate: Long? = null,
+    /** Bumped when "My stickers" changes. */
+    val libraryVersion: Int = 0,
 ) {
     /** Objects to draw: drafts of the open object tool replace (or are added to) the list. */
     fun displayObjects(): List<CanvasObject> {
@@ -549,36 +550,60 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         }
     }
 
-    /** Imports a picture (ideally a transparent PNG) as a sticker. */
-    fun importStickerImage(uri: Uri) {
+    /**
+     * Imports pictures (ideally transparent PNGs) into "My stickers". With a single picture it is
+     * also placed on the canvas (or replaces the selected sticker).
+     */
+    fun importStickerImages(uris: List<Uri>) {
+        if (uris.isEmpty()) return
         val replaceId = (_state.value.tool as? ToolState.PickSticker)?.replaceId
+        viewModelScope.launch {
+            var last: java.io.File? = null
+            var failed = 0
+            withContext(Dispatchers.IO) {
+                for (uri in uris) {
+                    try {
+                        val imported = ImageIo.read(app.contentResolver, uri)
+                        val dec = ImageIo.decode(imported.bytes, maxSide = 1024)
+                        last = app.stickerLibrary.add(dec.bitmap)
+                        dec.bitmap.recycle()
+                    } catch (e: Exception) { failed++ }
+                }
+            }
+            _state.update { it.copy(libraryVersion = it.libraryVersion + 1) }
+            if (failed > 0) _messages.send(UiMessage.Res(R.string.error_import))
+            if (uris.size == 1) last?.let { placeLibrarySticker(it, replaceId) }
+            else _messages.send(UiMessage.Res(R.string.stickers_imported, listOf(uris.size - failed)))
+        }
+    }
+
+    /** Places a "My stickers" picture: copies it into the project assets and adds the object. */
+    fun placeLibrarySticker(file: java.io.File, replaceId: String? = (_state.value.tool as? ToolState.PickSticker)?.replaceId) {
         closeTool(render = false)
         viewModelScope.launch {
-            try {
-                val (png, aspect) = withContext(Dispatchers.IO) {
-                    val imported = ImageIo.read(app.contentResolver, uri)
-                    val dec = ImageIo.decode(imported.bytes, maxSide = 1024)
-                    val aspect = dec.bitmap.width.toFloat() / dec.bitmap.height
-                    val out = ByteArrayOutputStream()
-                    dec.bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-                    dec.bitmap.recycle()
-                    out.toByteArray() to aspect
-                }
-                val path = "stickers/${UUID.randomUUID()}.png"
-                assets[path] = png
-                bumpAssets()
-                val replace = replaceId?.let { doc.objectById(it) as? StickerObject }
-                if (replace != null) {
-                    commit(doc.updateObject(replace.copy(source = "asset:$path", aspect = aspect, colors = emptyList()), now()), "replace")
-                } else {
-                    val o = StickerObject(newObjectId(), center(), "asset:$path", aspect = aspect)
-                    _state.update { it.copy(selectedId = o.id) }
-                    commit(doc.addObject(o, now()), "sticker")
-                }
-            } catch (e: Exception) {
-                _messages.send(UiMessage.Res(R.string.error_import))
+            val bytes = withContext(Dispatchers.IO) { runCatching { file.readBytes() }.getOrNull() } ?: return@launch
+            val aspect = withContext(Dispatchers.Default) {
+                val o = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, o)
+                if (o.outWidth > 0 && o.outHeight > 0) o.outWidth.toFloat() / o.outHeight else 1f
+            }
+            val path = "stickers/${file.name}"
+            assets[path] = bytes
+            bumpAssets()
+            val replace = replaceId?.let { doc.objectById(it) as? StickerObject }
+            if (replace != null) {
+                commit(doc.updateObject(replace.copy(source = "asset:$path", aspect = aspect, colors = emptyList()), now()), "replace")
+            } else {
+                val o = StickerObject(newObjectId(), center(), "asset:$path", aspect = aspect)
+                _state.update { it.copy(selectedId = o.id) }
+                commit(doc.addObject(o, now()), "sticker")
             }
         }
+    }
+
+    fun deleteLibrarySticker(file: java.io.File) {
+        app.stickerLibrary.delete(file)
+        _state.update { it.copy(libraryVersion = it.libraryVersion + 1) }
     }
 
     /** Imports a TTF/OTF into the font library. Returns the font reference via [onDone]. */

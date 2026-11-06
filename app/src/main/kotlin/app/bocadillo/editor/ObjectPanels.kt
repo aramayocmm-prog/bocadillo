@@ -1,7 +1,27 @@
 package app.bocadillo.editor
 
 import android.graphics.Typeface
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.material3.AlertDialog
+import app.bocadillo.core.model.ObjectTransform
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -80,6 +100,7 @@ fun balloonShapeLabel(s: BalloonShape) = when (s) {
 @Composable
 fun BalloonEditorPanel(
     tool: ToolState.EditBalloon,
+    renderer: ObjectRenderer,
     fonts: List<FontOption>,
     typeface: (String) -> Typeface,
     onChange: (BalloonObject) -> Unit,
@@ -97,9 +118,7 @@ fun BalloonEditorPanel(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
             placeholder = { Text(stringResource(R.string.hint_text)) }, maxLines = 4,
         )
-        Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            for (s in BalloonShape.entries) FilterChip(b.shape == s, { onChange(b.copy(shape = s)) }, label = { Text(stringResource(balloonShapeLabel(s))) })
-        }
+        BalloonShapeRow(b.shape, renderer) { onChange(b.copy(shape = it)) }
         ScrollableTabRow(selectedTabIndex = tab, edgePadding = 8.dp) {
             listOf(R.string.tab_balloon, R.string.tab_font, R.string.tab_text).forEachIndexed { i, l -> Tab(tab == i, { tab = i }, text = { Text(stringResource(l)) }) }
         }
@@ -138,17 +157,24 @@ fun BalloonEditorPanel(
 }
 
 @Composable
-fun StickerPickerPanel(catalog: StickerCatalog, renderer: ObjectRenderer, replacing: Boolean, onPick: (StickerDef) -> Unit, onImport: () -> Unit, onCancel: () -> Unit) {
-    var cat by rememberSaveable { mutableIntStateOf(0) }
+fun StickerPickerPanel(
+    catalog: StickerCatalog, renderer: ObjectRenderer, replacing: Boolean,
+    library: List<File>, onPick: (StickerDef) -> Unit, onPickLibrary: (File) -> Unit, onDeleteLibrary: (File) -> Unit,
+    onImport: () -> Unit, onCancel: () -> Unit,
+) {
+    // tab 0 = "My stickers", then the built-in categories
+    var cat by rememberSaveable { mutableIntStateOf(1) }
     val lang = Locale.getDefault().language
     Column(Modifier.fillMaxWidth()) {
         PanelHeader(stringResource(if (replacing) R.string.sticker_replace else R.string.sticker_new), onCancel, onCancel)
         TextButton(onClick = onImport, modifier = Modifier.padding(start = 8.dp)) { Text(stringResource(R.string.sticker_import_png)) }
         ScrollableTabRow(selectedTabIndex = cat, edgePadding = 8.dp) {
-            catalog.categories.forEachIndexed { i, c -> Tab(cat == i, { cat = i }, text = { Text(c.name(lang)) }) }
+            Tab(cat == 0, { cat = 0 }, text = { Text(stringResource(R.string.my_stickers)) })
+            catalog.categories.forEachIndexed { i, c -> Tab(cat == i + 1, { cat = i + 1 }, text = { Text(c.name(lang)) }) }
         }
-        LazyVerticalGrid(GridCells.Adaptive(72.dp), Modifier.fillMaxWidth().height(260.dp).padding(8.dp)) {
-            items(catalog.categories[cat].stickers, key = { it.id }) { def ->
+        if (cat == 0) LibraryGrid(library, onPickLibrary, onDeleteLibrary)
+        else LazyVerticalGrid(GridCells.Adaptive(72.dp), Modifier.fillMaxWidth().height(260.dp).padding(8.dp)) {
+            items(catalog.categories[cat - 1].stickers, key = { it.id }) { def ->
                 Canvas(
                     Modifier.padding(4.dp).aspectRatio(1f)
                         .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
@@ -227,4 +253,65 @@ fun ObjectMenu(o: CanvasObject, stretchMode: Boolean, a: ObjectActions) {
 @Composable
 private fun Chip(icon: ImageVector, label: Int, rotate: Boolean = false, onClick: () -> Unit) {
     AssistChip(onClick = onClick, label = { Text(stringResource(label)) }, leadingIcon = { Icon(icon, null, Modifier.rotate(if (rotate) 90f else 0f)) })
+}
+
+
+/** Drawn preview of a balloon shape, tail included (used to pick the shape). */
+@Composable
+fun BalloonShapeTile(shape: BalloonShape, renderer: ObjectRenderer, selected: Boolean, onClick: () -> Unit) {
+    val sample = remember(shape) {
+        BalloonObject("tile", ObjectTransform(0.5f, 0.36f), shape, width = 0.82f, height = 0.5f, tailX = -0.16f, tailY = 0.44f, strokeWidth = 0.035f)
+    }
+    Column(
+        Modifier.width(78.dp).clip(RoundedCornerShape(10.dp))
+            .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(onClick = onClick).padding(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Canvas(Modifier.size(70.dp, 58.dp)) {
+            drawIntoCanvas { renderer.draw(it.nativeCanvas, sample, size.width, size.height) }
+        }
+        Text(stringResource(balloonShapeLabel(shape)), style = MaterialTheme.typography.labelSmall, maxLines = 1)
+    }
+}
+
+@Composable
+fun BalloonShapeRow(selected: BalloonShape?, renderer: ObjectRenderer, onPick: (BalloonShape) -> Unit) {
+    Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (sh in BalloonShape.entries) BalloonShapeTile(sh, renderer, sh == selected) { onPick(sh) }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun LibraryGrid(files: List<File>, onPick: (File) -> Unit, onDelete: (File) -> Unit) {
+    var confirm by remember { mutableStateOf<File?>(null) }
+    if (files.isEmpty()) {
+        Text(stringResource(R.string.my_stickers_empty), Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
+        return
+    }
+    LazyVerticalGrid(GridCells.Adaptive(72.dp), Modifier.fillMaxWidth().height(260.dp).padding(8.dp)) {
+        items(files, key = { it.name }) { f ->
+            val bmp by produceState<ImageBitmap?>(null, f) {
+                value = withContext(Dispatchers.IO) {
+                    val o = BitmapFactory.Options().apply { inSampleSize = 4 }
+                    BitmapFactory.decodeFile(f.path, o)?.asImageBitmap()
+                }
+            }
+            Box(
+                Modifier.padding(4.dp).aspectRatio(1f)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
+                    .combinedClickable(onClick = { onPick(f) }, onLongClick = { confirm = f })
+                    .padding(6.dp),
+            ) { bmp?.let { Image(it, null, Modifier.fillMaxWidth().aspectRatio(1f), contentScale = ContentScale.Fit) } }
+        }
+    }
+    confirm?.let { f ->
+        AlertDialog(
+            onDismissRequest = { confirm = null },
+            title = { Text(stringResource(R.string.my_stickers_delete)) },
+            confirmButton = { TextButton(onClick = { onDelete(f); confirm = null }) { Text(stringResource(R.string.action_delete)) } },
+            dismissButton = { TextButton(onClick = { confirm = null }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
 }

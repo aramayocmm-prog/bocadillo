@@ -187,7 +187,7 @@
     <string name="balloon_tail_hint">Tip: drag the green dot on the picture to move the pointer.</string>
     <string name="sticker_new">New sticker</string>
     <string name="sticker_replace">Replace sticker</string>
-    <string name="sticker_import_png">Import picture (transparent PNG)…</string>
+    <string name="sticker_import_png">Import pictures (transparent PNG)…</string>
     <string name="sticker_set_style">Sticker style</string>
     <string name="color_main">Main color</string>
     <string name="color_secondary">Secondary color</string>
@@ -217,4 +217,8 @@
         <item>Happy New Year</item>
         <item>Congratulations!</item>
     </string-array>
+    <string name="my_stickers">My stickers</string>
+    <string name="my_stickers_empty">Import pictures (transparent PNG works best) to build your own sticker collection. You can pick many at once.</string>
+    <string name="my_stickers_delete">Delete this sticker from My stickers?</string>
+    <string name="stickers_imported">%1$d stickers added to My stickers</string>
 </resources>

@@ -134,9 +134,10 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
             }
         }
     }
-    val stickerImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) vm.importStickerImage(uri)
+    val stickerImages = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(50)) { uris ->
+        vm.importStickerImages(uris)
     }
+    val library = remember(state.libraryVersion) { app.stickerLibrary.list() }
     val phraseOps = remember {
         PhraseOps(
             add = { p -> app.phrases.add(p).also { phrasesVersion++ } },
@@ -200,12 +201,15 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                             onApply = vm::applyTool, onCancel = vm::cancelTool,
                         )
                         is ToolState.EditBalloon -> BalloonEditorPanel(
-                            t, fonts, typeface, onChange = vm::updateDraft,
+                            t, objRenderer, fonts, typeface, onChange = vm::updateDraft,
                             onImportFont = { fontPicker.launch(arrayOf("font/*", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream")) },
                             onApply = vm::applyTool, onCancel = vm::cancelTool,
                         )
-                        is ToolState.PickSticker -> StickerPickerPanel(app.stickers, objRenderer, t.replaceId != null, onPick = vm::pickSticker,
-                            onImport = { stickerImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, onCancel = vm::cancelTool)
+                        is ToolState.PickSticker -> StickerPickerPanel(
+                            app.stickers, objRenderer, t.replaceId != null, library,
+                            onPick = vm::pickSticker, onPickLibrary = { vm.placeLibrarySticker(it) }, onDeleteLibrary = vm::deleteLibrarySticker,
+                            onImport = { stickerImages.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, onCancel = vm::cancelTool,
+                        )
                         is ToolState.StyleSticker -> StickerStylePanel(t, app.stickers, onChange = vm::updateDraft, onApply = vm::applyTool, onCancel = vm::cancelTool)
                         else -> state.selected?.let { sel ->
                             ObjectMenu(sel, state.stretchMode, ObjectActions(
@@ -221,7 +225,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                                 Menu.STICKER -> vm.openStickerPicker()
                                 else -> Unit
                             }
-                        }, app.registry.all, onBalloon = vm::newBalloon, onTool = { op ->
+                        }, app.registry.all, objRenderer, onBalloon = vm::newBalloon, onTool = { op ->
                             when (op.id) {
                                 TransformOps.Orient.id -> vm.openPanel(ToolState.Orient)
                                 TransformOps.Resize.id -> vm.openPanel(ToolState.Resize)
@@ -257,8 +261,9 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun MainMenu(menu: Menu, onMenu: (Menu) -> Unit, ops: List<ImageOp>, onBalloon: (BalloonShape) -> Unit, onTool: (ImageOp) -> Unit, onRestore: () -> Unit) {
+private fun MainMenu(menu: Menu, onMenu: (Menu) -> Unit, ops: List<ImageOp>, renderer: ObjectRenderer, onBalloon: (BalloonShape) -> Unit, onTool: (ImageOp) -> Unit, onRestore: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        if (menu == Menu.BALLOON) BalloonShapeRow(null, renderer, onBalloon)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val tools: List<ImageOp> = when (menu) {
                 Menu.ADJUST -> ops.filter { it.category == OpCategory.ADJUST }
@@ -266,9 +271,6 @@ private fun MainMenu(menu: Menu, onMenu: (Menu) -> Unit, ops: List<ImageOp>, onB
                 Menu.TRANSFORM -> ops.filter { it.category == OpCategory.TRANSFORM }
                 Menu.MORE -> ops.filter { it.category == OpCategory.MODERN }
                 Menu.TEXT, Menu.BALLOON, Menu.STICKER -> emptyList()
-            }
-            if (menu == Menu.BALLOON) for (shape in BalloonShape.entries) {
-                AssistChip(onClick = { onBalloon(shape) }, label = { Text(stringResource(balloonShapeLabel(shape))) })
             }
             if (menu == Menu.MORE) AssistChip(onClick = onRestore, label = { Text(stringResource(R.string.restore_original)) })
             for (op in tools) AssistChip(onClick = { onTool(op) }, label = { Text(stringResource(Labels.op(op.id))) })

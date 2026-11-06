@@ -7,6 +7,7 @@ import app.bocadillo.data.ExportRepository
 import app.bocadillo.data.FontRepository
 import app.bocadillo.data.PhraseRepository
 import app.bocadillo.data.ProjectRepository
+import app.bocadillo.data.StickerLibrary
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +21,8 @@ class BocadilloApp : Application() {
     lateinit var fonts: FontRepository
         private set
     lateinit var phrases: PhraseRepository
+        private set
+    lateinit var stickerLibrary: StickerLibrary
         private set
     val registry: OpRegistry by lazy { OpRegistry.default() }
 
@@ -37,5 +40,6 @@ class BocadilloApp : Application() {
         exports = ExportRepository(this)
         fonts = FontRepository(this)
         phrases = PhraseRepository(this)
+        stickerLibrary = StickerLibrary(this)
     }
 }

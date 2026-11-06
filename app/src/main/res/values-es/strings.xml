@@ -187,7 +187,7 @@
     <string name="balloon_tail_hint">Consejo: arrastra el punto verde sobre la imagen para mover el puntero.</string>
     <string name="sticker_new">Nuevo sticker</string>
     <string name="sticker_replace">Sustituir sticker</string>
-    <string name="sticker_import_png">Importar imagen (PNG transparente)…</string>
+    <string name="sticker_import_png">Importar imágenes (PNG transparente)…</string>
     <string name="sticker_set_style">Estilo del sticker</string>
     <string name="color_main">Color principal</string>
     <string name="color_secondary">Color secundario</string>
@@ -217,4 +217,8 @@
         <item>Feliz Año Nuevo</item>
         <item>¡Felicidades!</item>
     </string-array>
+    <string name="my_stickers">Mis stickers</string>
+    <string name="my_stickers_empty">Importa imágenes (mejor PNG transparentes) para crear tu colección de stickers. Puedes elegir muchas a la vez.</string>
+    <string name="my_stickers_delete">¿Eliminar este sticker de Mis stickers?</string>
+    <string name="stickers_imported">%1$d stickers añadidos a Mis stickers</string>
 </resources>
