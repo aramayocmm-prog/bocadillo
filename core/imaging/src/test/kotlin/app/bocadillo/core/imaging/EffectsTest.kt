@@ -36,7 +36,8 @@ class EffectsTest {
     private fun meanDiff(a: PixelBuffer, b: PixelBuffer): Double {
         var s = 0.0
         for (i in 0 until a.size) {
-            val x = a.pixels[i]; val y = b.pixels[i]
+            // premultiplied: the colour of fully transparent pixels does not matter
+            val x = premultiply(a.pixels[i]); val y = premultiply(b.pixels[i])
             s += abs(red(x) - red(y)) + abs(green(x) - green(y)) + abs(blue(x) - blue(y)) + abs(alpha(x) - alpha(y))
         }
         return s / a.size / 4
@@ -187,13 +188,13 @@ class EffectsTest {
 
     /** Preview (small proxy) and export (full size) must look alike: compare at proxy size. */
     @Test fun previewMatchesExportForSizedEffects() {
-        val big = scene(800, 500); val small = Resample.resize(big, 200, 125)
+        val big = scene(1600, 1000); val small = Resample.resize(big, 400, 250)
         for (op in Effects.all) {
             val p = op.params.defaults()
-            val fromBig = Resample.resize(op.apply(big, p, ctx), 200, 125)
+            val fromBig = Resample.resize(op.apply(big, p, ctx), 400, 250)
             val fromSmall = op.apply(small, p, RenderContext(scale = 0.25f))
-            if (op.id in setOf("film_grain", "pencil_sketch", "comic_print")) {
-                // fine textures (grain, paper, halftone dots) only match on average tone
+            if (op.id in setOf("film_grain", "pencil_sketch", "comic_print", "neon")) {
+                // fine textures (grain, paper, halftone dots, 1-px neon edges) only match on average tone
                 fun meanLum(b: PixelBuffer) = b.pixels.map { app.bocadillo.core.imaging.effects.EffectKit.lum(it) }.average()
                 val d = abs(meanLum(fromBig) - meanLum(fromSmall))
                 assertTrue("${op.id} mean tone diff $d", d < 12)

@@ -203,14 +203,16 @@ object ColorArtOps {
         val gain = 4f + 12f * p.float("contrast", 0.5f)
         val w = src.width; val h = src.height
         val l = EffectKit.luminance(src)
-        EffectKit.blurGray(l, w, h, max(0.7f, unit(src) / 900f), ctx)
+        // soften edges to a width proportional to the picture, so |gradient|·sigma is scale-invariant
+        val sigma = max(0.7f, unit(src) / 400f)
+        EffectKit.blurGray(l, w, h, sigma, ctx)
         val e = FloatArray(l.size)
         ctx.forRows(h) { y0, y1 ->
             for (y in y0 until y1) for (x in 0 until w) {
                 fun at(dx: Int, dy: Int) = l[(y + dy).coerceIn(0, h - 1) * w + (x + dx).coerceIn(0, w - 1)]
                 val gx = at(1, -1) + 2 * at(1, 0) + at(1, 1) - at(-1, -1) - 2 * at(-1, 0) - at(-1, 1)
                 val gy = at(-1, 1) + 2 * at(0, 1) + at(1, 1) - at(-1, -1) - 2 * at(0, -1) - at(1, -1)
-                e[y * w + x] = min(1f, sqrt(gx * gx + gy * gy) / 1020f * gain * max(0.3f, unit(src) / 600f))
+                e[y * w + x] = min(1f, sqrt(gx * gx + gy * gy) / 1020f * gain * sigma * 0.5f)
             }
         }
         val glow = e.copyOf()
