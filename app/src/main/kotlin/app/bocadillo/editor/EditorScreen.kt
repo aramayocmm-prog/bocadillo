@@ -22,6 +22,10 @@ import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.TextFields
@@ -127,6 +131,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
     val fonts = remember(state.assetsVersion) { app.fonts.all() }
     val typeface = { ref: String -> app.fonts.typeface(ref, false, false, objRenderer.assets) }
     var phrasesVersion by remember { mutableIntStateOf(0) }
+    val panelPrefs = rememberPanelPrefs()
     val fontPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) vm.importFont(uri) { ref ->
             when (val t = vm.state.value.tool) {
@@ -150,7 +155,8 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            // hidden while a tool is open: more room for the picture
+            if (state.tool == null || state.tool == ToolState.Export || state.tool == ToolState.Resize) TopAppBar(
                 title = { Text(state.title.ifEmpty { stringResource(R.string.untitled) }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = { IconButton(onClick = leave) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) } },
                 actions = {
@@ -203,6 +209,11 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
             }
             if (!state.loading && state.fatalError == null) BottomPanel {
                 Column(Modifier.navigationBarsPadding()) {
+                    val info = panelInfo(state, context, vm)
+                    val expanded = info == null || panelPrefs.expanded(info)
+                    if (info != null && !expanded) CompactToolBar(info) { panelPrefs.set(info, true) }
+                    else {
+                    if (info != null) CollapseHandle { panelPrefs.set(info, false) }
                     when (val t = state.tool) {
                         is ToolState.Adjust -> AdjustPanel(t, vm::updateParam, vm::resetParams, vm::applyTool, vm::cancelTool) { on ->
                             if (on) vm.ensureBefore(); comparing = on
@@ -257,6 +268,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                                 else -> vm.openTool(op)
                             }
                         }, onRestore = { confirmRestore = true })
+                    }
                     }
                 }
             }
@@ -318,5 +330,41 @@ private fun MainMenu(menu: Menu, onMenu: (Menu) -> Unit, ops: List<ImageOp>, ren
                 }
             }
         }
+    }
+}
+
+
+/**
+ * Minimizable panel description for the open tool (or the selected object). Canvas-centred tools
+ * start minimized; tools where you type or pick from a list start expanded.
+ */
+@Composable
+private fun panelInfo(state: EditorUiState, context: Context, vm: EditorViewModel): PanelInfo? {
+    fun s(id: Int) = context.getString(id)
+    val undoRedo: @Composable RowScope.() -> Unit = {
+        IconButton(onClick = vm::undoStroke) { Icon(Icons.AutoMirrored.Filled.Undo, s(R.string.undo)) }
+        IconButton(onClick = vm::redoStroke) { Icon(Icons.AutoMirrored.Filled.Redo, s(R.string.redo)) }
+    }
+    return when (val t = state.tool) {
+        is ToolState.Adjust -> PanelInfo("adjust", s(Labels.op(t.op.id)), true, vm::cancelTool, vm::applyTool)
+        is ToolState.Crop -> PanelInfo("crop", s(R.string.op_crop), false, vm::cancelTool, vm::applyTool)
+        ToolState.Orient -> PanelInfo("orient", s(R.string.op_orient), true, vm::cancelTool, null)
+        is ToolState.EditText -> PanelInfo("text", s(if (t.isNew) R.string.title_new else R.string.title_edit), true, vm::cancelTool, vm::applyTool)
+        is ToolState.EditBalloon -> PanelInfo("balloon", s(if (t.isNew) R.string.wordballoon_new else R.string.wordballoon_edit), true, vm::cancelTool, vm::applyTool)
+        is ToolState.PickSticker -> null // a list to pick from: always expanded
+        is ToolState.StyleSticker -> PanelInfo("sticker_style", s(R.string.sticker_set_style), true, vm::cancelTool, vm::applyTool)
+        is ToolState.Draw -> PanelInfo("draw", s(when (t.kind) {
+            DrawKind.BRUSH -> R.string.brush; DrawKind.MARKER -> R.string.marker
+            DrawKind.ERASER -> R.string.eraser_transparent; DrawKind.HISTORY -> R.string.history_paint
+        }), false, vm::cancelTool, vm::applyTool, undoRedo)
+        is ToolState.Mask -> if (t.choosingEffect) null else PanelInfo("mask", s(R.string.mask_title), false, vm::cancelTool, vm::applyTool, undoRedo)
+        null -> state.selected?.let {
+            PanelInfo("object", s(R.string.object_selected), false, { vm.selectObject(null) }, null) {
+                IconButton(onClick = vm::editSelected) { Icon(Icons.Filled.Edit, s(R.string.edit)) }
+                IconButton(onClick = vm::duplicateSelected) { Icon(Icons.Filled.ContentCopy, s(R.string.action_duplicate)) }
+                IconButton(onClick = vm::deleteSelected) { Icon(Icons.Filled.Delete, s(R.string.action_delete)) }
+            }
+        }
+        else -> null
     }
 }

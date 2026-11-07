@@ -256,4 +256,7 @@
     <string name="next">Siguiente</string>
     <string name="mask_choose_effect">Elige el efecto para la zona marcada:</string>
     <string name="mask_back_to_paint">Volver a la máscara</string>
+    <string name="show_options">Mostrar opciones</string>
+    <string name="hide_options">Ocultar opciones</string>
+    <string name="object_selected">Objeto</string>
 </resources>
