@@ -54,7 +54,10 @@ class OpRegistry(ops: List<ImageOp>) {
     fun inCategory(c: OpCategory): List<ImageOp> = all.filter { it.category == c }
 
     companion object {
-        /** All ops implemented so far (transforms, colour adjustments, painting). */
-        fun default(): OpRegistry = OpRegistry(TransformOps.all + ColorOps.all + PaintOps.all)
+        /** All ops implemented so far (transforms, colour adjustments, painting, effects). */
+        fun default(): OpRegistry = OpRegistry(
+            TransformOps.all + ColorOps.all + PaintOps.all +
+                app.bocadillo.core.imaging.effects.Effects.all,
+        )
     }
 }

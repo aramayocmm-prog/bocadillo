@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -97,13 +99,16 @@ fun ParamControls(specs: List<ParamSpec>, params: Params, onChange: ((Params) ->
                 for (opt in spec.options) FilterChip(
                     selected = params.string(spec.key, spec.default) == opt,
                     onClick = { onChange { it.with(spec.key, opt) } },
-                    label = { Text(opt) },
+                    label = { Text(Labels.choice(opt)?.let { stringResource(it) } ?: opt) },
                 )
             }
             is ParamSpec.Color -> ColorRow(stringResource(Labels.param(spec.labelKey)), params.color(spec.key, spec.default)) { c ->
                 onChange { it.withColor(spec.key, c) }
             }
-            is ParamSpec.Point -> Unit // positioned on the canvas (effects stage)
+            is ParamSpec.Point -> Text(
+                stringResource(R.string.drag_point_hint), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 4.dp),
+            )
         }
     }
 }
@@ -150,7 +155,10 @@ fun ColorRow(label: String, selected: Int, onPick: (Int) -> Unit) {
 fun AdjustPanel(tool: ToolState.Adjust, onChange: ((Params) -> Params) -> Unit, onReset: () -> Unit, onApply: () -> Unit, onCancel: () -> Unit, onCompare: (Boolean) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         PanelHeader(stringResource(Labels.op(tool.op.id)), onCancel, onApply, onCompare)
-        ParamControls(tool.op.params, tool.params, onChange)
+        // long effects (tilt-shift, focal blur…) scroll instead of covering the photo
+        Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
+            ParamControls(tool.op.params, tool.params, onChange)
+        }
         if (tool.op.params.isNotEmpty()) TextButton(onClick = onReset, modifier = Modifier.padding(start = 8.dp)) { Text(stringResource(R.string.reset)) }
     }
 }

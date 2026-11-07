@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -73,12 +74,14 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.runtime.mutableIntStateOf
 import app.bocadillo.core.model.BalloonObject
 import app.bocadillo.core.model.BalloonShape
+import app.bocadillo.core.model.ParamSpec
 import app.bocadillo.core.model.TextObject
 import app.bocadillo.data.ImageIo
 import app.bocadillo.render.ObjectRenderer
 
 private enum class Menu(val label: Int, val icon: ImageVector) {
     ADJUST(R.string.menu_adjust, Icons.Filled.Tune),
+    EFFECTS(R.string.menu_effects, Icons.Filled.AutoAwesome),
     COLOR(R.string.menu_color, Icons.Filled.Palette),
     TRANSFORM(R.string.menu_transform, Icons.Filled.Transform),
     TEXT(R.string.menu_text, Icons.Filled.TextFields),
@@ -102,6 +105,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
     val snackbar = remember { SnackbarHostState() }
     var comparing by remember { mutableStateOf(false) }
     var menu by rememberSaveable { mutableStateOf(Menu.ADJUST) }
+    var family by rememberSaveable { mutableStateOf(OpCategory.DISTORT) }
     var confirmRestore by remember { mutableStateOf(false) }
     var pendingExport by remember { mutableStateOf<ExportOptions?>(null) }
 
@@ -177,7 +181,8 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                     crop = state.tool as? ToolState.Crop,
                     cropPixelSize = state.outputWidth to state.outputHeight,
                     onCropRect = vm::setCropRect,
-                    twoFingerNavigation = state.tool is ToolState.Draw || state.tool is ToolState.Mask,
+                    twoFingerNavigation = state.tool is ToolState.Draw || state.tool is ToolState.Mask ||
+                        (state.tool as? ToolState.Adjust)?.op?.params?.any { it is ParamSpec.Point } == true,
                 ) { zoom ->
                     ObjectLayer(
                         objects = state.displayObjects(),
@@ -201,6 +206,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                             t.brush.size, androidx.compose.ui.graphics.Color(if (t.protect) 0x88E53935.toInt() else 0x8843A047.toInt()),
                             false, state.maskOverlay, vm::addStroke, { _, _ -> },
                         )
+                        is ToolState.Adjust -> PointHandles(t.op.params, t.params, zoom, vm::updateParam)
                         else -> Unit
                     }
                 }
@@ -241,7 +247,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                             onUndo = vm::undoStroke, onRedo = vm::redoStroke, onApply = vm::applyTool, onCancel = vm::cancelTool,
                         )
                         is ToolState.Mask -> MaskPanel(
-                            t, app.registry.all.filter { (it.category == OpCategory.ADJUST || it.category == OpCategory.COLOR) && !it.geometric },
+                            t, maskEffects(app.registry.all),
                             { op -> context.getString(Labels.op(op.id)) },
                             onUpdate = vm::updateMask, onBrush = vm::setBrush, onUndo = vm::undoStroke, onRedo = vm::redoStroke,
                             onNext = vm::applyTool, onEffect = vm::applyEffectWithMask, onCancel = vm::cancelTool,
@@ -261,7 +267,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                                 Menu.STICKER -> vm.openStickerPicker()
                                 else -> Unit
                             }
-                        }, app.registry.all, objRenderer, onBalloon = vm::newBalloon, onDraw = vm::openDraw, onMask = { vm.openMask(protect = false) }, onTool = { op ->
+                        }, family, { family = it }, app.registry.all, objRenderer, onBalloon = vm::newBalloon, onDraw = vm::openDraw, onMask = { vm.openMask(protect = false) }, onTool = { op ->
                             when (op.id) {
                                 TransformOps.Orient.id -> vm.openPanel(ToolState.Orient)
                                 TransformOps.Resize.id -> vm.openPanel(ToolState.Resize)
@@ -297,13 +303,31 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
     )
 }
 
+private val EFFECT_FAMILIES = listOf(OpCategory.DISTORT, OpCategory.ARTISTIC, OpCategory.PHOTO, OpCategory.FRAMES, OpCategory.MISC)
+
+/**
+ * Effects offered after painting a mask, as in the original: adjustments, colour, artistic, photo
+ * and misc, plus "Make transparent"; no distortions, frames or geometric tools.
+ */
+private fun maskEffects(all: List<ImageOp>): List<ImageOp> {
+    val cats = listOf(OpCategory.ADJUST, OpCategory.COLOR, OpCategory.ARTISTIC, OpCategory.PHOTO, OpCategory.MISC)
+    return all.filter { !it.geometric && (it.category in cats || it.id == "make_transparent") }
+        .sortedBy { if (it.id == "make_transparent") -1 else cats.indexOf(it.category) }
+}
+
 @Composable
-private fun MainMenu(menu: Menu, onMenu: (Menu) -> Unit, ops: List<ImageOp>, renderer: ObjectRenderer, onBalloon: (BalloonShape) -> Unit, onDraw: (DrawKind) -> Unit, onMask: () -> Unit, onTool: (ImageOp) -> Unit, onRestore: () -> Unit) {
+private fun MainMenu(menu: Menu, onMenu: (Menu) -> Unit, family: OpCategory, onFamily: (OpCategory) -> Unit, ops: List<ImageOp>, renderer: ObjectRenderer, onBalloon: (BalloonShape) -> Unit, onDraw: (DrawKind) -> Unit, onMask: () -> Unit, onTool: (ImageOp) -> Unit, onRestore: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         if (menu == Menu.BALLOON) BalloonShapeRow(null, renderer, onBalloon)
+        if (menu == Menu.EFFECTS) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (c in EFFECT_FAMILIES) androidx.compose.material3.FilterChip(
+                selected = c == family, onClick = { onFamily(c) }, label = { Text(stringResource(Labels.category(c))) },
+            )
+        }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val tools: List<ImageOp> = when (menu) {
                 Menu.ADJUST -> ops.filter { it.category == OpCategory.ADJUST }
+                Menu.EFFECTS -> ops.filter { it.category == family }
                 Menu.COLOR -> ops.filter { it.category == OpCategory.COLOR }
                 Menu.TRANSFORM -> ops.filter { it.category == OpCategory.TRANSFORM }
                 Menu.MORE -> ops.filter { it.category == OpCategory.MODERN }

@@ -25,7 +25,7 @@ class VisualAndPerformanceTest {
     private val outDir = File(System.getProperty("bocadillo.visualOut") ?: "build/visual").apply { mkdirs() }
 
     /** Synthetic "photo": sky gradient, sun, hills, colour bars, skin-tone patch and a grey ramp. */
-    private fun scene(w: Int, h: Int): PixelBuffer {
+    fun scene(w: Int, h: Int): PixelBuffer {
         val px = IntArray(w * h)
         for (y in 0 until h) for (x in 0 until w) {
             val fx = x / w.toFloat(); val fy = y / h.toFloat()
@@ -45,6 +45,12 @@ class VisualAndPerformanceTest {
             px[y * w + x] = argb(255, clamp255(r), clamp255(g), clamp255(b))
         }
         return PixelBuffer(w, h, px)
+    }
+
+    /** Stage 2 ops only; the effects have their own sheet and timings (EffectsTest). */
+    private fun stage2Registry(): OpRegistry {
+        val fx = app.bocadillo.core.imaging.effects.Effects.all.map { it.id }.toSet()
+        return OpRegistry(OpRegistry.default().all.filter { it.id !in fx })
     }
 
     private fun toImage(p: PixelBuffer): BufferedImage =
@@ -67,7 +73,7 @@ class VisualAndPerformanceTest {
 
     @Test fun contactSheetOfAllOps() {
         val src = scene(320, 200)
-        val registry = OpRegistry.default()
+        val registry = stage2Registry()
         val cell = 340; val cols = 4
         val tiles = listOf("original" to src) + registry.all.map { op ->
             val p = demoParams(op.id, op.params.defaults())
@@ -98,7 +104,7 @@ class VisualAndPerformanceTest {
     @Test fun performanceOn12Megapixels() {
         val w = 4000; val h = 3000
         val src = scene(w, h)
-        val registry = OpRegistry.default()
+        val registry = stage2Registry()
         val report = StringBuilder("op;ms (JVM, ${Runtime.getRuntime().availableProcessors()} cores)\n")
         val ctx = RenderContext(scale = 1f)
         for (op in registry.all) {

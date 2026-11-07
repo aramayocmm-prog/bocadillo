@@ -400,7 +400,11 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         if (render) requestRender()
     }
 
-    fun openPanel(tool: ToolState) { _state.update { it.copy(tool = tool) } }
+    fun openPanel(tool: ToolState) {
+        // effects such as rounded corners or "make transparent" add transparency to an opaque photo
+        val alpha = tool == ToolState.Export && (lastPreview?.hasTransparency() == true)
+        _state.update { it.copy(tool = tool, sourceHasAlpha = it.sourceHasAlpha || alpha) }
+    }
 
     // ------------------------------------------------------------------ orient / resize
 

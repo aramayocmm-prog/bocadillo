@@ -187,6 +187,7 @@ fun DrawPanel(
 }
 
 /** Paint Mask / Selection, then choose the effect. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun MaskPanel(
     tool: ToolState.Mask,
@@ -204,8 +205,14 @@ fun MaskPanel(
         PanelHeader(stringResource(R.string.mask_title), onCancel, onNext)
         if (tool.choosingEffect) {
             Text(stringResource(R.string.mask_choose_effect), Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodyMedium)
-            Row(Modifier.horizontalScroll(rememberScrollState()).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                for (op in effects) androidx.compose.material3.AssistChip(onClick = { onEffect(op) }, label = { Text(effectLabel(op)) })
+            // grouped by family, wrapping, scrollable (about 40 effects)
+            Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
+                for ((cat, list) in effects.groupBy { it.category }) {
+                    Text(stringResource(Labels.category(cat)), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        for (op in list) androidx.compose.material3.AssistChip(onClick = { onEffect(op) }, label = { Text(effectLabel(op)) })
+                    }
+                }
             }
             TextButton(onClick = { onUpdate { it.copy(choosingEffect = false) } }, modifier = Modifier.padding(start = 8.dp)) { Text(stringResource(R.string.mask_back_to_paint)) }
             return@Column
