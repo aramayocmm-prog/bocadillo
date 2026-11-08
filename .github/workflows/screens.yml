@@ -37,7 +37,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
-            ./gradlew :app:connectedDebugAndroidTest --stacktrace || touch test_failed
+            ./gradlew :app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --stacktrace || touch test_failed
             mkdir -p screens && adb exec-out run-as app.bocadillo.debug tar c files/screens > screens/screens.tar || true
             cd screens && tar xf screens.tar && rm screens.tar; cd ..
             test ! -f test_failed
