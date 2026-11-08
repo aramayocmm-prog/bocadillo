@@ -87,6 +87,28 @@ class HomeViewModel(private val app: BocadilloApp) : ViewModel() {
         }
     }
 
+    fun importProject(uri: Uri) {
+        if (_busy.value) return
+        _busy.value = true
+        viewModelScope.launch {
+            try {
+                val id = withContext(Dispatchers.IO) { app.contentResolver.openInputStream(uri)!!.use { repo.importArchive(it) } }
+                _openProject.send(id)
+            } catch (e: Exception) {
+                _messages.send(UiMessage.Res(R.string.error_open_project))
+            } finally { _busy.value = false }
+        }
+    }
+
+    fun exportProject(id: String, uri: Uri) = viewModelScope.launch {
+        try {
+            withContext(Dispatchers.IO) { app.contentResolver.openOutputStream(uri)!!.use { repo.exportArchive(id, it) } }
+            _messages.send(UiMessage.Res(R.string.project_saved))
+        } catch (e: Exception) {
+            _messages.send(UiMessage.Res(R.string.error_save_project))
+        }
+    }
+
     fun setFavorite(id: String, fav: Boolean) = viewModelScope.launch { repo.setFavorite(id, fav) }
     fun delete(id: String) = viewModelScope.launch { repo.delete(id) }
     fun duplicate(id: String, suffix: String) = viewModelScope.launch {

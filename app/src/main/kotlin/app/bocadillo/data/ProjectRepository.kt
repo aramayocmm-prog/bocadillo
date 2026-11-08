@@ -87,7 +87,7 @@ class ProjectRepository(context: Context) {
         val b = load(id)
         val now = System.currentTimeMillis()
         val newDoc = b.document.copy(id = UUID.randomUUID().toString(), title = b.document.title + copySuffix, createdAt = now, modifiedAt = now)
-        save(ProjectBundle(newDoc, b.sourceBytes, b.masks, b.thumbnailJpeg))
+        save(ProjectBundle(newDoc, b.sourceBytes, b.masks, b.thumbnailJpeg, b.assets))
         newDoc.id
     }
 
@@ -100,6 +100,20 @@ class ProjectRepository(context: Context) {
 
     suspend fun setFavorite(id: String, favorite: Boolean) = withContext(Dispatchers.IO) {
         mutex.withLock { writeIndex(_index.value.setFavorite(id, favorite)) }
+    }
+
+    /** Copies a project's `.bcproj` file ("Save project…"). */
+    suspend fun exportArchive(id: String, out: java.io.OutputStream) = withContext(Dispatchers.IO) {
+        projectFile(id).inputStream().use { it.copyTo(out) }
+    }
+
+    /** Adds a `.bcproj` file as a new project ("Open project…"); returns its id. */
+    suspend fun importArchive(input: java.io.InputStream): String = withContext(Dispatchers.IO) {
+        val b = ProjectArchive.read(input.buffered())
+        // new id so importing twice (or a copy of an existing project) never overwrites anything
+        val doc = b.document.copy(id = UUID.randomUUID().toString(), modifiedAt = System.currentTimeMillis())
+        save(ProjectBundle(doc, b.sourceBytes, b.masks, b.thumbnailJpeg, b.assets))
+        doc.id
     }
 
     // ---- crash recovery: a marker exists while a project is open in the editor ----

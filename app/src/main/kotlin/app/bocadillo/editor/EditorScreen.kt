@@ -118,11 +118,25 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
             } else {
                 val send = Intent(Intent.ACTION_SEND).setType(s.mimeType).putExtra(Intent.EXTRA_STREAM, s.uri)
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                // Settings › Sharing: default subject and signature (used by e-mail apps)
+                app.settings.shareSubject.takeIf { it.isNotBlank() }?.let { send.putExtra(Intent.EXTRA_SUBJECT, it) }
+                app.settings.shareSignature.takeIf { it.isNotBlank() }?.let { send.putExtra(Intent.EXTRA_TEXT, it) }
                 context.startActivity(Intent.createChooser(send, context.getString(R.string.share_chooser)))
             }
         }
     }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vm.flush() }
+    // Settings › Editor: hide the status bar while editing
+    val hideBar = app.settings.hideStatusBar
+    androidx.compose.runtime.DisposableEffect(hideBar) {
+        val window = (context as? android.app.Activity)?.window
+        val ctl = window?.let { androidx.core.view.WindowCompat.getInsetsController(it, it.decorView) }
+        if (hideBar) {
+            ctl?.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            ctl?.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+        }
+        onDispose { ctl?.show(androidx.core.view.WindowInsetsCompat.Type.statusBars()) }
+    }
 
     val leave = { vm.closeEditor(); onBack() }
     BackHandler {

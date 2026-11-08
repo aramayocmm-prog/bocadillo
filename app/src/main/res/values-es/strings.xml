@@ -357,4 +357,25 @@
     <string name="export_menu_share">Compartir imagen con…</string>
     <string name="export_menu_set_as">Establecer imagen como…</string>
     <string name="compare">Comparar</string>
+    <string name="home_edit_photo">Editar una foto</string>
+    <string name="home_get_photo">Tomar una foto</string>
+    <string name="home_recent_photos">Fotos recientes</string>
+    <string name="home_more">Más…</string>
+    <string name="home_tagline">Fotos que hablan</string>
+    <string name="more_new_blank">Nueva imagen en blanco</string>
+    <string name="more_open_project">Abrir proyecto…</string>
+    <string name="more_save_project">Guardar proyecto…</string>
+    <string name="more_recent_projects">Proyectos recientes</string>
+    <string name="more_pick_project">Elige el proyecto a guardar</string>
+    <string name="settings">Ajustes</string>
+    <string name="settings_editor">Editor</string>
+    <string name="settings_hide_status_bar">Ocultar la barra de estado al editar</string>
+    <string name="settings_reset_panels">Volver a mostrar todos los paneles</string>
+    <string name="settings_reset_panels_done">Paneles restablecidos</string>
+    <string name="settings_sharing">Compartir</string>
+    <string name="settings_share_subject">Asunto predeterminado</string>
+    <string name="settings_share_signature">Firma</string>
+    <string name="error_open_project">No se pudo abrir ese archivo de proyecto</string>
+    <string name="error_save_project">No se pudo guardar el proyecto</string>
+    <string name="project_saved">Proyecto guardado</string>
 </resources>

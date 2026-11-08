@@ -357,4 +357,25 @@
     <string name="export_menu_share">Share picture via…</string>
     <string name="export_menu_set_as">Set picture as…</string>
     <string name="compare">Compare</string>
+    <string name="home_edit_photo">Edit a Photo</string>
+    <string name="home_get_photo">Get a Photo</string>
+    <string name="home_recent_photos">Recent Photos</string>
+    <string name="home_more">More…</string>
+    <string name="home_tagline">Photos that talk</string>
+    <string name="more_new_blank">New blank picture</string>
+    <string name="more_open_project">Open project…</string>
+    <string name="more_save_project">Save project…</string>
+    <string name="more_recent_projects">Recent projects</string>
+    <string name="more_pick_project">Choose a project to save</string>
+    <string name="settings">Settings</string>
+    <string name="settings_editor">Editor</string>
+    <string name="settings_hide_status_bar">Hide status bar while editing</string>
+    <string name="settings_reset_panels">Show all tool panels again</string>
+    <string name="settings_reset_panels_done">Tool panels reset</string>
+    <string name="settings_sharing">Sharing</string>
+    <string name="settings_share_subject">Default subject</string>
+    <string name="settings_share_signature">Signature</string>
+    <string name="error_open_project">Could not open that project file</string>
+    <string name="error_save_project">Could not save the project</string>
+    <string name="project_saved">Project saved</string>
 </resources>

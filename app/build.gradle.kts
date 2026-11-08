@@ -16,6 +16,7 @@ android {
         targetSdk = 35       // Android 15
         versionCode = 9
         versionName = "0.6.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -82,4 +83,11 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)
+    // screen captures on an emulator (visual validation against the reference screens)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
