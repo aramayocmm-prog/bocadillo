@@ -206,11 +206,11 @@ fun MaskPanel(
         if (tool.choosingEffect) {
             Text(stringResource(R.string.mask_choose_effect), Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodyMedium)
             // grouped by family, wrapping, scrollable (about 40 effects)
-            Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
+            Column(Modifier.heightIn(max = 340.dp).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
                 for ((cat, list) in effects.groupBy { it.category }) {
                     Text(stringResource(Labels.category(cat)), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
-                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        for (op in list) androidx.compose.material3.AssistChip(onClick = { onEffect(op) }, label = { Text(effectLabel(op)) })
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        for (op in list) OpTile(op, effectLabel(op)) { onEffect(op) }
                     }
                 }
             }

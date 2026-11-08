@@ -75,6 +75,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import app.bocadillo.core.model.BalloonObject
 import app.bocadillo.core.model.BalloonShape
 import app.bocadillo.core.model.ParamSpec
+import app.bocadillo.core.model.TextStyle
+import app.bocadillo.core.imaging.preview.ToolPreviews
 import app.bocadillo.core.model.TextObject
 import app.bocadillo.data.ImageIo
 import app.bocadillo.render.ObjectRenderer
@@ -229,7 +231,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                         is ToolState.EditText -> TextEditorPanel(
                             t, fonts, typeface, state.photoDate, phrases = { app.phrases.list() }, onPhrasesChanged = {}, phraseOps = phraseOps,
                             onChange = vm::updateDraft, onImportFont = { fontPicker.launch(arrayOf("font/*", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream")) },
-                            onApply = vm::applyTool, onCancel = vm::cancelTool,
+                            onApply = vm::applyTool, onCancel = vm::cancelTool, renderer = objRenderer,
                         )
                         is ToolState.EditBalloon -> BalloonEditorPanel(
                             t, objRenderer, fonts, typeface, onChange = vm::updateDraft,
@@ -263,11 +265,10 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                         } ?: MainMenu(menu, { m ->
                             menu = m
                             when (m) {
-                                Menu.TEXT -> vm.newText()
                                 Menu.STICKER -> vm.openStickerPicker()
                                 else -> Unit
                             }
-                        }, family, { family = it }, app.registry.all, objRenderer, onBalloon = vm::newBalloon, onDraw = vm::openDraw, onMask = { vm.openMask(protect = false) }, onTool = { op ->
+                        }, family, { family = it }, app.registry.all, objRenderer, onBalloon = vm::newBalloon, onText = { vm.newText(style = it) }, onDraw = vm::openDraw, onMask = { vm.openMask(protect = false) }, onTool = { op ->
                             when (op.id) {
                                 TransformOps.Orient.id -> vm.openPanel(ToolState.Orient)
                                 TransformOps.Resize.id -> vm.openPanel(ToolState.Resize)
@@ -316,7 +317,7 @@ private fun maskEffects(all: List<ImageOp>): List<ImageOp> {
 }
 
 @Composable
-private fun MainMenu(menu: Menu, onMenu: (Menu) -> Unit, family: OpCategory, onFamily: (OpCategory) -> Unit, ops: List<ImageOp>, renderer: ObjectRenderer, onBalloon: (BalloonShape) -> Unit, onDraw: (DrawKind) -> Unit, onMask: () -> Unit, onTool: (ImageOp) -> Unit, onRestore: () -> Unit) {
+private fun MainMenu(menu: Menu, onMenu: (Menu) -> Unit, family: OpCategory, onFamily: (OpCategory) -> Unit, ops: List<ImageOp>, renderer: ObjectRenderer, onBalloon: (BalloonShape) -> Unit, onText: (TextStyle) -> Unit, onDraw: (DrawKind) -> Unit, onMask: () -> Unit, onTool: (ImageOp) -> Unit, onRestore: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         if (menu == Menu.BALLOON) BalloonShapeRow(null, renderer, onBalloon)
         if (menu == Menu.EFFECTS) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -333,13 +334,19 @@ private fun MainMenu(menu: Menu, onMenu: (Menu) -> Unit, family: OpCategory, onF
                 Menu.MORE -> ops.filter { it.category == OpCategory.MODERN }
                 Menu.TEXT, Menu.BALLOON, Menu.STICKER, Menu.DRAW -> emptyList()
             }
-            if (menu == Menu.DRAW) {
-                for ((k, label) in listOf(DrawKind.BRUSH to R.string.brush, DrawKind.MARKER to R.string.marker, DrawKind.ERASER to R.string.eraser_transparent, DrawKind.HISTORY to R.string.history_paint))
-                    AssistChip(onClick = { onDraw(k) }, label = { Text(stringResource(label)) })
-                AssistChip(onClick = onMask, label = { Text(stringResource(R.string.mask_title)) })
+            if (menu == Menu.TEXT) {
+                TextStyleTile(TextStyle(), stringResource(R.string.new_text), renderer, { onText(TextStyle()) })
+                for ((label, p) in TEXT_PRESETS) TextStyleTile(p, stringResource(label), renderer, { onText(p) })
             }
-            if (menu == Menu.MORE) AssistChip(onClick = onRestore, label = { Text(stringResource(R.string.restore_original)) })
-            for (op in tools) AssistChip(onClick = { onTool(op) }, label = { Text(stringResource(Labels.op(op.id))) })
+            if (menu == Menu.DRAW) {
+                for ((k, label) in listOf(
+                    DrawKind.BRUSH to R.string.brush, DrawKind.MARKER to R.string.marker,
+                    DrawKind.ERASER to R.string.eraser_transparent, DrawKind.HISTORY to R.string.history_paint,
+                )) DrawTile(ToolPreviews.DrawDemo.valueOf(k.name), stringResource(label), { onDraw(k) })
+                DrawTile(ToolPreviews.DrawDemo.MASK, stringResource(R.string.mask_title), onMask)
+            }
+            if (menu == Menu.MORE) DrawTile(ToolPreviews.DrawDemo.RESTORE, stringResource(R.string.restore_original), onRestore)
+            for (op in tools) OpTile(op, stringResource(Labels.op(op.id))) { onTool(op) }
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
             for (m in Menu.entries) {

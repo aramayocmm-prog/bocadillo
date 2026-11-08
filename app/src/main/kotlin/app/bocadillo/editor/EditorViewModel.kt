@@ -542,8 +542,8 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
 
     private fun center(): ObjectTransform = ObjectTransform(0.5f, 0.5f)
 
-    fun newText(text: String = "") {
-        val draft = TextObject(newObjectId(), center(), text, TextStyle())
+    fun newText(text: String = "", style: TextStyle = TextStyle()) {
+        val draft = TextObject(newObjectId(), center(), text, style)
         _state.update { it.copy(tool = ToolState.EditText(draft, true), selectedId = null) }
     }
 

@@ -223,12 +223,17 @@ private fun RatioDialog(onDismiss: () -> Unit, onSet: (Float, Float) -> Unit) {
 fun OrientPanel(onOrient: (rotation: Int, flipH: Boolean, flipV: Boolean) -> Unit, onClose: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         PanelHeader(stringResource(R.string.op_orient), onClose, onClose)
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.SpaceEvenly) {
-            OrientButton(Icons.Filled.RotateLeft, R.string.rotate_left) { onOrient(270, false, false) }
-            OrientButton(Icons.Filled.RotateRight, R.string.rotate_right) { onOrient(90, false, false) }
-            OrientButton(Icons.Filled.RotateRight, R.string.rotate_180) { onOrient(180, false, false) }
-            OrientButton(Icons.Filled.Flip, R.string.flip_h) { onOrient(0, true, false) }
-            OrientButton(Icons.Filled.Flip, R.string.flip_v, rotateIcon = true) { onOrient(0, false, true) }
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for ((label, v) in listOf(
+                R.string.rotate_left to Triple(270, false, false), R.string.rotate_right to Triple(90, false, false),
+                R.string.rotate_180 to Triple(180, false, false), R.string.flip_h to Triple(0, true, false), R.string.flip_v to Triple(0, false, true),
+            )) {
+                val (rot, fh, fv) = v
+                ToolTile(stringResource(label), "orient:$rot:$fh:$fv", { onOrient(rot, fh, fv) }) { sample ->
+                    val op = app.bocadillo.core.imaging.ops.TransformOps.Orient
+                    op.apply(sample, app.bocadillo.core.model.Params.of("rotation" to rot.toString(), "flipH" to fh, "flipV" to fv), app.bocadillo.core.imaging.RenderContext())
+                }
+            }
         }
     }
 }

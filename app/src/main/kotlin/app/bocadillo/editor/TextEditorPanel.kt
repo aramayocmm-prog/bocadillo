@@ -92,6 +92,7 @@ fun TextEditorPanel(
     onImportFont: () -> Unit,
     onApply: () -> Unit,
     onCancel: () -> Unit,
+    renderer: app.bocadillo.render.ObjectRenderer? = null,
 ) {
     val o = tool.draft
     val st = o.style
@@ -117,7 +118,9 @@ fun TextEditorPanel(
         }
         Column(Modifier.heightIn(max = 260.dp).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp)) {
             when (tab) {
-                0 -> PresetRow(typeface) { p -> style { it.applyPreset(p) } }
+                0 -> if (renderer != null) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for ((label, p) in TEXT_PRESETS) TextStyleTile(p, stringResource(label), renderer, { style { it.applyPreset(p) } })
+                } else PresetRow(typeface) { p -> style { it.applyPreset(p) } }
                 1 -> FontList(fonts, st.font, typeface, onPick = { ref -> style { it.copy(font = ref) } }, onImport = onImportFont) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         FilterChip(st.bold, { style { it.copy(bold = !it.bold) } }, label = { Text(stringResource(R.string.bold)) })

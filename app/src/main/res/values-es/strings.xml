@@ -347,4 +347,5 @@
     <string name="cat_misc">Varios</string>
     <string name="menu_effects">Efectos</string>
     <string name="drag_point_hint">Arrastra el punto sobre la foto para mover el centro</string>
+    <string name="new_text">Texto nuevo</string>
 </resources>
