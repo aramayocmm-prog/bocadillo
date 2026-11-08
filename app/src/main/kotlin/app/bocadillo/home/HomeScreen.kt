@@ -330,15 +330,15 @@ private fun SettingsPage(settings: app.bocadillo.data.AppSettings, onBack: () ->
             app.bocadillo.ui.classic.ClassicSection(stringResource(R.string.settings_editor))
             Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.settings_hide_status_bar), color = Classic.Text, fontSize = 17.sp, modifier = Modifier.weight(1f))
-                androidx.compose.material3.Switch(settings.hideStatusBar, settings::setHideStatusBar)
+                androidx.compose.material3.Switch(settings.hideStatusBar, settings::updateHideStatusBar)
             }
             ClassicMenuRow(stringResource(if (reset) R.string.settings_reset_panels_done else R.string.settings_reset_panels), { settings.resetPanels(); reset = true }) {
                 Icon(Icons.Filled.History, null, Modifier.size(26.dp), tint = Classic.Text)
             }
             app.bocadillo.ui.classic.ClassicSection(stringResource(R.string.settings_sharing))
-            OutlinedTextField(settings.shareSubject, settings::setShareSubject, Modifier.fillMaxWidth().padding(14.dp, 8.dp),
+            OutlinedTextField(settings.shareSubject, settings::updateShareSubject, Modifier.fillMaxWidth().padding(14.dp, 8.dp),
                 label = { Text(stringResource(R.string.settings_share_subject)) }, singleLine = true)
-            OutlinedTextField(settings.shareSignature, settings::setShareSignature, Modifier.fillMaxWidth().padding(14.dp, 8.dp),
+            OutlinedTextField(settings.shareSignature, settings::updateShareSignature, Modifier.fillMaxWidth().padding(14.dp, 8.dp),
                 label = { Text(stringResource(R.string.settings_share_signature)) }, minLines = 2)
         }
     }

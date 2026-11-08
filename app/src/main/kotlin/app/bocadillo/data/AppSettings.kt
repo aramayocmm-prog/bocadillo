@@ -18,9 +18,9 @@ class AppSettings(context: Context) {
     var shareSubject by mutableStateOf(prefs.getString("share_subject", "") ?: ""); private set
     var shareSignature by mutableStateOf(prefs.getString("share_signature", "") ?: ""); private set
 
-    fun setHideStatusBar(v: Boolean) { hideStatusBar = v; prefs.edit().putBoolean("hide_status_bar", v).apply() }
-    fun setShareSubject(v: String) { shareSubject = v; prefs.edit().putString("share_subject", v).apply() }
-    fun setShareSignature(v: String) { shareSignature = v; prefs.edit().putString("share_signature", v).apply() }
+    fun updateHideStatusBar(v: Boolean) { hideStatusBar = v; prefs.edit().putBoolean("hide_status_bar", v).apply() }
+    fun updateShareSubject(v: String) { shareSubject = v; prefs.edit().putString("share_subject", v).apply() }
+    fun updateShareSignature(v: String) { shareSignature = v; prefs.edit().putString("share_signature", v).apply() }
 
     /** Forgets which tool panels were minimized. */
     fun resetPanels() = panels.edit().clear().apply()
