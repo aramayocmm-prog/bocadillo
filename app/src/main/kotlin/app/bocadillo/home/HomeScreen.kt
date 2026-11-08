@@ -87,6 +87,7 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.withStyle
 import app.bocadillo.ui.classic.ClassicButton
 import app.bocadillo.ui.classic.ClassicMenuRow
 import app.bocadillo.ui.classic.ClassicTopBar
