@@ -162,11 +162,11 @@ fun StickerPickerPanel(
     catalog: StickerCatalog, renderer: ObjectRenderer, replacing: Boolean,
     library: List<File>, noto: NotoStickers,
     onPick: (StickerDef) -> Unit, onPickNoto: (String) -> Unit, onPickLibrary: (File) -> Unit, onDeleteLibrary: (File) -> Unit,
-    onImport: () -> Unit, onCancel: () -> Unit,
+    onImport: () -> Unit, onCancel: () -> Unit, initialTab: Int = 1,
 ) {
     // tabs: 0 = My stickers · 1..n = built-in categories · then the Noto Emoji groups
     val builtin = catalog.categories.size
-    var tab by rememberSaveable { mutableIntStateOf(1) }
+    var tab by rememberSaveable(initialTab) { mutableIntStateOf(initialTab) }
     var query by rememberSaveable { mutableStateOf("") }
     val lang = Locale.getDefault().language
     Column(Modifier.fillMaxWidth()) {

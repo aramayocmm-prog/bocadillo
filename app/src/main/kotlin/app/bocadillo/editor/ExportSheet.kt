@@ -12,14 +12,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.SdStorage
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,6 +42,7 @@ fun ExportSheet(
     outputWidth: Int,
     outputHeight: Int,
     hasAlpha: Boolean,
+    target: ExportTarget,
     onDismiss: () -> Unit,
     onExport: (ExportOptions, ExportTarget) -> Unit,
 ) {
@@ -80,14 +79,13 @@ fun ExportSheet(
                     FilterChip(selected = scale == p, onClick = { scale = p }, label = { Text(stringResource(R.string.export_size_option, p, w, h)) })
                 }
             }
-            Button(onClick = { onExport(options, ExportTarget.GALLERY) }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.SaveAlt, null); Text("  " + stringResource(R.string.export_to_gallery))
-            }
-            OutlinedButton(onClick = { onExport(options, ExportTarget.DOCUMENT) }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.SdStorage, null); Text("  " + stringResource(R.string.export_save_as))
-            }
-            OutlinedButton(onClick = { onExport(options, ExportTarget.SHARE) }, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-                Icon(Icons.Filled.Share, null); Text("  " + stringResource(R.string.export_share))
+            // one action: the Export menu row already chose where the picture goes
+            Button(onClick = { onExport(options, target) }, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                Icon(if (target == ExportTarget.SHARE || target == ExportTarget.SET_AS) Icons.Filled.Share else Icons.Filled.SaveAlt, null)
+                Text("  " + stringResource(when (target) {
+                    ExportTarget.GALLERY -> R.string.export_menu_album; ExportTarget.DOCUMENT -> R.string.export_menu_file
+                    ExportTarget.SHARE -> R.string.export_menu_share; ExportTarget.SET_AS -> R.string.export_menu_set_as
+                }))
             }
         }
     }

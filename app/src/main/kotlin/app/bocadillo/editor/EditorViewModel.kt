@@ -92,7 +92,7 @@ sealed interface ToolState {
     data class EditText(val draft: TextObject, val isNew: Boolean) : ToolState
     data class EditBalloon(val draft: BalloonObject, val isNew: Boolean) : ToolState
     /** Sticker catalogue; [replaceId] set when replacing the selected sticker. */
-    data class PickSticker(val replaceId: String?) : ToolState
+    data class PickSticker(val replaceId: String?, val tab: Int = 1) : ToolState
     /** Sticker colours / outline / opacity. */
     data class StyleSticker(val draft: StickerObject) : ToolState
 
@@ -182,7 +182,8 @@ data class EditorUiState(
 }
 
 /** Share requests are one-off events delivered to the screen. */
-data class ShareRequest(val uri: Uri, val mimeType: String)
+/** [attach] = "Set picture as" (ACTION_ATTACH_DATA) instead of sharing. */
+data class ShareRequest(val uri: Uri, val mimeType: String, val attach: Boolean = false)
 
 enum class ExportFormat(val quality: Int) {
     JPEG_VERY_HIGH(95), JPEG_HIGH(85), JPEG_MEDIUM(70), PNG(100), ORIGINAL(95)
@@ -196,7 +197,8 @@ data class ExportOptions(
     val jpegBackground: Int = 0xFFFFFFFF.toInt(),
 )
 
-enum class ExportTarget { GALLERY, SHARE, DOCUMENT }
+/** Export menu entries (FASE1 §3.6): album, file, share via, set picture as. */
+enum class ExportTarget { GALLERY, SHARE, DOCUMENT, SET_AS }
 
 class EditorViewModel(private val app: BocadilloApp, private val projectId: String) : ViewModel() {
 
@@ -552,8 +554,8 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         _state.update { it.copy(tool = ToolState.EditBalloon(draft, true), selectedId = null) }
     }
 
-    fun openStickerPicker(replace: Boolean = false) {
-        _state.update { it.copy(tool = ToolState.PickSticker(if (replace) it.selectedId else null)) }
+    fun openStickerPicker(replace: Boolean = false, tab: Int = 1) {
+        _state.update { it.copy(tool = ToolState.PickSticker(if (replace) it.selectedId else null, tab)) }
     }
 
     /** Opens the editor that fits the selected object. */
@@ -929,6 +931,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
                     ExportTarget.GALLERY -> { app.exports.saveToGallery(bytes, fmt.mimeType, name); _messages.send(UiMessage.Res(R.string.export_done_gallery)) }
                     ExportTarget.DOCUMENT -> { app.exports.saveToUri(requireNotNull(documentUri), bytes); _messages.send(UiMessage.Res(R.string.export_done_file)) }
                     ExportTarget.SHARE -> _shares.send(ShareRequest(app.exports.prepareShare(bytes, name), fmt.mimeType))
+                    ExportTarget.SET_AS -> _shares.send(ShareRequest(app.exports.prepareShare(bytes, name), fmt.mimeType, attach = true))
                 }
             } catch (e: CancellationException) {
                 throw e

@@ -66,6 +66,11 @@ import kotlin.math.roundToInt
 /** Header row shared by all tool panels: cancel · title · (compare) · apply. */
 @Composable
 fun PanelHeader(title: String, onCancel: () -> Unit, onApply: () -> Unit, onCompare: ((Boolean) -> Unit)? = null) {
+    if (LocalClassicChrome.current) {
+        // the classic top bar already shows ← title ✓; keep only the press-to-compare button
+        if (onCompare != null) Row(Modifier.fillMaxWidth().padding(end = 8.dp), horizontalArrangement = Arrangement.End) { CompareButton(onCompare) }
+        return
+    }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onCancel) { Icon(Icons.Filled.Close, stringResource(R.string.cancel)) }
         Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
@@ -83,6 +88,19 @@ fun PanelHeader(title: String, onCancel: () -> Unit, onApply: () -> Unit, onComp
         }
         IconButton(onClick = onApply) { Icon(Icons.Filled.Check, stringResource(R.string.apply)) }
     }
+}
+
+/** True inside the classic editor: panels drop their own header (the top bar has it). */
+val LocalClassicChrome = androidx.compose.runtime.staticCompositionLocalOf { false }
+
+@Composable
+private fun CompareButton(onCompare: (Boolean) -> Unit) {
+    Box(
+        Modifier.size(40.dp).pointerInput(Unit) {
+            awaitEachGesture { awaitFirstDown(); onCompare(true); waitForUpOrCancellation(); onCompare(false) }
+        },
+        contentAlignment = Alignment.Center,
+    ) { Icon(Icons.Filled.Compare, stringResource(R.string.compare)) }
 }
 
 /** Builds controls from the op's [ParamSpec]s — new tools need no UI code. */
@@ -118,13 +136,11 @@ private fun SliderRow(spec: ParamSpec.Slider, value: Float, onValue: (Float) -> 
     val shown = value * spec.displayFactor
     val unit = when (spec.unit) { ParamSpec.Unit.DEGREES -> "°"; ParamSpec.Unit.PERCENT -> "%"; ParamSpec.Unit.PIXELS -> " px"; else -> "" }
     val text = if (spec.step * spec.displayFactor >= 1f) "${shown.roundToInt()}$unit" else String.format(Locale.getDefault(), "%.2f%s", shown, unit)
-    Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(Labels.param(spec.labelKey)), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            Text(text, style = MaterialTheme.typography.labelLarge)
-        }
-        Slider(value = value, onValueChange = { onValue(spec.snap(it)) }, valueRange = spec.min..spec.max)
-    }
+    // signed value like the reference ("+0.50") when the range goes below zero
+    val signed = if (spec.min < 0f && shown > 0f) "+$text" else text
+    app.bocadillo.ui.classic.ClassicSlider(
+        stringResource(Labels.param(spec.labelKey)), value, spec.min..spec.max, spec.step, signed, onChange = onValue,
+    )
 }
 
 private val SWATCHES = listOf(

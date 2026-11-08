@@ -348,4 +348,13 @@
     <string name="menu_effects">Efectos</string>
     <string name="drag_point_hint">Arrastra el punto sobre la foto para mover el centro</string>
     <string name="new_text">Texto nuevo</string>
+    <string name="menu_effect">Efecto</string>
+    <string name="section_transform_picture">Transformar imagen</string>
+    <string name="word_balloon">Globo de diálogo</string>
+    <string name="title_sticker">Título</string>
+    <string name="export_menu_album">Guardar imagen en el álbum</string>
+    <string name="export_menu_file">Guardar como archivo…</string>
+    <string name="export_menu_share">Compartir imagen con…</string>
+    <string name="export_menu_set_as">Establecer imagen como…</string>
+    <string name="compare">Comparar</string>
 </resources>

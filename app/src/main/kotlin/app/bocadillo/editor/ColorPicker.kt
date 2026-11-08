@@ -83,11 +83,7 @@ private fun Swatch(c: Int, selected: Boolean, size: Int = 30, onClick: () -> Uni
 /** Compact slider with a label and a formatted value. */
 @Composable
 fun LabeledSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, display: (Float) -> String = { "%.2f".format(it) }, onFinished: (() -> Unit)? = null, onValue: (Float) -> Unit) {
-    Column(Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-            Text(display(value), style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(64.dp))
-        }
-        Slider(value = value.coerceIn(range.start, range.endInclusive), onValueChange = onValue, valueRange = range, onValueChangeFinished = onFinished)
-    }
+    app.bocadillo.ui.classic.ClassicSlider(
+        label, value.coerceIn(range.start, range.endInclusive), range, 0f, display(value), onChange = onValue, onFinished = { onFinished?.invoke() },
+    )
 }

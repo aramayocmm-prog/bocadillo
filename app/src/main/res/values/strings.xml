@@ -348,4 +348,13 @@
     <string name="menu_effects">Effects</string>
     <string name="drag_point_hint">Drag the point on the photo to move the center</string>
     <string name="new_text">New text</string>
+    <string name="menu_effect">Effect</string>
+    <string name="section_transform_picture">Transform Picture</string>
+    <string name="word_balloon">Word Balloon</string>
+    <string name="title_sticker">Title</string>
+    <string name="export_menu_album">Save picture to album</string>
+    <string name="export_menu_file">Save as file…</string>
+    <string name="export_menu_share">Share picture via…</string>
+    <string name="export_menu_set_as">Set picture as…</string>
+    <string name="compare">Compare</string>
 </resources>

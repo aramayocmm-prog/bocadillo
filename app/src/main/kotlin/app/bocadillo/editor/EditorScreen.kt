@@ -20,7 +20,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.foundation.background
+import androidx.compose.runtime.CompositionLocalProvider
+import app.bocadillo.ui.classic.BarItem
+import app.bocadillo.ui.classic.ClassicBottomBar
+import app.bocadillo.ui.classic.ClassicTopBar
+import app.bocadillo.ui.theme.Classic
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.ContentCopy
@@ -81,18 +88,6 @@ import app.bocadillo.core.model.TextObject
 import app.bocadillo.data.ImageIo
 import app.bocadillo.render.ObjectRenderer
 
-private enum class Menu(val label: Int, val icon: ImageVector) {
-    ADJUST(R.string.menu_adjust, Icons.Filled.Tune),
-    EFFECTS(R.string.menu_effects, Icons.Filled.AutoAwesome),
-    COLOR(R.string.menu_color, Icons.Filled.Palette),
-    TRANSFORM(R.string.menu_transform, Icons.Filled.Transform),
-    TEXT(R.string.menu_text, Icons.Filled.TextFields),
-    BALLOON(R.string.menu_balloon, Icons.Filled.ChatBubble),
-    STICKER(R.string.menu_sticker, Icons.Filled.EmojiEmotions),
-    DRAW(R.string.menu_draw, Icons.Filled.Brush),
-    MORE(R.string.menu_more, Icons.Filled.MoreHoriz),
-}
-
 fun UiMessage.text(context: Context): String = when (this) {
     is UiMessage.Res -> context.getString(id, *args.toTypedArray())
 }
@@ -106,23 +101,52 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var comparing by remember { mutableStateOf(false) }
-    var menu by rememberSaveable { mutableStateOf(Menu.ADJUST) }
-    var family by rememberSaveable { mutableStateOf(OpCategory.DISTORT) }
+    var openMenu by rememberSaveable { mutableStateOf<EditorMenu?>(null) }
+    var exportTarget by rememberSaveable { mutableStateOf(ExportTarget.GALLERY) }
+    val (adjustMenu, effectMenu) = remember { EditorMenus.withLeftovers(app.registry) }
     var confirmRestore by remember { mutableStateOf(false) }
     var pendingExport by remember { mutableStateOf<ExportOptions?>(null) }
 
     LaunchedEffect(vm) { vm.messages.collect { snackbar.showSnackbar(it.text(context)) } }
     LaunchedEffect(vm) {
         vm.shares.collect { s ->
-            val send = Intent(Intent.ACTION_SEND).setType(s.mimeType).putExtra(Intent.EXTRA_STREAM, s.uri)
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            context.startActivity(Intent.createChooser(send, context.getString(R.string.share_chooser)))
+            if (s.attach) {
+                // "Set picture as" (wallpaper, contact photo…)
+                val set = Intent(Intent.ACTION_ATTACH_DATA).setDataAndType(s.uri, s.mimeType).putExtra("mimeType", s.mimeType)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                context.startActivity(Intent.createChooser(set, context.getString(R.string.export_menu_set_as)))
+            } else {
+                val send = Intent(Intent.ACTION_SEND).setType(s.mimeType).putExtra(Intent.EXTRA_STREAM, s.uri)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                context.startActivity(Intent.createChooser(send, context.getString(R.string.share_chooser)))
+            }
         }
     }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vm.flush() }
 
     val leave = { vm.closeEditor(); onBack() }
-    BackHandler { if (state.tool != null) vm.cancelTool() else leave() }
+    BackHandler {
+        when {
+            openMenu == EditorMenu.BALLOON_SHAPES -> openMenu = EditorMenu.STICKER
+            openMenu != null -> openMenu = null
+            state.tool != null -> vm.cancelTool()
+            state.selectedId != null -> vm.selectObject(null)
+            else -> leave()
+        }
+    }
+    fun runMenu(a: MenuAction) {
+        openMenu = null
+        when (a) {
+            is MenuAction.Op -> when (a.id) {
+                TransformOps.Orient.id -> vm.openPanel(ToolState.Orient)
+                TransformOps.Resize.id -> vm.openPanel(ToolState.Resize)
+                else -> app.registry[a.id]?.let { vm.openTool(it) }
+            }
+            is MenuAction.Draw -> vm.openDraw(a.kind)
+            MenuAction.Mask -> vm.openMask(protect = false)
+            MenuAction.Restore -> confirmRestore = true
+        }
+    }
 
     val saveJpeg = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/jpeg")) { uri ->
         val o = pendingExport; if (uri != null && o != null) vm.export(o, ExportTarget.DOCUMENT, uri)
@@ -160,23 +184,50 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
     }
 
     Scaffold(
+        containerColor = Classic.Background,
         topBar = {
-            // hidden while a tool is open: more room for the picture
-            if (state.tool == null || state.tool == ToolState.Export || state.tool == ToolState.Resize) TopAppBar(
-                title = { Text(state.title.ifEmpty { stringResource(R.string.untitled) }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = { IconButton(onClick = leave) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) } },
-                actions = {
-                    IconButton(onClick = vm::undo, enabled = state.canUndo && state.tool == null) { Icon(Icons.AutoMirrored.Filled.Undo, stringResource(R.string.undo)) }
-                    IconButton(onClick = vm::redo, enabled = state.canRedo && state.tool == null) { Icon(Icons.AutoMirrored.Filled.Redo, stringResource(R.string.redo)) }
-                    IconButton(onClick = { vm.openPanel(ToolState.Export) }, enabled = !state.loading && !state.exporting && state.fatalError == null) {
-                        Icon(Icons.Filled.IosShare, stringResource(R.string.export))
-                    }
-                },
-            )
+            val info = panelInfo(state, context, vm)
+            val bar = toolBar(state, context, vm)
+            when {
+                openMenu != null -> ClassicTopBar(
+                    stringResource(when (openMenu!!) {
+                        EditorMenu.ADJUST -> R.string.menu_adjust; EditorMenu.EFFECT -> R.string.menu_effect
+                        EditorMenu.STICKER -> R.string.sticker_new; EditorMenu.EXPORT -> R.string.export
+                        EditorMenu.BALLOON_SHAPES -> R.string.word_balloon
+                    }),
+                    onBack = { openMenu = if (openMenu == EditorMenu.BALLOON_SHAPES) EditorMenu.STICKER else null },
+                )
+                bar != null -> ClassicTopBar(bar.title, onBack = bar.onCancel, onConfirm = bar.onApply, actions = { info?.quick?.invoke(this) })
+                else -> ClassicTopBar(
+                    state.title.ifEmpty { stringResource(R.string.untitled) }, onBack = leave, onConfirm = leave,
+                    actions = {
+                        IconButton(onClick = vm::undo, enabled = state.canUndo && state.tool == null) { Icon(Icons.AutoMirrored.Filled.Undo, stringResource(R.string.undo), tint = if (state.canUndo) Classic.Text else Classic.Cell) }
+                        IconButton(onClick = vm::redo, enabled = state.canRedo && state.tool == null) { Icon(Icons.AutoMirrored.Filled.Redo, stringResource(R.string.redo), tint = if (state.canRedo) Classic.Text else Classic.Cell) }
+                    },
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        CompositionLocalProvider(LocalClassicChrome provides true) {
         Column(Modifier.padding(padding).fillMaxSize()) {
+            when (openMenu) {
+                EditorMenu.ADJUST -> { MenuList(adjustMenu, app.registry, ::runMenu); return@Column }
+                EditorMenu.EFFECT -> { MenuList(effectMenu, app.registry, ::runMenu); return@Column }
+                EditorMenu.STICKER -> {
+                    StickerMenuList(app.stickers, app.noto, objRenderer) { c ->
+                        when (c) {
+                            StickerChoice.Balloon -> openMenu = EditorMenu.BALLOON_SHAPES
+                            StickerChoice.Title -> { openMenu = null; vm.newText() }
+                            is StickerChoice.Category -> { openMenu = null; vm.openStickerPicker(tab = c.tab) }
+                        }
+                    }
+                    return@Column
+                }
+                EditorMenu.BALLOON_SHAPES -> { BalloonShapeGrid(objRenderer) { sh -> openMenu = null; vm.newBalloon(sh) }; return@Column }
+                EditorMenu.EXPORT -> { ExportMenuList { t -> openMenu = null; exportTarget = t; vm.openPanel(ToolState.Export) }; return@Column }
+                null -> Unit
+            }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 EditorCanvas(
                     image = if (comparing) state.before ?: state.preview else state.preview,
@@ -215,11 +266,11 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                 if (state.loading || state.exporting) CircularProgressIndicator(Modifier.align(Alignment.Center))
                 state.fatalError?.let { Text(it.text(context), Modifier.align(Alignment.Center).padding(24.dp), color = MaterialTheme.colorScheme.error) }
             }
-            if (!state.loading && state.fatalError == null) BottomPanel {
+            if (!state.loading && state.fatalError == null) Box(Modifier.fillMaxWidth().background(Classic.Menu)) {
                 Column(Modifier.navigationBarsPadding()) {
                     val info = panelInfo(state, context, vm)
                     val expanded = info == null || panelPrefs.expanded(info)
-                    if (info != null && !expanded) CompactToolBar(info) { panelPrefs.set(info, true) }
+                    if (info != null && !expanded) ExpandHandle { panelPrefs.set(info, true) }
                     else {
                     if (info != null) CollapseHandle { panelPrefs.set(info, false) }
                     when (val t = state.tool) {
@@ -242,6 +293,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                             app.stickers, objRenderer, t.replaceId != null, library, app.noto,
                             onPick = vm::pickSticker, onPickNoto = vm::pickNoto, onPickLibrary = { vm.placeLibrarySticker(it) }, onDeleteLibrary = vm::deleteLibrarySticker,
                             onImport = { stickerImages.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, onCancel = vm::cancelTool,
+                            initialTab = t.tab,
                         )
                         is ToolState.Draw -> DrawPanel(
                             t, vm.historyStages(), { id -> context.getString(Labels.op(id)) },
@@ -262,23 +314,18 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                                 toggleStretch = vm::toggleStretchMode, replace = { vm.openStickerPicker(replace = true) },
                                 opacityLive = vm::setOpacityLive, opacityCommit = { vm.commitLive("opacity") }, done = { vm.selectObject(null) },
                             ))
-                        } ?: MainMenu(menu, { m ->
-                            menu = m
-                            when (m) {
-                                Menu.STICKER -> vm.openStickerPicker()
-                                else -> Unit
-                            }
-                        }, family, { family = it }, app.registry.all, objRenderer, onBalloon = vm::newBalloon, onText = { vm.newText(style = it) }, onDraw = vm::openDraw, onMask = { vm.openMask(protect = false) }, onTool = { op ->
-                            when (op.id) {
-                                TransformOps.Orient.id -> vm.openPanel(ToolState.Orient)
-                                TransformOps.Resize.id -> vm.openPanel(ToolState.Resize)
-                                else -> vm.openTool(op)
-                            }
-                        }, onRestore = { confirmRestore = true })
+                        } ?: ClassicBottomBar(listOf(
+                            BarItem(stringResource(R.string.menu_adjust), { Icon(Icons.Filled.Tune, null, tint = Classic.Text) }, { openMenu = EditorMenu.ADJUST }),
+                            BarItem(stringResource(R.string.menu_effect), { Icon(Icons.Filled.AutoFixHigh, null, tint = Classic.Text) }, { openMenu = EditorMenu.EFFECT }),
+                            BarItem(stringResource(R.string.menu_sticker), { Icon(Icons.Filled.ChatBubble, null, tint = Classic.Text) }, { openMenu = EditorMenu.STICKER }),
+                            BarItem(stringResource(R.string.export), { Icon(Icons.Filled.Share, null, tint = Classic.Text) }, { openMenu = EditorMenu.EXPORT },
+                                enabled = !state.exporting),
+                        ))
                     }
                     }
                 }
             }
+        }
         }
     }
 
@@ -286,7 +333,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
         ResizeDialog(state.outputWidth, state.outputHeight, onApply = { w, h, m, bg -> vm.applyResize(w, h, m, bg) }, onDismiss = vm::cancelTool)
     }
     if (state.tool == ToolState.Export) {
-        ExportSheet(state.outputWidth, state.outputHeight, state.sourceHasAlpha, onDismiss = vm::cancelTool) { options, target ->
+        ExportSheet(state.outputWidth, state.outputHeight, state.sourceHasAlpha, exportTarget, onDismiss = vm::cancelTool) { options, target ->
             if (target == ExportTarget.DOCUMENT) {
                 pendingExport = options
                 vm.cancelTool()
@@ -304,7 +351,6 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
     )
 }
 
-private val EFFECT_FAMILIES = listOf(OpCategory.DISTORT, OpCategory.ARTISTIC, OpCategory.PHOTO, OpCategory.FRAMES, OpCategory.MISC)
 
 /**
  * Effects offered after painting a mask, as in the original: adjustments, colour, artistic, photo
@@ -315,55 +361,6 @@ private fun maskEffects(all: List<ImageOp>): List<ImageOp> {
     return all.filter { !it.geometric && (it.category in cats || it.id == "make_transparent") }
         .sortedBy { if (it.id == "make_transparent") -1 else cats.indexOf(it.category) }
 }
-
-@Composable
-private fun MainMenu(menu: Menu, onMenu: (Menu) -> Unit, family: OpCategory, onFamily: (OpCategory) -> Unit, ops: List<ImageOp>, renderer: ObjectRenderer, onBalloon: (BalloonShape) -> Unit, onText: (TextStyle) -> Unit, onDraw: (DrawKind) -> Unit, onMask: () -> Unit, onTool: (ImageOp) -> Unit, onRestore: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        if (menu == Menu.BALLOON) BalloonShapeRow(null, renderer, onBalloon)
-        if (menu == Menu.EFFECTS) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            for (c in EFFECT_FAMILIES) androidx.compose.material3.FilterChip(
-                selected = c == family, onClick = { onFamily(c) }, label = { Text(stringResource(Labels.category(c))) },
-            )
-        }
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            val tools: List<ImageOp> = when (menu) {
-                Menu.ADJUST -> ops.filter { it.category == OpCategory.ADJUST }
-                Menu.EFFECTS -> ops.filter { it.category == family }
-                Menu.COLOR -> ops.filter { it.category == OpCategory.COLOR }
-                Menu.TRANSFORM -> ops.filter { it.category == OpCategory.TRANSFORM }
-                Menu.MORE -> ops.filter { it.category == OpCategory.MODERN }
-                Menu.TEXT, Menu.BALLOON, Menu.STICKER, Menu.DRAW -> emptyList()
-            }
-            if (menu == Menu.TEXT) {
-                TextStyleTile(TextStyle(), stringResource(R.string.new_text), renderer, { onText(TextStyle()) })
-                for ((label, p) in TEXT_PRESETS) TextStyleTile(p, stringResource(label), renderer, { onText(p) })
-            }
-            if (menu == Menu.DRAW) {
-                for ((k, label) in listOf(
-                    DrawKind.BRUSH to R.string.brush, DrawKind.MARKER to R.string.marker,
-                    DrawKind.ERASER to R.string.eraser_transparent, DrawKind.HISTORY to R.string.history_paint,
-                )) DrawTile(ToolPreviews.DrawDemo.valueOf(k.name), stringResource(label), { onDraw(k) })
-                DrawTile(ToolPreviews.DrawDemo.MASK, stringResource(R.string.mask_title), onMask)
-            }
-            if (menu == Menu.MORE) DrawTile(ToolPreviews.DrawDemo.RESTORE, stringResource(R.string.restore_original), onRestore)
-            for (op in tools) OpTile(op, stringResource(Labels.op(op.id))) { onTool(op) }
-        }
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-            for (m in Menu.entries) {
-                val selected = m == menu
-                Column(
-                    Modifier.clickable { onMenu(m) }.padding(horizontal = 12.dp, vertical = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    val tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    Icon(m.icon, null, tint = tint)
-                    Text(stringResource(m.label), style = MaterialTheme.typography.labelMedium, color = tint)
-                }
-            }
-        }
-    }
-}
-
 
 /**
  * Minimizable panel description for the open tool (or the selected object). Canvas-centred tools
@@ -396,6 +393,29 @@ private fun panelInfo(state: EditorUiState, context: Context, vm: EditorViewMode
                 IconButton(onClick = vm::deleteSelected) { Icon(Icons.Filled.Delete, s(R.string.action_delete)) }
             }
         }
+        else -> null
+    }
+}
+
+/** Title and ← / ✓ actions of the classic top bar while a tool is open. */
+private class ToolBarInfo(val title: String, val onCancel: () -> Unit, val onApply: (() -> Unit)?)
+
+private fun toolBar(state: EditorUiState, context: Context, vm: EditorViewModel): ToolBarInfo? {
+    fun s(id: Int) = context.getString(id)
+    return when (val t = state.tool) {
+        null, ToolState.Export, ToolState.Resize -> null
+        is ToolState.Adjust -> ToolBarInfo(s(Labels.op(t.op.id)), vm::cancelTool, vm::applyTool)
+        is ToolState.Crop -> ToolBarInfo(s(R.string.op_crop), vm::cancelTool, vm::applyTool)
+        ToolState.Orient -> ToolBarInfo(s(R.string.op_orient), vm::cancelTool, null)
+        is ToolState.EditText -> ToolBarInfo(s(if (t.isNew) R.string.title_new else R.string.title_edit), vm::cancelTool, vm::applyTool)
+        is ToolState.EditBalloon -> ToolBarInfo(s(if (t.isNew) R.string.wordballoon_new else R.string.wordballoon_edit), vm::cancelTool, vm::applyTool)
+        is ToolState.PickSticker -> ToolBarInfo(s(if (t.replaceId != null) R.string.sticker_replace else R.string.sticker_new), vm::cancelTool, null)
+        is ToolState.StyleSticker -> ToolBarInfo(s(R.string.sticker_set_style), vm::cancelTool, vm::applyTool)
+        is ToolState.Draw -> ToolBarInfo(s(when (t.kind) {
+            DrawKind.BRUSH -> R.string.brush; DrawKind.MARKER -> R.string.marker
+            DrawKind.ERASER -> R.string.eraser_transparent; DrawKind.HISTORY -> R.string.history_paint
+        }), vm::cancelTool, vm::applyTool)
+        is ToolState.Mask -> ToolBarInfo(s(R.string.mask_title), vm::cancelTool, if (t.choosingEffect) null else vm::applyTool)
         else -> null
     }
 }

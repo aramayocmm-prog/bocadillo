@@ -75,3 +75,11 @@ fun CollapseHandle(onCollapse: () -> Unit) {
         Icon(Icons.Filled.KeyboardArrowDown, stringResource(R.string.hide_options), tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
+
+/** Thin bar shown while a tool's controls are hidden: tap to show them again. */
+@Composable
+fun ExpandHandle(onExpand: () -> Unit) {
+    Box(Modifier.fillMaxWidth().height(30.dp).clickable(onClick = onExpand), contentAlignment = Alignment.Center) {
+        Icon(Icons.Filled.KeyboardArrowUp, stringResource(R.string.show_options), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}

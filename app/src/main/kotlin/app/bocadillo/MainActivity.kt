@@ -29,7 +29,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // dark bars always, like the classic screens
+        enableEdgeToEdge(androidx.activity.SystemBarStyle.dark(android.graphics.Color.BLACK), androidx.activity.SystemBarStyle.dark(android.graphics.Color.BLACK))
         if (savedInstanceState == null) handleIntent(intent)
         val app = application as BocadilloApp
         setContent {
