@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
@@ -202,6 +203,8 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
         topBar = {
             val info = panelInfo(state, context, vm)
             val bar = toolBar(state, context, vm)
+            // edge-to-edge: keep the bar below the status bar (black strip behind it, as in the reference)
+            Column(Modifier.background(Classic.Background).statusBarsPadding()) {
             when {
                 openMenu != null -> ClassicTopBar(
                     stringResource(when (openMenu!!) {
@@ -219,6 +222,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                         IconButton(onClick = vm::redo, enabled = state.canRedo && state.tool == null) { Icon(Icons.AutoMirrored.Filled.Redo, stringResource(R.string.redo), tint = if (state.canRedo) Classic.Text else Classic.Cell) }
                     },
                 )
+            }
             }
         },
         snackbarHost = { SnackbarHost(snackbar) },

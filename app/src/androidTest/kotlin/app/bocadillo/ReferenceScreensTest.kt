@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.bocadillo.core.imaging.preview.SampleScene
@@ -40,6 +41,15 @@ class ReferenceScreensTest {
     }
     private fun tap(text: String) { rule.onAllNodesWithText(text, useUnmergedTree = true).onFirst().performClick(); rule.waitForIdle() }
     private fun scrollTo(text: String) { rule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText(text)); rule.waitForIdle() }
+    /** Waits until [text] is on screen (the editor loads its preview in the background). */
+    private fun waitFor(text: String, ms: Long = 30_000) {
+        rule.waitUntil(ms) { rule.onAllNodesWithText(text, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+    }
+    /** Shows a minimized tool panel so its controls appear in the capture. */
+    private fun expandPanel() {
+        val n = rule.onAllNodesWithContentDescription(s(R.string.show_options), useUnmergedTree = true)
+        if (n.fetchSemanticsNodes().isNotEmpty()) { n.onFirst().performClick(); rule.waitForIdle() }
+    }
     private fun back() { rule.onNodeWithContentDescription(s(R.string.back)).performClick(); rule.waitForIdle() }
 
     @Test fun captureReferenceScreens() {
@@ -52,9 +62,9 @@ class ReferenceScreensTest {
 
         shot("01_home")
         tap(s(R.string.home_more)); shot("18_more"); back()
-        tap(s(R.string.home_recent_photos)); tap("Sample"); shot("02_editor", 2500)
+        tap(s(R.string.home_recent_photos)); tap("Sample"); waitFor(s(R.string.menu_adjust)); shot("02_editor", 4000)
 
-        tap(s(R.string.menu_adjust)); shot("03_adjust")
+        tap(s(R.string.menu_adjust)); waitFor(s(R.string.op_boost)); shot("03_adjust", 2000)
         tap(s(R.string.op_exposure_contrast)); shot("04_exposure", 2000); back()
 
         tap(s(R.string.menu_effect)); shot("05_effect", 2500)
@@ -67,9 +77,9 @@ class ReferenceScreensTest {
         tap(s(R.string.menu_sticker)); tap(s(R.string.title_sticker)); shot("10_title_editor", 1500)
         tap(s(R.string.tab_outline)); shot("11_text_styles"); back()
 
-        tap(s(R.string.menu_effect)); tap(s(R.string.brush)); shot("12_paint"); back()
+        tap(s(R.string.menu_effect)); tap(s(R.string.brush)); expandPanel(); shot("12_paint", 2000); back()
         tap(s(R.string.export)); shot("13_export"); back()
-        tap(s(R.string.menu_adjust)); tap(s(R.string.op_crop)); shot("14_crop", 2000); back()
+        tap(s(R.string.menu_adjust)); tap(s(R.string.op_crop)); expandPanel(); shot("14_crop", 2500); back()
         tap(s(R.string.menu_adjust)); tap(s(R.string.op_rotate)); shot("15_rotate", 2000); back()
         tap(s(R.string.menu_adjust)); tap(s(R.string.op_resize)); shot("16_resize")
     }
