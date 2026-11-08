@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write   # publishes the captures to the "screens-output" branch
+
 jobs:
   screens:
     runs-on: ubuntu-latest
@@ -46,3 +49,15 @@ jobs:
           path: |
             screens/
             app/build/reports/androidTests/
+      - name: Publicar capturas en la rama screens-output
+        if: always()
+        run: |
+          set -e
+          [ -d screens/files/screens ] || exit 0
+          mkdir -p /tmp/out && cp screens/files/screens/*.png /tmp/out/
+          cd /tmp/out
+          git init -q -b screens-output
+          git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
+          echo "Capturas del emulador del commit ${GITHUB_SHA}" > README.md
+          git add -A && git commit -qm "Captures for ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" screens-output
