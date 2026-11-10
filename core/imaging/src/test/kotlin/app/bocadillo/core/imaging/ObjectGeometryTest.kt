@@ -68,7 +68,7 @@ class ObjectGeometryTest {
     }
 
     @Test fun balloonTailsAttachOutsideAndVanishInside() {
-        for (shape in BalloonShape.entries) {
+        for (shape in BalloonShape.entries - BalloonShape.CAPTION) { // a caption has no tail
             val with = BalloonGeometry.outline(shape, 200f, 120f, -60f, 140f, 0.3f, true)
             val without = BalloonGeometry.outline(shape, 200f, 120f, 5f, 5f, 0.3f, true)
             if (shape == BalloonShape.THOUGHT) {
@@ -175,5 +175,19 @@ class ObjectGeometryTest {
         g.dispose()
         ImageIO.write(img, "png", File(out, "stage3_balloons_stickers.png"))
         assertTrue(abs(img.width - cols * cell) == 0)
+    }
+}
+
+class BalloonShapesExtraTest {
+    @org.junit.Test fun captionHasNoTailAndPointerHasAnArrowHead() {
+        val cap = app.bocadillo.core.imaging.objects.BalloonGeometry.outline(app.bocadillo.core.model.BalloonShape.CAPTION, 200f, 100f, 0f, 150f, 0.3f, true)
+        val rect = app.bocadillo.core.imaging.objects.BalloonGeometry.outline(app.bocadillo.core.model.BalloonShape.RECTANGLE, 200f, 100f, 0f, 0f, 0.3f, false)
+        org.junit.Assert.assertArrayEquals(rect.contour, cap.contour, 0.001f)
+        val ptr = app.bocadillo.core.imaging.objects.BalloonGeometry.outline(app.bocadillo.core.model.BalloonShape.POINTER, 200f, 100f, 40f, 160f, 0.3f, true)
+        // the farthest vertex is the arrow tip
+        val far = (0 until ptr.contour.size / 2).maxBy { kotlin.math.hypot(ptr.contour[it * 2], ptr.contour[it * 2 + 1]) }
+        org.junit.Assert.assertEquals(40f, ptr.contour[far * 2], 0.5f)
+        org.junit.Assert.assertEquals(160f, ptr.contour[far * 2 + 1], 0.5f)
+        org.junit.Assert.assertTrue(ptr.contour.size > rect.contour.size)
     }
 }

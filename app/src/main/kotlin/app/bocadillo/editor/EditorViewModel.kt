@@ -183,7 +183,7 @@ data class EditorUiState(
 
 /** Share requests are one-off events delivered to the screen. */
 /** [attach] = "Set picture as" (ACTION_ATTACH_DATA) instead of sharing. */
-data class ShareRequest(val uri: Uri, val mimeType: String, val attach: Boolean = false)
+data class ShareRequest(val uri: Uri, val mimeType: String, val attach: Boolean = false, val component: android.content.ComponentName? = null)
 
 enum class ExportFormat(val quality: Int) {
     JPEG_VERY_HIGH(95), JPEG_HIGH(85), JPEG_MEDIUM(70), PNG(100), ORIGINAL(95)
@@ -686,6 +686,9 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         }
     }
 
+    /** Current preview (for the menu thumbnails). */
+    fun previewBitmap(): app.bocadillo.core.imaging.PixelBuffer? = lastPreview
+
     /** True when the edited picture has transparent areas (Add Background Color needs it). */
     fun currentHasTransparency(): Boolean = lastPreview?.hasTransparency() == true
 
@@ -1004,7 +1007,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
 
     // ------------------------------------------------------------------ export
 
-    fun export(options: ExportOptions, target: ExportTarget, documentUri: Uri? = null) {
+    fun export(options: ExportOptions, target: ExportTarget, documentUri: Uri? = null, shareTo: android.content.ComponentName? = null) {
         if (_state.value.exporting) return
         val d = doc
         _state.update { it.copy(exporting = true, tool = null) }
@@ -1025,7 +1028,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
                 when (target) {
                     ExportTarget.GALLERY -> { app.exports.saveToGallery(bytes, fmt.mimeType, name); _messages.send(UiMessage.Res(R.string.export_done_gallery)) }
                     ExportTarget.DOCUMENT -> { app.exports.saveToUri(requireNotNull(documentUri), bytes); _messages.send(UiMessage.Res(R.string.export_done_file)) }
-                    ExportTarget.SHARE -> _shares.send(ShareRequest(app.exports.prepareShare(bytes, name), fmt.mimeType))
+                    ExportTarget.SHARE -> _shares.send(ShareRequest(app.exports.prepareShare(bytes, name), fmt.mimeType, component = shareTo))
                     ExportTarget.SET_AS -> _shares.send(ShareRequest(app.exports.prepareShare(bytes, name), fmt.mimeType, attach = true))
                 }
             } catch (e: CancellationException) {

@@ -51,13 +51,37 @@ import kotlinx.coroutines.withContext
  */
 object ToolTileCache {
     val sample: PixelBuffer by lazy { SampleScene.render(160, 120) }
-    private val cache = LruCache<String, ImageBitmap>(120)
+    private val cache = LruCache<String, ImageBitmap>(160)
+
+    /**
+     * The menus of the original show each tool applied to the photo being edited. When a photo
+     * is set, menu thumbnails ([photoKey]) use a small portrait crop of it instead of the sample.
+     */
+    @Volatile private var photo: PixelBuffer? = null
+    @Volatile var photoVersion = 0; private set
+
+    fun setPhoto(src: PixelBuffer?) {
+        if (src == null || src.width < 2 || src.height < 2) { photo = null; photoVersion++; return }
+        // centre crop with the 26:40 proportion of the menu thumbnails, 64×98 px
+        val tw = 64; val th = 98
+        val dstRatio = tw.toFloat() / th
+        val (cw, ch) = if (src.width.toFloat() / src.height > dstRatio) (src.height * dstRatio).toInt().coerceAtLeast(1) to src.height
+            else src.width to (src.width / dstRatio).toInt().coerceAtLeast(1)
+        val ox = (src.width - cw) / 2; val oy = (src.height - ch) / 2
+        val crop = PixelBuffer(cw, ch, IntArray(cw * ch) { i -> src.pixels[(oy + i / cw) * src.width + ox + i % cw] })
+        photo = app.bocadillo.core.imaging.Resample.resize(crop, tw, th)
+        photoVersion++
+    }
+
+    /** Key of a thumbnail computed on the current photo. */
+    fun photoKey(key: String) = "p$photoVersion:$key"
 
     suspend fun get(key: String, compute: (PixelBuffer) -> PixelBuffer): ImageBitmap? {
         cache.get(key)?.let { return it }
+        val source = if (key.startsWith("p")) photo ?: sample else sample
         val bmp = withContext(Dispatchers.Default) {
             runCatching {
-                val p = compute(sample)
+                val p = compute(source)
                 Bitmap.createBitmap(p.pixels, p.width, p.height, Bitmap.Config.ARGB_8888).asImageBitmap()
             }.getOrNull()
         } ?: return null

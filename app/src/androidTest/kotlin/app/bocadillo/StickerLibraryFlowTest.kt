@@ -104,7 +104,8 @@ class StickerLibraryFlowTest {
         val png = ByteArrayOutputStream().also { ImageIo.toBitmap(sample).compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
         val doc = runBlocking { app.projects.create(ImageIo.Imported(png, "image/png", "Stickers"), 1200, 900, false, "Stickers", ImageIo.thumbnail(sample)) }
         rule.waitForIdle()
-        tap(s(R.string.home_recent_photos)); tap("Stickers"); waitFor(s(R.string.menu_adjust)); Thread.sleep(2500)
+        rule.onAllNodesWithContentDescription(s(R.string.home_more), useUnmergedTree = true).onFirst().performClick(); rule.waitForIdle()
+        tap(s(R.string.more_recent_projects)); tap("Stickers"); waitFor(s(R.string.menu_adjust)); Thread.sleep(2500)
 
         // 3. classic sticker menu: 32 categories, empty ones pending
         tap(s(R.string.menu_sticker)); waitFor(s(R.string.word_balloon)); shot("20_sticker_menu")

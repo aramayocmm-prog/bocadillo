@@ -61,7 +61,12 @@ data class TextStyle(
     val backgroundColor: Int = 0x00000000,
 )
 
-enum class BalloonShape { SPEECH, THOUGHT, SCREAM, WHISPER, RECTANGLE, ROUNDED }
+enum class BalloonShape { SPEECH, THOUGHT, SCREAM, WHISPER, RECTANGLE, ROUNDED, CAPTION, POINTER;
+    companion object {
+        /** Order of the shape picker (two columns, as in the classic screen). */
+        val pickerOrder = listOf(SPEECH, RECTANGLE, THOUGHT, WHISPER, ROUNDED, SCREAM, CAPTION, POINTER)
+    }
+}
 
 enum class Arrange { FRONT, FORWARD, BACKWARD, BACK }
 

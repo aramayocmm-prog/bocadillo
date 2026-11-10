@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.bocadillo.R
 import app.bocadillo.core.imaging.objects.StickerCatalog
 import app.bocadillo.core.imaging.ops.ImageOp
@@ -152,8 +153,10 @@ fun MenuList(sections: List<MenuSection>, registry: OpRegistry, onAction: (MenuA
 
 @Composable
 private fun Thumb(key: String, compute: (app.bocadillo.core.imaging.PixelBuffer) -> app.bocadillo.core.imaging.PixelBuffer) {
-    val bmp by produceState(ToolTileCache.cached(key), key) { if (value == null) value = ToolTileCache.get(key, compute) }
-    Box(Modifier.size(ClassicDims.Thumb + 10.dp, ClassicDims.Thumb).clip(RoundedCornerShape(3.dp)).background(Classic.Cell)) {
+    // narrow portrait preview of the edited photo, as in the original lists
+    val k = ToolTileCache.photoKey(key)
+    val bmp by produceState(ToolTileCache.cached(k), k) { if (value == null) value = ToolTileCache.get(k, compute) }
+    Box(Modifier.size(ClassicDims.ThumbW, ClassicDims.ThumbH).background(Classic.Cell)) {
         bmp?.let { androidx.compose.foundation.Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
     }
 }
@@ -177,38 +180,53 @@ fun OpThumb(op: ImageOp) = Thumb("op:${op.id}") { ToolPreviews.forOp(op, it) }
 @Composable
 fun DrawThumb(demo: ToolPreviews.DrawDemo) = Thumb("draw:${demo.name}") { ToolPreviews.forDraw(demo, it) }
 
-/** Export menu (FASE1 §3.6): album, file, share, set as. */
+/**
+ * Export (share) list of the original: the picture's file name at the top, Save picture to album,
+ * Save as file…, then every installed app that accepts a picture (icon + name), alphabetically.
+ * "Set picture as…" is an addition of this app.
+ */
 @Composable
-fun ExportMenuList(onTarget: (ExportTarget) -> Unit) {
-    Column(Modifier.fillMaxSize().background(Classic.Menu)) {
-        for ((t, label, icon) in listOf(
-            Triple(ExportTarget.GALLERY, R.string.export_menu_album, Icons.Filled.Save),
-            Triple(ExportTarget.DOCUMENT, R.string.export_menu_file, Icons.Filled.InsertDriveFile),
-            Triple(ExportTarget.SHARE, R.string.export_menu_share, Icons.Filled.Share),
-            Triple(ExportTarget.SET_AS, R.string.export_menu_set_as, Icons.Filled.Wallpaper),
-        )) ClassicMenuRow(stringResource(label), { onTarget(t) }) { Icon(icon, null, tint = Classic.Text, modifier = Modifier.size(30.dp)) }
+fun ExportMenuList(title: String, onTarget: (ExportTarget) -> Unit, onApp: (android.content.ComponentName) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val apps by produceState<List<Triple<String, android.content.ComponentName, androidx.compose.ui.graphics.ImageBitmap?>>>(emptyList()) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val pm = context.packageManager
+            val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("image/*")
+            pm.queryIntentActivities(send, 0)
+                .filter { it.activityInfo.packageName != context.packageName }
+                .map { ri ->
+                    val icon = runCatching { ri.loadIcon(pm).toBitmapSafe(96)?.asImageBitmap() }.getOrNull()
+                    Triple(ri.loadLabel(pm).toString(), android.content.ComponentName(ri.activityInfo.packageName, ri.activityInfo.name), icon)
+                }
+                .sortedBy { it.first.lowercase() }
+        }
     }
-}
-
-/** Grid of the 6 balloon shapes on dark grey cells (two columns). */
-@Composable
-fun BalloonShapeGrid(renderer: ObjectRenderer, onPick: (BalloonShape) -> Unit) {
-    LazyVerticalGrid(
-        GridCells.Fixed(2), Modifier.fillMaxSize().background(Classic.Menu).padding(10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        items(BalloonShape.entries) { sh ->
-            val sample = BalloonObject("cell", ObjectTransform(0.5f, 0.42f), sh, width = 0.8f, height = 0.62f, tailX = -0.18f, tailY = 0.46f, strokeWidth = 0.03f)
-            Column(
-                Modifier.clip(RoundedCornerShape(6.dp)).background(Classic.Cell).border(1.dp, Classic.Divider, RoundedCornerShape(6.dp))
-                    .clickable { onPick(sh) }.padding(6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Canvas(Modifier.fillMaxWidth().aspectRatio(1.5f)) { drawIntoCanvas { renderer.draw(it.nativeCanvas, sample, size.width, size.height) } }
-                Text(stringResource(balloonShapeLabel(sh)), color = Classic.TextDim, style = androidx.compose.material3.MaterialTheme.typography.labelSmall)
+    LazyColumn(Modifier.fillMaxSize().background(Classic.Menu)) {
+        item {
+            Box(Modifier.fillMaxWidth().background(Classic.Bar).padding(start = 52.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)) {
+                Text(
+                    (title.ifBlank { "picture" }) + ".jpg", color = androidx.compose.ui.graphics.Color(0xFF333333), fontSize = 13.sp, maxLines = 1,
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(androidx.compose.ui.graphics.Color(0xFFDDDDDD)).padding(horizontal = 10.dp, vertical = 6.dp),
+                )
+            }
+        }
+        item { ClassicMenuRow(stringResource(R.string.export_menu_album), { onTarget(ExportTarget.GALLERY) }) { Icon(Icons.Filled.Collections, null, tint = Classic.Accent, modifier = Modifier.size(30.dp)) } }
+        item { ClassicMenuRow(stringResource(R.string.export_menu_file), { onTarget(ExportTarget.DOCUMENT) }) { Icon(Icons.Filled.InsertDriveFile, null, tint = androidx.compose.ui.graphics.Color(0xFFFFC107), modifier = Modifier.size(30.dp)) } }
+        item { ClassicMenuRow(stringResource(R.string.export_menu_set_as), { onTarget(ExportTarget.SET_AS) }) { Icon(Icons.Filled.Wallpaper, null, tint = Classic.Text, modifier = Modifier.size(30.dp)) } }
+        items(apps.size) { i ->
+            val (label, cn, icon) = apps[i]
+            ClassicMenuRow(label, { onApp(cn) }) {
+                if (icon != null) androidx.compose.foundation.Image(icon, null, Modifier.size(30.dp)) else Icon(Icons.Filled.Share, null, tint = Classic.Text, modifier = Modifier.size(30.dp))
             }
         }
     }
+}
+
+private fun android.graphics.drawable.Drawable.toBitmapSafe(px: Int): android.graphics.Bitmap? {
+    val b = android.graphics.Bitmap.createBitmap(px, px, android.graphics.Bitmap.Config.ARGB_8888)
+    val c = android.graphics.Canvas(b)
+    setBounds(0, 0, px, px); draw(c)
+    return b
 }
 
 @Suppress("unused") private val keepRow: @Composable () -> Unit = { Row {} }

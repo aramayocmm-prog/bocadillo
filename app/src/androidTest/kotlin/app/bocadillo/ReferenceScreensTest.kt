@@ -39,6 +39,7 @@ class ReferenceScreensTest {
         val bmp = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: return
         File(out, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
+    private fun desc(d: String) { rule.onAllNodesWithContentDescription(d, useUnmergedTree = true).onFirst().performClick(); rule.waitForIdle() }
     private fun tap(text: String) { rule.onAllNodesWithText(text, useUnmergedTree = true).onFirst().performClick(); rule.waitForIdle() }
     private fun scrollTo(text: String) { rule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText(text)); rule.waitForIdle() }
     /** Waits until [text] is on screen (the editor loads its preview in the background). */
@@ -75,8 +76,9 @@ class ReferenceScreensTest {
         rule.waitForIdle()
 
         shot("01_home")
-        tap(s(R.string.home_more)); shot("18_more"); back()
-        tap(s(R.string.home_recent_photos)); tap("Sample"); waitFor(s(R.string.menu_adjust)); shot("02_editor", 4000)
+        tap(s(R.string.get_a_picture)); shot("01b_get_picture"); InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK); rule.waitForIdle()
+        desc(s(R.string.home_more)); shot("18_more")
+        tap(s(R.string.more_recent_projects)); tap("Sample"); waitFor(s(R.string.menu_adjust)); shot("02_editor", 4000)
 
         tap(s(R.string.menu_adjust)); waitFor(s(R.string.op_boost)); shot("03_adjust", 2000)
         tap(s(R.string.op_exposure_contrast)); shot("04_exposure", 2000); back()
@@ -87,7 +89,8 @@ class ReferenceScreensTest {
 
         tap(s(R.string.menu_sticker)); shot("07_sticker", 1500)
         tap(s(R.string.word_balloon)); shot("08_balloon_shapes")
-        tap(s(R.string.balloon_speech)); shot("09_balloon_edit", 2000); hideKeyboard(); back()
+        desc(s(R.string.balloon_speech).uppercase()); shot("09_new_word_balloon", 2000)
+        desc(s(R.string.balloon_preview_hint)); shot("09b_balloon_style", 2000); hideKeyboard(); back()
 
         tap(s(R.string.menu_effect)); tapInList(s(R.string.paint)); expandPanel(); shot("12_paint", 2000); back()
         tap(s(R.string.export)); shot("13_export"); back()
@@ -96,7 +99,8 @@ class ReferenceScreensTest {
         tap(s(R.string.menu_adjust)); tap(s(R.string.op_resize)); shot("16_resize")
         rule.onAllNodesWithText(s(R.string.cancel), useUnmergedTree = true).onFirst().performClick(); rule.waitForIdle()
         // the title editor opens the keyboard: keep it for the end
-        tap(s(R.string.menu_sticker)); tap(s(R.string.title_sticker)); shot("10_title_editor", 1500)
-        hideKeyboard(); tap(s(R.string.tab_outline)); shot("11_text_styles")
+        tap(s(R.string.menu_sticker)); tap(s(R.string.title_sticker)); shot("10_new_title", 1500)
+        desc(s(R.string.title_preview_hint)); hideKeyboard(); tap(s(R.string.tab_font)); shot("10b_font_list", 1500)
+        tap(s(R.string.tab_outline)); shot("11_text_styles")
     }
 }

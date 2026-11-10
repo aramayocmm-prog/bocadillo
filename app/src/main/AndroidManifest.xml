@@ -44,4 +44,11 @@
                 android:resource="@xml/file_paths" />
         </provider>
     </application>
+    <!-- Export menu lists the apps that accept a picture (Android 11+ package visibility) -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="image/*" />
+        </intent>
+    </queries>
 </manifest>

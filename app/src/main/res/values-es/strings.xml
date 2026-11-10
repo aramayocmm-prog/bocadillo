@@ -120,7 +120,7 @@
     <string name="color_saturation">Saturación</string>
     <string name="color_brightness">Brillo</string>
     <string name="opacity">Opacidad</string>
-    <string name="title_new">Nuevo texto</string>
+    <string name="title_new">Nuevo título</string>
     <string name="title_edit">Editar texto</string>
     <string name="hint_text">Escribe tu texto aquí</string>
     <string name="insert_phrase">Frases frecuentes</string>
@@ -179,10 +179,10 @@
     <string name="balloon_whisper">Susurro</string>
     <string name="balloon_rectangle">Rectangular</string>
     <string name="balloon_rounded">Redondeado</string>
-    <string name="wordballoon_new">Nuevo globo</string>
+    <string name="wordballoon_new">Nuevo globo de diálogo</string>
     <string name="wordballoon_edit">Editar globo</string>
     <string name="fill_color">Color de relleno</string>
-    <string name="balloon_pointer">Puntero</string>
+    <string name="balloon_pointer">Señalador</string>
     <string name="pointer_width">Ancho del puntero</string>
     <string name="balloon_tail_hint">Consejo: arrastra el punto verde sobre la imagen para mover el puntero.</string>
     <string name="sticker_new">Nuevo sticker</string>
@@ -426,4 +426,16 @@ Longitud: %2$s</string>
     <string name="flip_horizontal">Voltear horizontal</string>
     <string name="flip_vertical">Voltear vertical</string>
     <string name="curve_reset">Restablecer</string>
+    <string name="get_a_picture">Obtener una imagen</string>
+    <string name="get_picture_from">Obtener imagen de</string>
+    <string name="get_from_gallery">Galería</string>
+    <string name="get_from_camera">Cámara</string>
+    <string name="get_from_import">Importar…</string>
+    <string name="balloon_caption">Rótulo…</string>
+    <string name="balloon_preview_hint">TOCA AQUÍ PARA DAR ESTILO AL GLOBO</string>
+    <string name="title_preview_hint">Toca para dar estilo al título</string>
+    <string name="next_shape">Forma siguiente</string>
+    <string name="enter_text_here">Escribe tu texto aquí</string>
+    <string name="phrases">Frases comunes</string>
+    <string name="more_fonts">Más fuentes</string>
 </resources>

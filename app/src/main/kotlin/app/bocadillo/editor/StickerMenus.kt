@@ -59,6 +59,9 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
 
+/** Light grey sheet of the sticker category grids (measured on the reference). */
+private val StickerSheet = androidx.compose.ui.graphics.Color(0xFFEEEEEE)
+
 /** Id used for "My Stickers" (personal pictures) in the sticker menu. */
 const val MY_STICKERS = "__mine__"
 
@@ -124,21 +127,21 @@ fun StickerCategoryGrid(
     var confirm by remember { mutableStateOf<LibrarySticker?>(null) }
     if (list.isEmpty()) {
         Column(
-            Modifier.fillMaxSize().background(Classic.Menu).padding(24.dp),
+            Modifier.fillMaxSize().background(StickerSheet).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
         ) {
-            Text(stringResource(R.string.sticker_pending_long), color = Classic.TextDim, textAlign = TextAlign.Center, fontSize = 15.sp)
+            Text(stringResource(R.string.sticker_pending_long), color = androidx.compose.ui.graphics.Color(0xFF616161), textAlign = TextAlign.Center, fontSize = 15.sp)
             ClassicButton(stringResource(R.string.sticker_import_library), onImportZip, Modifier.padding(top = 16.dp))
         }
         return
     }
     LazyVerticalGrid(
-        GridCells.Adaptive(84.dp), Modifier.fillMaxSize().background(Classic.Menu).padding(6.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp),
+        GridCells.Fixed(4), Modifier.fillMaxSize().background(StickerSheet).padding(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(list, key = { it.id }) { s ->
             Box(
-                Modifier.aspectRatio(1f).clip(RoundedCornerShape(6.dp)).background(Classic.Cell)
+                Modifier.aspectRatio(1f)
                     .combinedClickable(onClick = { onPick(s) }, onLongClick = { confirm = s }).padding(8.dp),
                 contentAlignment = Alignment.Center,
             ) { PackThumb(packs, s, 72.dp) }

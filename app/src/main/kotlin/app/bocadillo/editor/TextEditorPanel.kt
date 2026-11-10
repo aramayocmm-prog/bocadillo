@@ -189,22 +189,35 @@ private fun PresetRow(typeface: (String) -> Typeface, onPick: (TextStyle) -> Uni
 
 @Composable
 fun FontList(fonts: List<FontOption>, selected: String, typeface: (String) -> Typeface, onPick: (String) -> Unit, onImport: () -> Unit, extra: @Composable () -> Unit = {}) {
-    Column {
+    // light list of the classic Font screen: grey group headers, white rows with the name drawn
+    // in its own font, the selected row highlighted, "More Fonts ›" (import) at the end
+    val light = app.bocadillo.ui.theme.Classic
+    Column(Modifier.background(light.LightRow)) {
         extra()
-        TextButton(onClick = onImport) { Text(stringResource(R.string.import_font)) }
         var lastKind: FontOption.Kind? = null
         for (f in fonts) {
             if (f.kind != lastKind) {
                 lastKind = f.kind
-                Text(stringResource(when (f.kind) { FontOption.Kind.SYSTEM -> R.string.fonts_system; FontOption.Kind.BUNDLED -> R.string.fonts_bundled; FontOption.Kind.IMPORTED -> R.string.fonts_imported }),
-                    style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp))
+                Text(
+                    stringResource(when (f.kind) { FontOption.Kind.SYSTEM -> R.string.fonts_system; FontOption.Kind.BUNDLED -> R.string.fonts_bundled; FontOption.Kind.IMPORTED -> R.string.fonts_imported }),
+                    color = light.LightHeaderText, fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth().background(light.LightHeader).padding(horizontal = 8.dp, vertical = 3.dp),
+                )
             }
             val sel = f.ref == selected
             Text(
                 f.displayName, fontFamily = FontFamily(typeface(f.ref)), fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                color = if (sel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.fillMaxWidth().clickable { onPick(f.ref) }.padding(vertical = 6.dp),
+                color = androidx.compose.ui.graphics.Color(0xFF111111),
+                modifier = Modifier.fillMaxWidth().background(if (sel) light.LightMore else light.LightRow).clickable { onPick(f.ref) }.padding(horizontal = 8.dp, vertical = 8.dp),
             )
+            HorizontalDivider(color = light.LightDivider)
+        }
+        Row(
+            Modifier.fillMaxWidth().background(light.LightMore).clickable(onClick = onImport).padding(horizontal = 8.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.more_fonts), color = androidx.compose.ui.graphics.Color(0xFF111111), fontSize = 18.sp, modifier = Modifier.weight(1f))
+            Text("›", color = androidx.compose.ui.graphics.Color(0xFF555555), fontSize = 20.sp)
         }
     }
 }
@@ -213,7 +226,7 @@ fun FontList(fonts: List<FontOption>, selected: String, typeface: (String) -> Ty
 class PhraseOps(val add: (String) -> List<String>, val update: (Int, String) -> List<String>, val remove: (Int) -> List<String>)
 
 @Composable
-private fun PhrasesDialog(initial: List<String>, ops: PhraseOps, onChanged: (List<String>) -> Unit, onDismiss: () -> Unit, onPick: (String) -> Unit) {
+internal fun PhrasesDialog(initial: List<String>, ops: PhraseOps, onChanged: (List<String>) -> Unit, onDismiss: () -> Unit, onPick: (String) -> Unit) {
     var list by remember { mutableStateOf(initial) }
     var editing by remember { mutableStateOf<Pair<Int, String>?>(null) } // index -1 = new
     AlertDialog(

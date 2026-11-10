@@ -96,6 +96,8 @@ fun balloonShapeLabel(s: BalloonShape) = when (s) {
     BalloonShape.WHISPER -> R.string.balloon_whisper
     BalloonShape.RECTANGLE -> R.string.balloon_rectangle
     BalloonShape.ROUNDED -> R.string.balloon_rounded
+    BalloonShape.CAPTION -> R.string.balloon_caption
+    BalloonShape.POINTER -> R.string.balloon_pointer
 }
 
 @Composable

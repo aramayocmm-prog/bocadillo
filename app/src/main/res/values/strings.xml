@@ -120,7 +120,7 @@
     <string name="color_saturation">Saturation</string>
     <string name="color_brightness">Brightness</string>
     <string name="opacity">Opacity</string>
-    <string name="title_new">New text</string>
+    <string name="title_new">New Title</string>
     <string name="title_edit">Edit text</string>
     <string name="hint_text">Type your text here</string>
     <string name="insert_phrase">Common phrases</string>
@@ -179,13 +179,13 @@
     <string name="balloon_whisper">Whisper</string>
     <string name="balloon_rectangle">Rectangle</string>
     <string name="balloon_rounded">Rounded</string>
-    <string name="wordballoon_new">New balloon</string>
+    <string name="wordballoon_new">New Word Balloon</string>
     <string name="wordballoon_edit">Edit balloon</string>
     <string name="fill_color">Fill color</string>
     <string name="balloon_pointer">Pointer</string>
     <string name="pointer_width">Pointer width</string>
     <string name="balloon_tail_hint">Tip: drag the green dot on the picture to move the pointer.</string>
-    <string name="sticker_new">New sticker</string>
+    <string name="sticker_new">New Sticker</string>
     <string name="sticker_replace">Replace sticker</string>
     <string name="sticker_import_png">Import pictures (transparent PNG)…</string>
     <string name="sticker_set_style">Sticker style</string>
@@ -426,4 +426,16 @@ Longitude: %2$s</string>
     <string name="flip_horizontal">Flip Horizontal</string>
     <string name="flip_vertical">Flip Vertical</string>
     <string name="curve_reset">Reset</string>
+    <string name="get_a_picture">Get a Picture</string>
+    <string name="get_picture_from">Get Picture from</string>
+    <string name="get_from_gallery">Gallery</string>
+    <string name="get_from_camera">Camera</string>
+    <string name="get_from_import">Import…</string>
+    <string name="balloon_caption">Caption…</string>
+    <string name="balloon_preview_hint">TAP HERE TO STYLE PREVIEW BALLOON</string>
+    <string name="title_preview_hint">Tap to style Title</string>
+    <string name="next_shape">Next shape</string>
+    <string name="enter_text_here">Enter your text here</string>
+    <string name="phrases">Common phrases</string>
+    <string name="more_fonts">More Fonts</string>
 </resources>

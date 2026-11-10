@@ -50,9 +50,13 @@ import kotlin.math.roundToInt
 object ClassicDims {
     val TopBar = 52.dp
     val BottomBar = 64.dp
-    val Row = 52.dp
-    val RowIcon = 36.dp
+    val Row = 55.dp
+    val Section = 21.dp
+    val RowIcon = 32.dp
     val Thumb = 46.dp
+    /** Effect previews are narrow portrait crops flush with the left edge. */
+    val ThumbW = 26.dp
+    val ThumbH = 40.dp
 }
 
 /**
@@ -66,13 +70,15 @@ fun ClassicTopBar(
     onConfirm: (() -> Unit)? = null,
     backIcon: ImageVector = Icons.AutoMirrored.Filled.ArrowBack,
     actions: @Composable RowScope.() -> Unit = {},
+    /** Green check of the sticker tools (New Title, New Word Balloon, Set … Style). */
+    greenConfirm: Boolean = false,
 ) {
     Box(
         Modifier.fillMaxWidth().height(ClassicDims.TopBar)
             .background(Brush.verticalGradient(listOf(Classic.BarTop, Classic.Bar))),
     ) {
         Text(
-            title, color = Classic.Text, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1,
+            title, color = Classic.Text, fontSize = 19.sp, fontWeight = FontWeight.Normal, maxLines = 1,
             overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
             modifier = Modifier.align(Alignment.Center).padding(horizontal = 104.dp),
         )
@@ -81,7 +87,9 @@ fun ClassicTopBar(
         }
         Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
             actions()
-            if (onConfirm != null) IconButton(onClick = onConfirm) { Icon(Icons.Filled.Check, stringResource(R.string.apply), tint = Classic.Text) }
+            if (onConfirm != null) IconButton(onClick = onConfirm) {
+                Icon(Icons.Filled.Check, stringResource(R.string.apply), tint = if (greenConfirm) Classic.Confirm else Classic.Text, modifier = Modifier.size(if (greenConfirm) 30.dp else 24.dp))
+            }
         }
         HorizontalDivider(Modifier.align(Alignment.BottomCenter), color = Classic.Background, thickness = 1.dp)
     }
@@ -110,8 +118,8 @@ fun ClassicBottomBar(items: List<BarItem>) {
 @Composable
 fun ClassicMenuRow(label: String, onClick: () -> Unit, height: Dp = ClassicDims.Row, note: String? = null, icon: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().background(Classic.Menu).clickable(onClick = onClick)) {
-        Row(Modifier.fillMaxWidth().heightIn(min = height).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.widthIn(min = 44.dp).padding(end = 14.dp), contentAlignment = Alignment.Center) { icon() }
+        Row(Modifier.fillMaxWidth().heightIn(min = height).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.widthIn(min = 32.dp).padding(end = 12.dp), contentAlignment = Alignment.Center) { icon() }
             Text(label, color = Classic.Text, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             // discreet status on the right (e.g. "Pending import"); the name keeps the space it needs
             if (note != null) Text(note, color = Classic.TextDim, fontSize = 11.sp, maxLines = 1, softWrap = false, modifier = Modifier.padding(start = 8.dp))
@@ -123,10 +131,10 @@ fun ClassicMenuRow(label: String, onClick: () -> Unit, height: Dp = ClassicDims.
 /** Grey section header inside a menu list ("Transform Picture", "Misc"…). */
 @Composable
 fun ClassicSection(text: String) {
-    Text(
-        text, color = Classic.SectionText, fontSize = 15.sp, fontWeight = FontWeight.Bold,
-        modifier = Modifier.fillMaxWidth().background(Classic.Section).padding(horizontal = 14.dp, vertical = 7.dp),
-    )
+    // 21 dp grey strip with small bold grey text, measured on the Adjust/Effect lists
+    Box(Modifier.fillMaxWidth().height(ClassicDims.Section).background(Classic.Section).padding(start = 8.dp), contentAlignment = Alignment.CenterStart) {
+        Text(text, color = Classic.SectionText, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
 }
 
 /** Round −/+ button beside the sliders. */

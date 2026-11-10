@@ -92,6 +92,10 @@ import app.bocadillo.ui.classic.ClassicButton
 import app.bocadillo.ui.classic.ClassicMenuRow
 import app.bocadillo.ui.classic.ClassicTopBar
 import app.bocadillo.ui.theme.Classic
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.filled.Menu
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -128,6 +132,7 @@ fun HomeScreen(vm: HomeViewModel, onOpen: (String) -> Unit) {
     // Pages of the home screen (reference screens 1 and 18 plus the recent-projects list)
     var page by rememberSaveable { mutableStateOf(HomePage.MAIN) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    var getPicture by rememberSaveable { mutableStateOf(false) }
     var pickToSave by rememberSaveable { mutableStateOf(false) }
     var saveId by rememberSaveable { mutableStateOf<String?>(null) }
     val openArchive = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.importProject(uri) }
@@ -142,26 +147,31 @@ fun HomeScreen(vm: HomeViewModel, onOpen: (String) -> Unit) {
         Column(Modifier.padding(padding).fillMaxSize()) {
             when {
                 settingsOpen -> SettingsPage(app.settings) { settingsOpen = false }
-                page == HomePage.MAIN -> Column(
-                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Spacer(Modifier.height(28.dp))
-                    AppLogo(Modifier.fillMaxWidth(0.82f))
-                    Spacer(Modifier.height(24.dp))
-                    val iconMod = Modifier.size(28.dp)
-                    ClassicButton(stringResource(R.string.home_edit_photo), { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                        Modifier.fillMaxWidth(), enabled = !busy) { Icon(Icons.Filled.Image, null, iconMod, tint = Classic.Text) }
-                    Spacer(Modifier.height(10.dp))
-                    ClassicButton(stringResource(R.string.home_get_photo), { val u = app.exports.newCameraUri(); cameraUri = u.toString(); camera.launch(u) },
-                        Modifier.fillMaxWidth(), enabled = !busy) { Icon(Icons.Filled.PhotoCamera, null, iconMod, tint = Classic.Text) }
-                    Spacer(Modifier.height(10.dp))
-                    ClassicButton(stringResource(R.string.home_recent_photos), { page = HomePage.RECENT },
-                        Modifier.fillMaxWidth()) { Icon(Icons.Filled.PhotoLibrary, null, iconMod, tint = Classic.Text) }
-                    Spacer(Modifier.height(10.dp))
-                    ClassicButton(stringResource(R.string.home_more), { page = HomePage.MORE },
-                        Modifier.fillMaxWidth()) { Icon(Icons.Filled.Settings, null, iconMod, tint = Classic.Text) }
-                    if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 16.dp))
+                page == HomePage.MAIN -> Box(Modifier.fillMaxSize().background(Classic.Home)) {
+                    // menu (≡) at the top left opens the list of other actions; the last edited
+                    // picture sits at the top right; logo and "Get a Picture" in the middle
+                    IconButton(onClick = { page = HomePage.MORE }, modifier = Modifier.align(Alignment.TopStart).padding(4.dp)) {
+                        Icon(Icons.Filled.Menu, stringResource(R.string.home_more), tint = Classic.TextDim, modifier = Modifier.size(30.dp))
+                    }
+                    index.recent().firstOrNull()?.let { last ->
+                        val thumb = vm.thumbFile(last.id)
+                        val bmp = remember(last.id, last.modifiedAt) { runCatching { android.graphics.BitmapFactory.decodeFile(thumb.path)?.asImageBitmap() }.getOrNull() }
+                        if (bmp != null) androidx.compose.foundation.Image(
+                            bmp, last.title, contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(44.dp, 58.dp)
+                                .border(2.dp, Classic.Text).clickable { onOpen(last.id) },
+                        )
+                    }
+                    Column(Modifier.align(Alignment.Center).fillMaxWidth().padding(horizontal = 24.dp).offset(y = (-40).dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        AppLogo(Modifier.fillMaxWidth(0.62f))
+                        Spacer(Modifier.height(36.dp))
+                        Box(
+                            Modifier.fillMaxWidth(0.62f).height(52.dp).background(Classic.HomeButton)
+                                .clickable(enabled = !busy) { getPicture = true },
+                            contentAlignment = Alignment.Center,
+                        ) { Text(stringResource(R.string.get_a_picture), color = Classic.HomeButtonText, fontSize = 19.sp) }
+                        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth(0.62f).padding(top = 16.dp))
+                    }
                 }
                 page == HomePage.MORE -> {
                     ClassicTopBar(stringResource(R.string.home_more), onBack = { page = HomePage.MAIN })
@@ -264,6 +274,13 @@ fun HomeScreen(vm: HomeViewModel, onOpen: (String) -> Unit) {
             confirmButton = { TextButton(onClick = { aboutOpen = false }) { Text(stringResource(R.string.close)) } },
         )
     }
+    if (getPicture) GetPictureDialog(
+        onDismiss = { getPicture = false },
+        onGallery = { getPicture = false; picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+        onCamera = { getPicture = false; val u = app.exports.newCameraUri(); cameraUri = u.toString(); camera.launch(u) },
+        onImport = { getPicture = false; openArchive.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) },
+        onBlank = { getPicture = false; blankDialog = true },
+    )
     if (blankDialog) BlankDialog(onDismiss = { blankDialog = false }) { w, h, c ->
         blankDialog = false; vm.createBlank(w, h, c, untitled)
     }
@@ -292,6 +309,31 @@ private fun ProjectCard(e: ProjectEntry, thumb: File, onOpen: () -> Unit, onFavo
 }
 
 private enum class HomePage { MAIN, RECENT, MORE }
+
+/** "Get Picture from" chooser: white dialog with a blue title and four rows. */
+@Composable
+private fun GetPictureDialog(onDismiss: () -> Unit, onGallery: () -> Unit, onCamera: () -> Unit, onImport: () -> Unit, onBlank: () -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth().background(androidx.compose.ui.graphics.Color(0xFFFAFAFA))) {
+            Text(stringResource(R.string.get_picture_from), color = Classic.Accent, fontSize = 21.sp, modifier = Modifier.padding(20.dp, 18.dp))
+            androidx.compose.material3.HorizontalDivider(color = Classic.Accent, thickness = 2.dp)
+            val dark = androidx.compose.ui.graphics.Color(0xFF212121)
+            for ((label, icon, action) in listOf(
+                Triple(R.string.get_from_gallery, Icons.Filled.PhotoLibrary, onGallery),
+                Triple(R.string.get_from_camera, Icons.Filled.PhotoCamera, onCamera),
+                Triple(R.string.get_from_import, Icons.Filled.FolderOpen, onImport),
+                Triple(R.string.more_new_blank, Icons.Filled.NoteAdd, onBlank),
+            )) {
+                Row(Modifier.fillMaxWidth().clickable(onClick = action).padding(16.dp, 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(icon, null, tint = androidx.compose.ui.graphics.Color(0xFF616161), modifier = Modifier.size(34.dp))
+                    Spacer(Modifier.width(16.dp))
+                    Text(stringResource(label), color = dark, fontSize = 18.sp)
+                }
+                androidx.compose.material3.HorizontalDivider(color = androidx.compose.ui.graphics.Color(0xFFE0E0E0))
+            }
+        }
+    }
+}
 
 /** Own logo (not PicSay's): a speech balloon with the app name. */
 @Composable

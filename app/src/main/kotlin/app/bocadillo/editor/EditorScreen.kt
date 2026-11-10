@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.AutoFixHigh
@@ -57,6 +58,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -122,10 +125,12 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
             } else {
                 val send = Intent(Intent.ACTION_SEND).setType(s.mimeType).putExtra(Intent.EXTRA_STREAM, s.uri)
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                s.component?.let { send.component = it }
                 // Settings › Sharing: default subject and signature (used by e-mail apps)
                 app.settings.shareSubject.takeIf { it.isNotBlank() }?.let { send.putExtra(Intent.EXTRA_SUBJECT, it) }
                 app.settings.shareSignature.takeIf { it.isNotBlank() }?.let { send.putExtra(Intent.EXTRA_TEXT, it) }
-                context.startActivity(Intent.createChooser(send, context.getString(R.string.share_chooser)))
+                if (s.component != null) runCatching { context.startActivity(send) }
+                else context.startActivity(Intent.createChooser(send, context.getString(R.string.share_chooser)))
             }
         }
     }
@@ -154,6 +159,12 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
         }
     }
     var rotateFlipDialog by rememberSaveable { mutableStateOf(false) }
+    var styleDetails by rememberSaveable { mutableStateOf(false) }
+    var composerPhrases by remember { mutableStateOf(false) }
+    // a new composer always starts in the light screen
+    val toolKind = state.tool?.let { it::class.simpleName + ((it as? ToolState.EditBalloon)?.draft?.id ?: (it as? ToolState.EditText)?.draft?.id ?: "") }
+    androidx.compose.runtime.LaunchedEffect(toolKind) { styleDetails = false }
+    }
     var needsTransparency by rememberSaveable { mutableStateOf(false) }
     var locationOpen by rememberSaveable { mutableStateOf(false) }
     var location by remember { mutableStateOf<Pair<Double, Double>?>(null) }
@@ -166,6 +177,8 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
         confirmButton = { TextButton({ needsTransparency = false }) { Text(stringResource(R.string.ok)) } },
     )
     if (locationOpen) PictureLocationDialog(location) { locationOpen = false }
+    // menu thumbnails show the photo being edited (refreshed when a menu opens)
+    androidx.compose.runtime.LaunchedEffect(openMenu) { if (openMenu == EditorMenu.ADJUST || openMenu == EditorMenu.EFFECT) withContext(Dispatchers.Default) { ToolTileCache.setPhoto(vm.previewBitmap()) } }
     fun runMenu(a: MenuAction) {
         openMenu = null
         when (a) {
@@ -222,6 +235,14 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
             remove = { i -> app.phrases.remove(i).also { phrasesVersion++ } },
         )
     }
+    if (composerPhrases) PhrasesDialog(app.phrases.list(), phraseOps, {}, onDismiss = { composerPhrases = false }) { phrase ->
+        composerPhrases = false
+        when (val t = state.tool) {
+            is ToolState.EditBalloon -> vm.updateDraft(t.draft.copy(text = (t.draft.text + if (t.draft.text.isEmpty()) phrase else " $phrase")))
+            is ToolState.EditText -> vm.updateDraft(t.draft.copy(text = (t.draft.text + if (t.draft.text.isEmpty()) phrase else " $phrase")))
+            else -> Unit
+        }
+    }
 
     Scaffold(
         containerColor = Classic.Background,
@@ -240,7 +261,11 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                     onBack = { openMenu = if (openMenu == EditorMenu.BALLOON_SHAPES) EditorMenu.STICKER else null },
                     // menus close with ✕ like the original; sub-screens go back with ←
                     backIcon = if (openMenu == EditorMenu.BALLOON_SHAPES) Icons.AutoMirrored.Filled.ArrowBack else Icons.Filled.Close,
+                    // the Export list shows the file name instead of a title
+                    actions = {},
                 )
+                bar != null && ((state.tool as? ToolState.EditBalloon)?.isNew == true || (state.tool as? ToolState.EditText)?.isNew == true) && !styleDetails ->
+                    ClassicTopBar(bar.title, onBack = bar.onCancel, onConfirm = bar.onApply, backIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft, greenConfirm = true)
                 bar != null -> ClassicTopBar(bar.title, onBack = bar.onCancel, onConfirm = bar.onApply, actions = { info?.quick?.invoke(this) },
                     backIcon = if (bar.onApply == null && (state.tool as? ToolState.PickSticker)?.category == null) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack)
                 else -> ClassicTopBar(
@@ -262,8 +287,28 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                 EditorMenu.EFFECT -> { MenuList(effectMenu, app.registry, ::runMenu); return@Column }
                 EditorMenu.STICKER -> { openMenu = null; vm.openStickerPicker() }
                 EditorMenu.BALLOON_SHAPES -> { BalloonShapeGrid(objRenderer) { sh -> openMenu = null; vm.newBalloon(sh) }; return@Column }
-                EditorMenu.EXPORT -> { ExportMenuList { t -> openMenu = null; exportTarget = t; vm.openPanel(ToolState.Export) }; return@Column }
+                EditorMenu.EXPORT -> {
+                    // album / share / set-as go straight out with the default format (as in the
+                    // original); "Save as file…" first asks for the format
+                    ExportMenuList(state.title, onTarget = { t ->
+                        openMenu = null
+                        if (t == ExportTarget.DOCUMENT) { exportTarget = t; vm.openPanel(ToolState.Export) }
+                        else vm.export(ExportOptions(format = if (vm.currentHasTransparency()) ExportFormat.PNG else ExportFormat.JPEG_VERY_HIGH), t)
+                    }, onApp = { cn -> openMenu = null; vm.export(ExportOptions(format = if (vm.currentHasTransparency()) ExportFormat.PNG else ExportFormat.JPEG_VERY_HIGH), ExportTarget.SHARE, shareTo = cn) })
+                    return@Column
+                }
                 null -> Unit
+            }
+            // "New Word Balloon" / "New Title": light full-screen composer until the user taps the
+            // preview for every style option (then the usual panel over the photo)
+            val newTool = state.tool
+            if (newTool is ToolState.EditBalloon && newTool.isNew && !styleDetails) {
+                NewBalloonScreen(newTool.draft, objRenderer, vm::updateDraft, onStylePreview = { styleDetails = true }, onPhrases = { composerPhrases = true })
+                return@Column
+            }
+            if (newTool is ToolState.EditText && newTool.isNew && !styleDetails) {
+                NewTitleScreen(newTool.draft, objRenderer, vm::updateDraft, onStylePreview = { styleDetails = true }, onPhrases = { composerPhrases = true })
+                return@Column
             }
             // "New Sticker": the classic list, a category grid or My Stickers (full screen)
             (state.tool as? ToolState.PickSticker)?.let { t ->

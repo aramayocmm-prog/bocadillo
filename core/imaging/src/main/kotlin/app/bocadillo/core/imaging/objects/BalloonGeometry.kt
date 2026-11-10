@@ -30,27 +30,72 @@ object BalloonGeometry {
         val rx = w / 2f; val ry = h / 2f
         val body: FloatArray = when (shape) {
             BalloonShape.SPEECH, BalloonShape.WHISPER -> ellipse(rx, ry, 144)
-            BalloonShape.RECTANGLE -> roundRect(rx, ry, 0f)
+            BalloonShape.RECTANGLE, BalloonShape.CAPTION, BalloonShape.POINTER -> roundRect(rx, ry, 0f)
             BalloonShape.ROUNDED -> roundRect(rx, ry, min(rx, ry) * 0.45f)
             BalloonShape.SCREAM -> burst(rx, ry)
             BalloonShape.THOUGHT -> cloud(rx, ry)
         }
         val textScale = when (shape) {
             BalloonShape.SPEECH, BalloonShape.WHISPER -> 0.70f
-            BalloonShape.RECTANGLE -> 0.88f
+            BalloonShape.RECTANGLE, BalloonShape.CAPTION, BalloonShape.POINTER -> 0.88f
             BalloonShape.ROUNDED -> 0.82f
             BalloonShape.SCREAM -> 0.58f
             BalloonShape.THOUGHT -> 0.64f
         }
-        val tipOutside = hasTail && !inside(body, tipX, tipY) && hypot(tipX, tipY) > 1f
+        // a caption box never has a tail
+        val tipOutside = hasTail && shape != BalloonShape.CAPTION && !inside(body, tipX, tipY) && hypot(tipX, tipY) > 1f
         val dashed = shape == BalloonShape.WHISPER
         if (!tipOutside) return BalloonOutline(body, FloatArray(0), dashed, rx * textScale, ry * textScale)
         if (shape == BalloonShape.THOUGHT) {
             return BalloonOutline(body, thoughtBubbles(body, rx, ry, tipX, tipY), false, rx * textScale, ry * textScale)
         }
         val baseHalf = tailWidth.coerceIn(0.05f, 0.9f) * min(rx, ry)
+        if (shape == BalloonShape.POINTER) {
+            return BalloonOutline(pointerTail(roundRect(rx, ry, 0f), tipX, tipY, baseHalf), FloatArray(0), false, rx * textScale, ry * textScale)
+        }
         val merged = insertTail(body, tipX, tipY, baseHalf, jagged = shape == BalloonShape.SCREAM)
         return BalloonOutline(merged, FloatArray(0), dashed, rx * textScale, ry * textScale)
+    }
+
+    /**
+     * Pointer: a straight shaft that leaves the rectangle where the line centre→tip crosses it
+     * and ends in an arrow head at the tip. Built directly on the rectangle outline.
+     */
+    private fun pointerTail(body: FloatArray, tipX: Float, tipY: Float, baseHalf: Float): FloatArray {
+        val n = body.size / 2
+        val len = hypot(tipX, tipY)
+        val ux = tipX / len; val uy = tipY / len
+        // where the centre→tip ray leaves the body: nearest vertex along that direction
+        var k = 0; var best = -Float.MAX_VALUE
+        for (i in 0 until n) {
+            val d = body[i * 2] * ux + body[i * 2 + 1] * uy - abs(body[i * 2] * uy - body[i * 2 + 1] * ux) * 4f
+            if (d > best) { best = d; k = i }
+        }
+        val hx = body[k * 2]; val hy = body[k * 2 + 1]
+        val dist = hypot(tipX - hx, tipY - hy)
+        if (dist < 4f) return body
+        val vx = (tipX - hx) / dist; val vy = (tipY - hy) / dist   // shaft direction
+        val w = baseHalf * 0.38f; val head = baseHalf * 1.05f
+        val headLen = min(dist * 0.45f, baseHalf * 2.2f)
+        val ex = tipX - vx * headLen; val ey = tipY - vy * headLen
+        // edge direction at k (polygon order) and the matching side of the shaft
+        val k1 = (k + 1) % n; val k0 = (k - 1 + n) % n
+        var tx = body[k1 * 2] - body[k0 * 2]; var ty = body[k1 * 2 + 1] - body[k0 * 2 + 1]
+        val tl = hypot(tx, ty).coerceAtLeast(1e-3f); tx /= tl; ty /= tl
+        var mx = -vy; var my = vx
+        if (mx * tx + my * ty < 0) { mx = -mx; my = -my }
+        // drop the body vertices covered by the shaft base
+        val keep = (0 until n).filter { i -> i == k || hypot(body[i * 2] - hx, body[i * 2 + 1] - hy) > w * 1.2f }
+        val out = ArrayList<Float>(keep.size * 2 + 14)
+        for (i in keep) {
+            if (i == k) {
+                floatArrayOf(
+                    hx - tx * w, hy - ty * w, ex - mx * w, ey - my * w, ex - mx * head, ey - my * head, tipX, tipY,
+                    ex + mx * head, ey + my * head, ex + mx * w, ey + my * w, hx + tx * w, hy + ty * w,
+                ).forEach { out += it }
+            } else { out += body[i * 2]; out += body[i * 2 + 1] }
+        }
+        return out.toFloatArray()
     }
 
     // ---------------------------------------------------------------- bodies

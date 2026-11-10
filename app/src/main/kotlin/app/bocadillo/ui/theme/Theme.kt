@@ -13,13 +13,14 @@ import androidx.compose.ui.unit.sp
  * All colours of the app live here so every screen stays uniform.
  */
 object Classic {
+    // measured on the reference screenshots (747×1600, menus and sticker tools)
     val Background = Color(0xFF000000)
-    val Menu = Color(0xFF111111)
-    val Bar = Color(0xFF1F1F1F)
-    val BarTop = Color(0xFF2A2A2A)
-    val Section = Color(0xFF2B2B2B)
-    val SectionText = Color(0xFFB8B8B8)
-    val Divider = Color(0xFF2E2E2E)
+    val Menu = Color(0xFF111111)          // list background
+    val Bar = Color(0xFF1E1E1E)           // top bar
+    val BarTop = Color(0xFF1E1E1E)
+    val Section = Color(0xFF232323)       // group header ("Transform Picture", "Misc"…)
+    val SectionText = Color(0xFF9E9E9E)
+    val Divider = Color(0xFF1A1A1A)
     val Cell = Color(0xFF3A3A3A)
     val ButtonFill = Color(0xFF262626)
     val ButtonBorder = Color(0xFF7A7A7A)
@@ -28,6 +29,23 @@ object Classic {
     val Accent = Color(0xFF2196F3)
     val AccentDark = Color(0xFF0D47A1)
     val Selected = Color(0xFF1565C0)
+    val Confirm = Color(0xFF6CC644)       // green check mark of the sticker tools
+    // home screen
+    val Home = Color(0xFF333333)
+    val HomeButton = Color(0xFFCFCFCF)
+    val HomeButtonText = Color(0xFF333333)
+    // light sticker tools (New Title / New Word Balloon / Font / shape picker)
+    val LightPreview = Color(0xFFCFCFCF)
+    val LightGrid = Color(0xFFDFDFDF)
+    val LightField = Color(0xFFFFFFFF)
+    val LightFieldBorder = Color(0xFF7B9EE0)
+    val LightHeader = Color(0xFFCCCCCC)
+    val LightHeaderText = Color(0xFF333333)
+    val LightRow = Color(0xFFFFFFFF)
+    val LightDivider = Color(0xFFE6E6E6)
+    val LightMore = Color(0xFFA9D3EB)
+    val ShapeTop = Color(0xFFD0D0D0)
+    val ShapeBottom = Color(0xFFB5B3B6)
 }
 
 private val Scheme = darkColorScheme(
