@@ -58,6 +58,12 @@ class ReferenceScreensTest {
         }
         rule.waitForIdle(); Thread.sleep(800)
     }
+    /** Taps a row of a (lazy) menu list, scrolling to it first. */
+    private fun tapInList(text: String) {
+        val lists = rule.onAllNodes(hasScrollAction())
+        if (lists.fetchSemanticsNodes().isNotEmpty()) runCatching { lists.onFirst().performScrollToNode(hasText(text)) }
+        rule.waitForIdle(); tap(text)
+    }
     private fun back() { rule.onNodeWithContentDescription(s(R.string.back)).performClick(); rule.waitForIdle() }
 
     @Test fun captureReferenceScreens() {
@@ -83,10 +89,10 @@ class ReferenceScreensTest {
         tap(s(R.string.word_balloon)); shot("08_balloon_shapes")
         tap(s(R.string.balloon_speech)); shot("09_balloon_edit", 2000); hideKeyboard(); back()
 
-        tap(s(R.string.menu_effect)); tap(s(R.string.brush)); expandPanel(); shot("12_paint", 2000); back()
+        tap(s(R.string.menu_effect)); tapInList(s(R.string.paint)); expandPanel(); shot("12_paint", 2000); back()
         tap(s(R.string.export)); shot("13_export"); back()
         tap(s(R.string.menu_adjust)); tap(s(R.string.op_crop)); expandPanel(); shot("14_crop", 2500); back()
-        tap(s(R.string.menu_adjust)); tap(s(R.string.op_rotate)); shot("15_rotate", 2000); back()
+        tap(s(R.string.menu_adjust)); tapInList(s(R.string.op_rotate)); shot("15_rotate", 2000); back()
         tap(s(R.string.menu_adjust)); tap(s(R.string.op_resize)); shot("16_resize")
         rule.onAllNodesWithText(s(R.string.cancel), useUnmergedTree = true).onFirst().performClick(); rule.waitForIdle()
         // the title editor opens the keyboard: keep it for the end
