@@ -48,10 +48,10 @@ import kotlin.math.roundToInt
 
 /** Shared sizes of the classic screens (measured on the reference, scaled to dp). */
 object ClassicDims {
-    val TopBar = 52.dp
+    val TopBar = 54.dp
     val BottomBar = 64.dp
-    val Row = 55.dp
-    val Section = 21.dp
+    val Row = 58.dp
+    val Section = 22.dp
     val RowIcon = 32.dp
     val Thumb = 46.dp
     /** Effect previews are narrow portrait crops flush with the left edge. */
@@ -78,7 +78,7 @@ fun ClassicTopBar(
             .background(Brush.verticalGradient(listOf(Classic.BarTop, Classic.Bar))),
     ) {
         Text(
-            title, color = Classic.Text, fontSize = 19.sp, fontWeight = FontWeight.Normal, maxLines = 1,
+            title, color = Classic.Text, fontSize = 21.sp, fontWeight = FontWeight.Normal, maxLines = 1,
             overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
             modifier = Modifier.align(Alignment.Center).padding(horizontal = 104.dp),
         )
@@ -120,7 +120,7 @@ fun ClassicMenuRow(label: String, onClick: () -> Unit, height: Dp = ClassicDims.
     Column(Modifier.fillMaxWidth().background(Classic.Menu).clickable(onClick = onClick)) {
         Row(Modifier.fillMaxWidth().heightIn(min = height).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.widthIn(min = 32.dp).padding(end = 12.dp), contentAlignment = Alignment.Center) { icon() }
-            Text(label, color = Classic.Text, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text(label, color = Classic.Text, fontSize = 21.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             // discreet status on the right (e.g. "Pending import"); the name keeps the space it needs
             if (note != null) Text(note, color = Classic.TextDim, fontSize = 11.sp, maxLines = 1, softWrap = false, modifier = Modifier.padding(start = 8.dp))
         }
@@ -133,7 +133,7 @@ fun ClassicMenuRow(label: String, onClick: () -> Unit, height: Dp = ClassicDims.
 fun ClassicSection(text: String) {
     // 21 dp grey strip with small bold grey text, measured on the Adjust/Effect lists
     Box(Modifier.fillMaxWidth().height(ClassicDims.Section).background(Classic.Section).padding(start = 8.dp), contentAlignment = Alignment.CenterStart) {
-        Text(text, color = Classic.SectionText, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(text, color = Classic.SectionText, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 

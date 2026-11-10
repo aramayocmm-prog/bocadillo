@@ -438,4 +438,5 @@ Longitude: %2$s</string>
     <string name="enter_text_here">Enter your text here</string>
     <string name="phrases">Common phrases</string>
     <string name="more_fonts">More Fonts</string>
+    <string name="more_options">All options…</string>
 </resources>

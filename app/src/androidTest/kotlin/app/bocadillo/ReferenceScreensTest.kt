@@ -65,6 +65,11 @@ class ReferenceScreensTest {
         if (lists.fetchSemanticsNodes().isNotEmpty()) runCatching { lists.onFirst().performScrollToNode(hasText(text)) }
         rule.waitForIdle(); tap(text)
     }
+    /** Classic tool chrome: ✕ (unchanged) or ✓ (changed); the system Back always cancels. */
+    private fun cancelTool() {
+        InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+        rule.waitForIdle(); Thread.sleep(500)
+    }
     private fun back() { rule.onNodeWithContentDescription(s(R.string.back)).performClick(); rule.waitForIdle() }
 
     @Test fun captureReferenceScreens() {
@@ -81,10 +86,10 @@ class ReferenceScreensTest {
         tap(s(R.string.more_recent_projects)); tap("Sample"); waitFor(s(R.string.menu_adjust)); shot("02_editor", 4000)
 
         tap(s(R.string.menu_adjust)); waitFor(s(R.string.op_boost)); shot("03_adjust", 2000)
-        tap(s(R.string.op_exposure_contrast)); shot("04_exposure", 2000); back()
+        tap(s(R.string.op_exposure_contrast)); shot("04_exposure", 2000); cancelTool()
 
         tap(s(R.string.menu_effect)); shot("05_effect", 2500)
-        tap(s(R.string.op_twirl)); shot("06_twirl", 2500); back()
+        tapInList(s(R.string.op_twirl)); shot("06_twirl", 2500); cancelTool()
         tap(s(R.string.menu_effect)); scrollTo(s(R.string.op_hue)); shot("17_color_filters", 2500); back()
 
         tap(s(R.string.menu_sticker)); shot("07_sticker", 1500)
@@ -95,7 +100,7 @@ class ReferenceScreensTest {
         tap(s(R.string.menu_effect)); tapInList(s(R.string.paint)); expandPanel(); shot("12_paint", 2000); back()
         tap(s(R.string.export)); shot("13_export"); back()
         tap(s(R.string.menu_adjust)); tap(s(R.string.op_crop)); expandPanel(); shot("14_crop", 2500); back()
-        tap(s(R.string.menu_adjust)); tapInList(s(R.string.op_rotate)); shot("15_rotate", 2000); back()
+        tap(s(R.string.menu_adjust)); tapInList(s(R.string.op_rotate)); shot("15_rotate", 2000); cancelTool()
         tap(s(R.string.menu_adjust)); tap(s(R.string.op_resize)); shot("16_resize")
         rule.onAllNodesWithText(s(R.string.cancel), useUnmergedTree = true).onFirst().performClick(); rule.waitForIdle()
         // the title editor opens the keyboard: keep it for the end

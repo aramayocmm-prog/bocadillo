@@ -159,11 +159,17 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
         }
     }
     var rotateFlipDialog by rememberSaveable { mutableStateOf(false) }
+    // classic tool chrome: which slider the bottom bar controls, and whether all options show
+    var activeParam by rememberSaveable { mutableStateOf("") }
+    var allOptions by rememberSaveable { mutableStateOf(false) }
     var styleDetails by rememberSaveable { mutableStateOf(false) }
     var composerPhrases by remember { mutableStateOf(false) }
     // a new composer always starts in the light screen
     val toolKind = state.tool?.let { it::class.simpleName + ((it as? ToolState.EditBalloon)?.draft?.id ?: (it as? ToolState.EditText)?.draft?.id ?: "") }
-    androidx.compose.runtime.LaunchedEffect(toolKind) { styleDetails = false }
+    androidx.compose.runtime.LaunchedEffect(toolKind) {
+        styleDetails = false; allOptions = false
+        activeParam = (state.tool as? ToolState.Adjust)?.op?.params?.filterIsInstance<ParamSpec.Slider>()?.firstOrNull()?.key ?: ""
+    }
     var needsTransparency by rememberSaveable { mutableStateOf(false) }
     var locationOpen by rememberSaveable { mutableStateOf(false) }
     var location by remember { mutableStateOf<Pair<Double, Double>?>(null) }
@@ -263,6 +269,11 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                     // the Export list shows the file name instead of a title
                     actions = {},
                 )
+                (state.tool as? ToolState.Adjust)?.takeIf { usesClassicChrome(it) } != null -> {
+                    val t = state.tool as ToolState.Adjust
+                    ClassicToolTopBar(t, activeParam, { activeParam = it }, vm::resetParams, { on -> if (on) vm.ensureBefore(); comparing = on },
+                        onMoreOptions = { allOptions = !allOptions }, onCancel = vm::cancelTool, onApply = vm::applyTool)
+                }
                 bar != null && ((state.tool as? ToolState.EditBalloon)?.isNew == true || (state.tool as? ToolState.EditText)?.isNew == true) && !styleDetails ->
                     ClassicTopBar(bar.title, onBack = bar.onCancel, onConfirm = bar.onApply, backIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft, greenConfirm = true)
                 bar != null -> ClassicTopBar(bar.title, onBack = bar.onCancel, onConfirm = bar.onApply, actions = { info?.quick?.invoke(this) },
@@ -327,7 +338,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                 if (importingStickers) LinearProgressIndicator(Modifier.fillMaxWidth())
                 return@Column
             }
-            Box(Modifier.weight(1f).fillMaxWidth()) {
+            Box(Modifier.weight(1f).fillMaxWidth().background(if (state.tool != null) ToolChrome.Work else Classic.Background)) {
                 EditorCanvas(
                     image = if (comparing) state.before ?: state.preview else state.preview,
                     crop = state.tool as? ToolState.Crop,
@@ -367,13 +378,16 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
             }
             if (!state.loading && state.fatalError == null) Box(Modifier.fillMaxWidth().background(Classic.Menu)) {
                 Column(Modifier.navigationBarsPadding()) {
-                    val info = panelInfo(state, context, vm)
+                    // the classic slider bar is already minimal: no expand/collapse handle for it
+                    val classicBar = (state.tool as? ToolState.Adjust)?.let { usesClassicChrome(it) && !allOptions } == true
+                    val info = if (classicBar) null else panelInfo(state, context, vm)
                     val expanded = info == null || panelPrefs.expanded(info)
                     if (info != null && !expanded) ExpandHandle { panelPrefs.set(info, true) }
                     else {
                     if (info != null) CollapseHandle { panelPrefs.set(info, false) }
                     when (val t = state.tool) {
-                        is ToolState.Adjust -> AdjustPanel(t, vm::updateParam, vm::resetParams, vm::applyTool, vm::cancelTool) { on ->
+                        is ToolState.Adjust -> if (usesClassicChrome(t) && !allOptions) ClassicToolSliderBar(t, activeParam, vm::updateParam)
+                        else AdjustPanel(t, vm::updateParam, vm::resetParams, vm::applyTool, vm::cancelTool) { on ->
                             if (on) vm.ensureBefore(); comparing = on
                         }
                         is ToolState.Crop -> CropPanel(t, vm::setCropPreset, vm::setStraighten, vm::applyTool, vm::cancelTool)

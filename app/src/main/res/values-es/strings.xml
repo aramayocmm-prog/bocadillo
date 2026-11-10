@@ -438,4 +438,5 @@ Longitud: %2$s</string>
     <string name="enter_text_here">Escribe tu texto aquí</string>
     <string name="phrases">Frases comunes</string>
     <string name="more_fonts">Más fuentes</string>
+    <string name="more_options">Todas las opciones…</string>
 </resources>
