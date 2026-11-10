@@ -108,11 +108,16 @@ fun ClassicBottomBar(items: List<BarItem>) {
 
 /** Menu row: picture/icon on the left, white name, thin separator below. */
 @Composable
-fun ClassicMenuRow(label: String, onClick: () -> Unit, height: Dp = ClassicDims.Row, icon: @Composable () -> Unit) {
+fun ClassicMenuRow(label: String, onClick: () -> Unit, height: Dp = ClassicDims.Row, note: String? = null, icon: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().background(Classic.Menu).clickable(onClick = onClick)) {
         Row(Modifier.fillMaxWidth().heightIn(min = height).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.widthIn(min = 44.dp).padding(end = 14.dp), contentAlignment = Alignment.Center) { icon() }
-            Text(label, color = Classic.Text, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(label, color = Classic.Text, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            // discreet status on the right (e.g. "Pending import")
+            if (note != null) {
+                Spacer(Modifier.weight(1f))
+                Text(note, color = Classic.TextDim, fontSize = 12.sp, maxLines = 1, modifier = Modifier.padding(start = 8.dp))
+            }
         }
         HorizontalDivider(color = Classic.Divider, thickness = 1.dp)
     }

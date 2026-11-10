@@ -50,6 +50,14 @@ class ReferenceScreensTest {
         val n = rule.onAllNodesWithContentDescription(s(R.string.show_options), useUnmergedTree = true)
         if (n.fetchSemanticsNodes().isNotEmpty()) { n.onFirst().performClick(); rule.waitForIdle() }
     }
+    /** The text editor opens the keyboard, which would cover the bottom bar. */
+    private fun hideKeyboard() {
+        rule.runOnUiThread {
+            val imm = ctx.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+            imm.hideSoftInputFromWindow(ctx.window.decorView.windowToken, 0)
+        }
+        rule.waitForIdle(); Thread.sleep(800)
+    }
     private fun back() { rule.onNodeWithContentDescription(s(R.string.back)).performClick(); rule.waitForIdle() }
 
     @Test fun captureReferenceScreens() {
@@ -75,7 +83,7 @@ class ReferenceScreensTest {
         tap(s(R.string.word_balloon)); shot("08_balloon_shapes")
         tap(s(R.string.balloon_speech)); shot("09_balloon_edit", 2000); back()
         tap(s(R.string.menu_sticker)); tap(s(R.string.title_sticker)); shot("10_title_editor", 1500)
-        tap(s(R.string.tab_outline)); shot("11_text_styles"); back()
+        tap(s(R.string.tab_outline)); shot("11_text_styles"); hideKeyboard(); back()
 
         tap(s(R.string.menu_effect)); tap(s(R.string.brush)); expandPanel(); shot("12_paint", 2000); back()
         tap(s(R.string.export)); shot("13_export"); back()

@@ -53,7 +53,7 @@ class StickerLibraryFlowTest {
     }
     private fun tap(text: String) { rule.onAllNodesWithText(text, useUnmergedTree = true).onFirst().performClick(); rule.waitForIdle() }
     private fun waitFor(text: String, ms: Long = 30_000) {
-        rule.waitUntil(ms) { rule.onAllNodesWithText(text, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(ms) { rule.onAllNodesWithText(text, substring = true, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
     }
 
     private fun testPng(): ByteArray {

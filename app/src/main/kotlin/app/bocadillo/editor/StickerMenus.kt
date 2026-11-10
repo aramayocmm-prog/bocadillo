@@ -85,16 +85,10 @@ fun StickerMenu(
         }
         items(StickerCategories.all, key = { it.id }) { cat ->
             val n = counts[cat.id] ?: 0
-            Column(Modifier.fillMaxWidth()) {
-                ClassicMenuRow(cat.name(lang), { onCategory(cat.id) }) {
-                    val first = remember(index, cat.id) { index.inCategory(cat.id).firstOrNull() }
-                    if (first != null) PackThumb(packs, first, ClassicDims.RowIcon) else EmptyIcon()
-                }
+            ClassicMenuRow(cat.name(lang), { onCategory(cat.id) }, note = if (n == 0) stringResource(R.string.sticker_pending_short) else null) {
+                val first = remember(index, cat.id) { index.inCategory(cat.id).firstOrNull() }
+                if (first != null) PackThumb(packs, first, ClassicDims.RowIcon) else EmptyIcon()
             }
-            if (n == 0) Text(
-                stringResource(R.string.sticker_pending_short), color = Classic.TextDim, fontSize = 11.sp,
-                modifier = Modifier.fillMaxWidth().background(Classic.Menu).padding(start = 70.dp, bottom = 4.dp),
-            )
         }
         item { ClassicMenuRow(stringResource(R.string.my_stickers), { onCategory(MY_STICKERS) }) { Icon(Icons.Filled.Collections, null, tint = Classic.Text, modifier = Modifier.size(30.dp)) } }
         item { ClassicMenuRow(stringResource(R.string.sticker_import_library), onImportZip) { Icon(Icons.Filled.Unarchive, null, tint = Classic.Text, modifier = Modifier.size(30.dp)) } }
