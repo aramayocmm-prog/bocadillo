@@ -47,6 +47,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -144,6 +145,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
         when {
             openMenu == EditorMenu.BALLOON_SHAPES -> openMenu = EditorMenu.STICKER
             openMenu != null -> openMenu = null
+            (state.tool as? ToolState.PickSticker)?.category != null -> vm.showStickerCategory(null)
             state.tool != null -> vm.cancelTool()
             state.selectedId != null -> vm.selectObject(null)
             else -> leave()
@@ -190,6 +192,10 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
         vm.importStickerImages(uris)
     }
     val library = remember(state.libraryVersion) { app.stickerLibrary.list() }
+    val stickerZip = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.importStickerZip(uri) }
+    val importingStickers by vm.importingStickers.collectAsStateWithLifecycle()
+    val stickerImport by vm.stickerImport.collectAsStateWithLifecycle()
+    StickerImportReportDialog(stickerImport?.first, stickerImport?.second, vm::dismissStickerImport)
     val phraseOps = remember {
         PhraseOps(
             add = { p -> app.phrases.add(p).also { phrasesVersion++ } },
@@ -232,19 +238,28 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
             when (openMenu) {
                 EditorMenu.ADJUST -> { MenuList(adjustMenu, app.registry, ::runMenu); return@Column }
                 EditorMenu.EFFECT -> { MenuList(effectMenu, app.registry, ::runMenu); return@Column }
-                EditorMenu.STICKER -> {
-                    StickerMenuList(app.stickers, app.noto, objRenderer) { c ->
-                        when (c) {
-                            StickerChoice.Balloon -> openMenu = EditorMenu.BALLOON_SHAPES
-                            StickerChoice.Title -> { openMenu = null; vm.newText() }
-                            is StickerChoice.Category -> { openMenu = null; vm.openStickerPicker(tab = c.tab) }
-                        }
-                    }
-                    return@Column
-                }
+                EditorMenu.STICKER -> { openMenu = null; vm.openStickerPicker() }
                 EditorMenu.BALLOON_SHAPES -> { BalloonShapeGrid(objRenderer) { sh -> openMenu = null; vm.newBalloon(sh) }; return@Column }
                 EditorMenu.EXPORT -> { ExportMenuList { t -> openMenu = null; exportTarget = t; vm.openPanel(ToolState.Export) }; return@Column }
                 null -> Unit
+            }
+            // "New Sticker": the classic list, a category grid or My Stickers (full screen)
+            (state.tool as? ToolState.PickSticker)?.let { t ->
+                when (val cat = t.category) {
+                    null -> StickerMenu(
+                        app.stickerPacks, t.replaceId != null,
+                        onBalloon = { vm.cancelTool(); openMenu = EditorMenu.BALLOON_SHAPES },
+                        onTitle = { vm.cancelTool(); vm.newText() },
+                        onCategory = vm::showStickerCategory,
+                        onImportZip = { stickerZip.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) },
+                    )
+                    MY_STICKERS -> MyStickersGrid(library, onPick = { vm.placeLibrarySticker(it) }, onDelete = vm::deleteLibrarySticker,
+                        onImport = { stickerImages.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) })
+                    else -> StickerCategoryGrid(app.stickerPacks, cat, onPick = vm::placePackSticker, onDelete = { vm.deletePackSticker(it) },
+                        onImportZip = { stickerZip.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) })
+                }
+                if (importingStickers) LinearProgressIndicator(Modifier.fillMaxWidth())
+                return@Column
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 EditorCanvas(
@@ -307,12 +322,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                             onImportFont = { fontPicker.launch(arrayOf("font/*", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream")) },
                             onApply = vm::applyTool, onCancel = vm::cancelTool,
                         )
-                        is ToolState.PickSticker -> StickerPickerPanel(
-                            app.stickers, objRenderer, t.replaceId != null, library, app.noto,
-                            onPick = vm::pickSticker, onPickNoto = vm::pickNoto, onPickLibrary = { vm.placeLibrarySticker(it) }, onDeleteLibrary = vm::deleteLibrarySticker,
-                            onImport = { stickerImages.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, onCancel = vm::cancelTool,
-                            initialTab = t.tab,
-                        )
+                        is ToolState.PickSticker -> Unit // full-screen sticker menu above
                         is ToolState.Draw -> DrawPanel(
                             t, vm.historyStages(), { id -> context.getString(Labels.op(id)) },
                             onKind = vm::setDrawKind, onBrush = vm::setBrush, onStage = vm::setHistoryStage, onEyedropper = vm::setEyedropper,
@@ -335,7 +345,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                         } ?: ClassicBottomBar(listOf(
                             BarItem(stringResource(R.string.menu_adjust), { Icon(Icons.Filled.Tune, null, tint = Classic.Text) }, { openMenu = EditorMenu.ADJUST }),
                             BarItem(stringResource(R.string.menu_effect), { Icon(Icons.Filled.AutoFixHigh, null, tint = Classic.Text) }, { openMenu = EditorMenu.EFFECT }),
-                            BarItem(stringResource(R.string.menu_sticker), { Icon(Icons.Filled.ChatBubble, null, tint = Classic.Text) }, { openMenu = EditorMenu.STICKER }),
+                            BarItem(stringResource(R.string.menu_sticker), { Icon(Icons.Filled.ChatBubble, null, tint = Classic.Text) }, { vm.openStickerPicker() }),
                             BarItem(stringResource(R.string.export), { Icon(Icons.Filled.Share, null, tint = Classic.Text) }, { openMenu = EditorMenu.EXPORT },
                                 enabled = !state.exporting),
                         ))
@@ -427,7 +437,11 @@ private fun toolBar(state: EditorUiState, context: Context, vm: EditorViewModel)
         ToolState.Orient -> ToolBarInfo(s(R.string.op_orient), vm::cancelTool, null)
         is ToolState.EditText -> ToolBarInfo(s(if (t.isNew) R.string.title_new else R.string.title_edit), vm::cancelTool, vm::applyTool)
         is ToolState.EditBalloon -> ToolBarInfo(s(if (t.isNew) R.string.wordballoon_new else R.string.wordballoon_edit), vm::cancelTool, vm::applyTool)
-        is ToolState.PickSticker -> ToolBarInfo(s(if (t.replaceId != null) R.string.sticker_replace else R.string.sticker_new), vm::cancelTool, null)
+        is ToolState.PickSticker -> when (val c = t.category) {
+            null -> ToolBarInfo(s(if (t.replaceId != null) R.string.sticker_replace else R.string.sticker_new), vm::cancelTool, null)
+            MY_STICKERS -> ToolBarInfo(s(R.string.my_stickers), { vm.showStickerCategory(null) }, null)
+            else -> ToolBarInfo(app.bocadillo.core.model.StickerCategories.all.firstOrNull { it.id == c }?.name(java.util.Locale.getDefault().language) ?: c, { vm.showStickerCategory(null) }, null)
+        }
         is ToolState.StyleSticker -> ToolBarInfo(s(R.string.sticker_set_style), vm::cancelTool, vm::applyTool)
         is ToolState.Draw -> ToolBarInfo(s(when (t.kind) {
             DrawKind.BRUSH -> R.string.brush; DrawKind.MARKER -> R.string.marker

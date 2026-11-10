@@ -28,6 +28,8 @@ class BocadilloApp : Application() {
     lateinit var noto: NotoStickers
         private set
     val registry: OpRegistry by lazy { OpRegistry.default() }
+    /** External sticker library imported by the user (ZIP with manifest/SQLite/folders). */
+    val stickerPacks: app.bocadillo.data.StickerPacks by lazy { app.bocadillo.data.StickerPacks(this) }
     val settings: app.bocadillo.data.AppSettings by lazy { app.bocadillo.data.AppSettings(this) }
 
     /** Built-in vector stickers (assets/stickers/catalog.json). */

@@ -284,6 +284,8 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
                 }
             }
             c.restore()
+        } else if (o.source.endsWith(".svg", ignoreCase = true)) {
+            drawSvgAsset(c, o, bw, bh)
         } else {
             val bmp = bitmaps.getOrPut(o.source) {
                 assets[o.source.removePrefix("asset:")]?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
@@ -326,6 +328,34 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
             android.util.Log.w("ObjectRenderer", "Cannot draw emoji $id", e)
         }
     }
+
+    /** SVG sticker stored in the project (external library): vector on export, cached raster on screen. */
+    private fun drawSvgAsset(c: Canvas, o: StickerObject, bw: Float, bh: Float) {
+        val path = o.source.removePrefix("asset:")
+        val dst = RectF(-bw / 2, -bh / 2, bw / 2, bh / 2)
+        try {
+            val svg = svgAssets.get(path) ?: assets[path]?.let { com.caverock.androidsvg.SVG.getFromString(it.toString(Charsets.UTF_8)) }?.also { svgAssets.put(path, it) } ?: return
+            if (!c.isHardwareAccelerated) { svg.renderToCanvas(c, dst); return }
+            val t = o.transform
+            val longest = max(bw, bh) * abs(t.scale) * max(abs(t.stretchX), abs(t.stretchY))
+            val px = (ceil(longest / 64f) * 64f).toInt().coerceIn(64, 1536)
+            val key = "$path@$px"
+            val bmp = notoBitmaps.get(key) ?: run {
+                val w = if (bw >= bh) px else max(1, (px * bw / bh).toInt())
+                val h = if (bh >= bw) px else max(1, (px * bh / bw).toInt())
+                Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { b ->
+                    svg.renderToCanvas(Canvas(b), RectF(0f, 0f, w.toFloat(), h.toFloat()))
+                    notoBitmaps.put(key, b)
+                }
+            }
+            c.drawBitmap(bmp, null, dst, bmpPaint)
+        } catch (e: Throwable) {
+            if (e is OutOfMemoryError) notoBitmaps.evictAll()
+            android.util.Log.w("ObjectRenderer", "Cannot draw SVG sticker $path", e)
+        }
+    }
+
+    private val svgAssets = LruCache<String, com.caverock.androidsvg.SVG>(64)
 
     private val notoBitmaps = object : LruCache<String, Bitmap>(32 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount

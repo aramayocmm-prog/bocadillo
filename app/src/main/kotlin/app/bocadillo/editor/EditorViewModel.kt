@@ -92,7 +92,7 @@ sealed interface ToolState {
     data class EditText(val draft: TextObject, val isNew: Boolean) : ToolState
     data class EditBalloon(val draft: BalloonObject, val isNew: Boolean) : ToolState
     /** Sticker catalogue; [replaceId] set when replacing the selected sticker. */
-    data class PickSticker(val replaceId: String?, val tab: Int = 1) : ToolState
+    data class PickSticker(val replaceId: String?, val tab: Int = 1, val category: String? = null) : ToolState
     /** Sticker colours / outline / opacity. */
     data class StyleSticker(val draft: StickerObject) : ToolState
 
@@ -658,6 +658,60 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
                 commit(doc.addObject(o, now()), "sticker")
             }
         }
+    }
+
+    /**
+     * Places a sticker of the external library. The picture is copied into the project (like
+     * "My stickers"), so the project keeps working even if the library changes later.
+     */
+    fun placePackSticker(s: app.bocadillo.core.model.LibrarySticker) {
+        val replaceId = (_state.value.tool as? ToolState.PickSticker)?.replaceId
+        closeTool(render = false)
+        viewModelScope.launch {
+            val (bytes, aspect) = withContext(Dispatchers.IO) {
+                runCatching { app.stickerPacks.file(s).readBytes() }.getOrNull() to app.stickerPacks.aspect(s)
+            }
+            if (bytes == null) { _messages.send(UiMessage.Res(R.string.error_import)); return@launch }
+            val path = "stickers/${s.file}"
+            assets[path] = bytes
+            bumpAssets()
+            val replace = replaceId?.let { doc.objectById(it) as? StickerObject }
+            if (replace != null) {
+                commit(doc.updateObject(replace.copy(source = "asset:$path", aspect = aspect, colors = emptyList()), now()), "replace")
+            } else {
+                val o = StickerObject(newObjectId(), center(), "asset:$path", aspect = aspect)
+                _state.update { it.copy(selectedId = o.id) }
+                commit(doc.addObject(o, now()), "sticker")
+            }
+        }
+    }
+
+    /** Last sticker-library import result (shown in a dialog). */
+    private val _stickerImport = MutableStateFlow<Pair<app.bocadillo.data.StickerPacks.Report?, String?>?>(null)
+    val stickerImport: StateFlow<Pair<app.bocadillo.data.StickerPacks.Report?, String?>?> = _stickerImport
+    private val _importingStickers = MutableStateFlow(false)
+    val importingStickers: StateFlow<Boolean> = _importingStickers
+
+    /** Imports a sticker-library ZIP (manifest.json, SQLite catalogue or folders). */
+    fun importStickerZip(uri: Uri) {
+        if (_importingStickers.value) return
+        _importingStickers.value = true
+        viewModelScope.launch {
+            _stickerImport.value = try {
+                app.stickerPacks.importZip(app.contentResolver, uri) to null
+            } catch (e: Exception) {
+                null to (e.message ?: e.javaClass.simpleName)
+            } finally { _importingStickers.value = false }
+        }
+    }
+
+    fun dismissStickerImport() { _stickerImport.value = null }
+
+    fun deletePackSticker(s: app.bocadillo.core.model.LibrarySticker) = viewModelScope.launch { app.stickerPacks.delete(s.id) }
+
+    /** Shows a category of the sticker menu (null = the category list). */
+    fun showStickerCategory(id: String?) {
+        _state.update { st -> (st.tool as? ToolState.PickSticker)?.let { st.copy(tool = it.copy(category = id)) } ?: st }
     }
 
     fun deleteLibrarySticker(file: java.io.File) {

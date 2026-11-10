@@ -378,4 +378,16 @@
     <string name="error_open_project">Could not open that project file</string>
     <string name="error_save_project">Could not save the project</string>
     <string name="project_saved">Project saved</string>
+    <string name="sticker_pending_short">Pending import</string>
+    <string name="sticker_pending_long">This category has no stickers yet.\nImport a sticker library (ZIP) to fill it.</string>
+    <string name="sticker_import_library">Import sticker library (ZIP)…</string>
+    <string name="sticker_delete_from_library">Remove “%1$s” from the sticker library?</string>
+    <string name="sticker_delete_mine">Remove this picture from My Stickers?</string>
+    <string name="sticker_import_title">Sticker library</string>
+    <string name="sticker_import_failed">The library could not be imported: %1$s</string>
+    <string name="sticker_import_summary">Catalogue: %1$s\nAdded: %2$d\nUpdated: %3$d\nAlready installed: %4$d\nDuplicates skipped: %5$d\nErrors: %6$d\n\nStickers in the library: %7$d</string>
+    <string name="sticker_import_duplicates">Duplicates (same picture already installed):</string>
+    <string name="sticker_import_errors">Errors:</string>
+    <string name="delete">Delete</string>
+    <string name="sticker_import">Import picture</string>
 </resources>

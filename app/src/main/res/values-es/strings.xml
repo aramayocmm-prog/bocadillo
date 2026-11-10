@@ -378,4 +378,16 @@
     <string name="error_open_project">No se pudo abrir ese archivo de proyecto</string>
     <string name="error_save_project">No se pudo guardar el proyecto</string>
     <string name="project_saved">Proyecto guardado</string>
+    <string name="sticker_pending_short">Pendiente de importar</string>
+    <string name="sticker_pending_long">Esta categoría todavía no tiene stickers.\nImporta una biblioteca de stickers (ZIP) para completarla.</string>
+    <string name="sticker_import_library">Importar biblioteca de stickers (ZIP)…</string>
+    <string name="sticker_delete_from_library">¿Quitar «%1$s» de la biblioteca de stickers?</string>
+    <string name="sticker_delete_mine">¿Quitar esta imagen de Mis stickers?</string>
+    <string name="sticker_import_title">Biblioteca de stickers</string>
+    <string name="sticker_import_failed">No se pudo importar la biblioteca: %1$s</string>
+    <string name="sticker_import_summary">Catálogo: %1$s\nAgregados: %2$d\nActualizados: %3$d\nYa instalados: %4$d\nDuplicados omitidos: %5$d\nErrores: %6$d\n\nStickers en la biblioteca: %7$d</string>
+    <string name="sticker_import_duplicates">Duplicados (la misma imagen ya estaba instalada):</string>
+    <string name="sticker_import_errors">Errores:</string>
+    <string name="delete">Eliminar</string>
+    <string name="sticker_import">Importar imagen</string>
 </resources>

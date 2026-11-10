@@ -157,45 +157,6 @@ fun OpThumb(op: ImageOp) = Thumb("op:${op.id}") { ToolPreviews.forOp(op, it) }
 @Composable
 fun DrawThumb(demo: ToolPreviews.DrawDemo) = Thumb("draw:${demo.name}") { ToolPreviews.forDraw(demo, it) }
 
-/** What a row of the Sticker menu opens. */
-sealed interface StickerChoice {
-    data object Balloon : StickerChoice
-    data object Title : StickerChoice
-    data class Category(val tab: Int) : StickerChoice
-}
-
-/** Sticker menu: Word Balloon, Title, then every sticker category (built-in, Noto, mine). */
-@Composable
-fun StickerMenuList(catalog: StickerCatalog, noto: NotoStickers, renderer: ObjectRenderer, onChoice: (StickerChoice) -> Unit) {
-    val lang = Locale.getDefault().language
-    LazyColumn(Modifier.fillMaxSize().background(Classic.Menu)) {
-        item { ClassicMenuRow(stringResource(R.string.word_balloon), { onChoice(StickerChoice.Balloon) }) { ClassicIconView(ClassicIcon.BALLOON) } }
-        item { ClassicMenuRow(stringResource(R.string.title_sticker), { onChoice(StickerChoice.Title) }) { ClassicIconView(ClassicIcon.TITLE) } }
-        catalog.categories.forEachIndexed { i, cat ->
-            item {
-                ClassicMenuRow(cat.name(lang), { onChoice(StickerChoice.Category(i + 1)) }) {
-                    val def = cat.stickers.firstOrNull()
-                    Canvas(Modifier.size(ClassicDims.RowIcon)) {
-                        if (def != null) drawIntoCanvas { renderer.drawStickerPreview(it.nativeCanvas, def, size.width, size.height) }
-                    }
-                }
-            }
-        }
-        noto.groups.forEachIndexed { i, g ->
-            item {
-                ClassicMenuRow("${g.name(lang)} (Noto)", { onChoice(StickerChoice.Category(catalog.categories.size + 1 + i)) }) {
-                    val first = g.items.firstOrNull()?.id
-                    val bmp by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, first) {
-                        value = first?.let { id -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { noto.thumbnail(id, 96)?.asImageBitmap() } }
-                    }
-                    Box(Modifier.size(ClassicDims.RowIcon)) { bmp?.let { androidx.compose.foundation.Image(it, null, Modifier.fillMaxSize()) } }
-                }
-            }
-        }
-        item { ClassicMenuRow(stringResource(R.string.my_stickers), { onChoice(StickerChoice.Category(0)) }) { Icon(Icons.Filled.Collections, null, tint = Classic.Text, modifier = Modifier.size(30.dp)) } }
-    }
-}
-
 /** Export menu (FASE1 §3.6): album, file, share, set as. */
 @Composable
 fun ExportMenuList(onTarget: (ExportTarget) -> Unit) {
