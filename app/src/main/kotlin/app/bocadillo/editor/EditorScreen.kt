@@ -164,7 +164,6 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
     // a new composer always starts in the light screen
     val toolKind = state.tool?.let { it::class.simpleName + ((it as? ToolState.EditBalloon)?.draft?.id ?: (it as? ToolState.EditText)?.draft?.id ?: "") }
     androidx.compose.runtime.LaunchedEffect(toolKind) { styleDetails = false }
-    }
     var needsTransparency by rememberSaveable { mutableStateOf(false) }
     var locationOpen by rememberSaveable { mutableStateOf(false) }
     var location by remember { mutableStateOf<Pair<Double, Double>?>(null) }
