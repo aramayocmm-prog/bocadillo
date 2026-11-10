@@ -137,7 +137,10 @@ class StickerLibraryFlowTest {
         }
         rule.waitForIdle(); shot("24_sticker_transformed")
 
-        // 5. duplicate, then delete the copy
+        // 5. duplicate, then delete the copy (the object panel starts minimized)
+        rule.onAllNodesWithContentDescription(s(R.string.show_options), useUnmergedTree = true).let { n ->
+            if (n.fetchSemanticsNodes().isNotEmpty()) { n.onFirst().performClick(); rule.waitForIdle() }
+        }
         tap(s(R.string.action_duplicate)); rule.waitForIdle(); shot("25_sticker_duplicated")
         tap(s(R.string.action_delete)); rule.waitForIdle()
 
