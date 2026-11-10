@@ -81,7 +81,7 @@ class ReferenceScreensTest {
 
         tap(s(R.string.menu_sticker)); shot("07_sticker", 1500)
         tap(s(R.string.word_balloon)); shot("08_balloon_shapes")
-        tap(s(R.string.balloon_speech)); shot("09_balloon_edit", 2000); back()
+        tap(s(R.string.balloon_speech)); shot("09_balloon_edit", 2000); hideKeyboard(); back()
 
         tap(s(R.string.menu_effect)); tap(s(R.string.brush)); expandPanel(); shot("12_paint", 2000); back()
         tap(s(R.string.export)); shot("13_export"); back()
