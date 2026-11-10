@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.AutoFixHigh
@@ -55,6 +56,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import kotlinx.coroutines.launch
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -151,17 +153,34 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
             else -> leave()
         }
     }
+    var rotateFlipDialog by rememberSaveable { mutableStateOf(false) }
+    var needsTransparency by rememberSaveable { mutableStateOf(false) }
+    var locationOpen by rememberSaveable { mutableStateOf(false) }
+    var location by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val insertPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> if (uri != null) vm.insertPicture(uri) }
+    if (rotateFlipDialog) RotateFlipDialog(onDismiss = { rotateFlipDialog = false }) { rot, h, v -> rotateFlipDialog = false; vm.orient(rot, h, v) }
+    if (needsTransparency) AlertDialog(
+        onDismissRequest = { needsTransparency = false },
+        text = { Text(stringResource(R.string.bg_needs_transparency)) },
+        confirmButton = { TextButton({ needsTransparency = false }) { Text(stringResource(R.string.ok)) } },
+    )
+    if (locationOpen) PictureLocationDialog(location) { locationOpen = false }
     fun runMenu(a: MenuAction) {
         openMenu = null
         when (a) {
             is MenuAction.Op -> when (a.id) {
-                TransformOps.Orient.id -> vm.openPanel(ToolState.Orient)
+                // the original shows Rotate and Flip as a small pop-up list
+                TransformOps.Orient.id -> rotateFlipDialog = true
+                "add_background_color" -> if (vm.currentHasTransparency()) app.registry[a.id]?.let { vm.openTool(it) } else needsTransparency = true
                 TransformOps.Resize.id -> vm.openPanel(ToolState.Resize)
                 else -> app.registry[a.id]?.let { vm.openTool(it) }
             }
             is MenuAction.Draw -> vm.openDraw(a.kind)
             MenuAction.Mask -> vm.openMask(protect = false)
             MenuAction.Restore -> confirmRestore = true
+            MenuAction.InsertPicture -> insertPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            MenuAction.Location -> scope.launch { location = vm.pictureLocation(); locationOpen = true }
         }
     }
 
@@ -219,8 +238,11 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                         EditorMenu.BALLOON_SHAPES -> R.string.word_balloon
                     }),
                     onBack = { openMenu = if (openMenu == EditorMenu.BALLOON_SHAPES) EditorMenu.STICKER else null },
+                    // menus close with ✕ like the original; sub-screens go back with ←
+                    backIcon = if (openMenu == EditorMenu.BALLOON_SHAPES) Icons.AutoMirrored.Filled.ArrowBack else Icons.Filled.Close,
                 )
-                bar != null -> ClassicTopBar(bar.title, onBack = bar.onCancel, onConfirm = bar.onApply, actions = { info?.quick?.invoke(this) })
+                bar != null -> ClassicTopBar(bar.title, onBack = bar.onCancel, onConfirm = bar.onApply, actions = { info?.quick?.invoke(this) },
+                    backIcon = if (bar.onApply == null && (state.tool as? ToolState.PickSticker)?.category == null) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack)
                 else -> ClassicTopBar(
                     state.title.ifEmpty { stringResource(R.string.untitled) }, onBack = leave, onConfirm = leave,
                     actions = {
@@ -268,7 +290,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                     cropPixelSize = state.outputWidth to state.outputHeight,
                     onCropRect = vm::setCropRect,
                     twoFingerNavigation = state.tool is ToolState.Draw || state.tool is ToolState.Mask ||
-                        (state.tool as? ToolState.Adjust)?.op?.params?.any { it is ParamSpec.Point } == true,
+                        (state.tool as? ToolState.Adjust)?.op?.let { op -> op.id == "warp_brush" || op.params.any { it is ParamSpec.Point } } == true,
                 ) { zoom ->
                     ObjectLayer(
                         objects = state.displayObjects(),
@@ -292,7 +314,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                             t.brush.size, androidx.compose.ui.graphics.Color(if (t.protect) 0x88E53935.toInt() else 0x8843A047.toInt()),
                             false, state.maskOverlay, vm::addStroke, { _, _ -> },
                         )
-                        is ToolState.Adjust -> PointHandles(t.op.params, t.params, zoom, vm::updateParam)
+                        is ToolState.Adjust -> if (t.op.id == "warp_brush") WarpOverlay(t.params, vm::updateParam) else PointHandles(t.op.params, t.params, zoom, vm::updateParam)
                         else -> Unit
                     }
                 }

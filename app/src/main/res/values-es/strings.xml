@@ -246,7 +246,7 @@
     <string name="eraser_hint">Lo que borres quedará transparente. Exporta en PNG para conservar la transparencia.</string>
     <string name="history_paint_unavailable">No hay pasos anteriores del mismo tamaño desde los que pintar.</string>
     <string name="history_pick_stage">Pintar desde este paso:</string>
-    <string name="mask_title">Máscara / Selección</string>
+    <string name="mask_title">Pintar máscara / Selección</string>
     <string name="mask_select">Seleccionar (verde)</string>
     <string name="mask_protect">Proteger (rojo)</string>
     <string name="mask_select_hint">Pinta donde quieres aplicar el efecto. Usa el borrador para quitar partes de la selección.</string>
@@ -267,7 +267,7 @@
     <string name="op_adjust_rgb">Ajustar RGB</string>
     <string name="op_spherize">Esferizar</string>
     <string name="op_twirl">Remolino</string>
-    <string name="op_bulge">Abultar</string>
+    <string name="op_bulge">Abultar y pellizcar</string>
     <string name="op_circle_splash">Ondas</string>
     <string name="op_stretch">Estirar</string>
     <string name="op_stretch_v">Estirar vertical</string>
@@ -342,7 +342,7 @@
     <string name="c_clear">Borrar</string>
     <string name="cat_distort">Distorsionar</string>
     <string name="cat_artistic">Artístico</string>
-    <string name="cat_photo">Foto</string>
+    <string name="cat_photo">Efectos fotográficos</string>
     <string name="cat_frames">Filtros y marcos</string>
     <string name="cat_misc">Varios</string>
     <string name="menu_effects">Efectos</string>
@@ -390,4 +390,40 @@
     <string name="sticker_import_errors">Errores:</string>
     <string name="delete">Eliminar</string>
     <string name="sticker_import">Importar imagen</string>
+    <string name="section_color_adjustments">Ajustes de color</string>
+    <string name="paint">Pintar</string>
+    <string name="op_curves">Curvas</string>
+    <string name="op_fix_red_eye">Corregir ojos rojos</string>
+    <string name="op_add_background_color">Agregar color de fondo</string>
+    <string name="op_pop_color">Resaltar color</string>
+    <string name="op_warp_brush">Pincel deformador</string>
+    <string name="insert_picture">Insertar imagen</string>
+    <string name="picture_location">Ubicación de la imagen</string>
+    <string name="p_pick_color">Color a conservar</string>
+    <string name="p_tolerance">Tolerancia</string>
+    <string name="p_pop_rest">Resto de la imagen</string>
+    <string name="p_brush_size">Tamaño del pincel</string>
+    <string name="c_gray">Escala de grises</string>
+    <string name="c_invert">Invertir</string>
+    <string name="c_blur">Desenfocar</string>
+    <string name="bg_needs_transparency">Agregar fondo solo funciona en imágenes con transparencia</string>
+    <string name="red_eye_hint">Acerca la imagen y ajusta el círculo a la parte roja del ojo lo más justo posible; luego toca ✓ para quitarlo</string>
+    <string name="warp_hint">Arrastra sobre la foto para empujarla. Con dos dedos haces zoom.</string>
+    <string name="curves_hint">Toca el gráfico para agregar un punto, arrástralo para moverlo y mantenlo pulsado para quitarlo</string>
+    <string name="pop_hint">Arrastra el punto sobre el color que quieres conservar</string>
+    <string name="channel_all">RGB</string>
+    <string name="channel_r">R</string>
+    <string name="channel_g">G</string>
+    <string name="channel_b">B</string>
+    <string name="location_title">Ubicación de la imagen</string>
+    <string name="location_none">Esta imagen no tiene información de ubicación (GPS).</string>
+    <string name="location_found">Latitud: %1$s
+Longitud: %2$s</string>
+    <string name="location_open_map">Abrir en mapas</string>
+    <string name="rotate_90_left">Girar 90° a la izquierda</string>
+    <string name="rotate_90_right">Girar 90° a la derecha</string>
+    <string name="rotate_180_menu">Girar 180°</string>
+    <string name="flip_horizontal">Voltear horizontal</string>
+    <string name="flip_vertical">Voltear vertical</string>
+    <string name="curve_reset">Restablecer</string>
 </resources>

@@ -686,6 +686,47 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         }
     }
 
+    /** True when the edited picture has transparent areas (Add Background Color needs it). */
+    fun currentHasTransparency(): Boolean = lastPreview?.hasTransparency() == true
+
+    /** GPS position stored in the photo's EXIF data (Picture Location), or null. */
+    suspend fun pictureLocation(): Pair<Double, Double>? = withContext(Dispatchers.IO) {
+        runCatching {
+            val exif = androidx.exifinterface.media.ExifInterface(java.io.ByteArrayInputStream(sourceBytes))
+            exif.latLong?.let { it[0] to it[1] }
+        }.getOrNull()
+    }
+
+    /**
+     * Insert Picture: adds a photo from the gallery as a movable object (stored inside the
+     * project, not in My Stickers). Transparency of PNG/WebP is kept.
+     */
+    fun insertPicture(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val (bytes, ext, aspect) = withContext(Dispatchers.IO) {
+                    val imported = ImageIo.read(app.contentResolver, uri)
+                    val dec = ImageIo.decode(imported.bytes, maxSide = 2048)
+                    val bmp = dec.bitmap
+                    val alpha = bmp.hasAlpha()
+                    val out = java.io.ByteArrayOutputStream()
+                    bmp.compress(if (alpha) android.graphics.Bitmap.CompressFormat.PNG else android.graphics.Bitmap.CompressFormat.JPEG, 92, out)
+                    val ar = bmp.width.toFloat() / bmp.height
+                    bmp.recycle()
+                    Triple(out.toByteArray(), if (alpha) "png" else "jpg", ar)
+                }
+                val path = "stickers/insert_${java.util.UUID.randomUUID()}.$ext"
+                assets[path] = bytes
+                bumpAssets()
+                val o = StickerObject(newObjectId(), center(), "asset:$path", aspect = aspect)
+                _state.update { it.copy(selectedId = o.id) }
+                commit(doc.addObject(o, now()), "insert")
+            } catch (e: Exception) {
+                _messages.send(UiMessage.Res(R.string.error_import))
+            }
+        }
+    }
+
     /** Last sticker-library import result (shown in a dialog). */
     private val _stickerImport = MutableStateFlow<Pair<app.bocadillo.data.StickerPacks.Report?, String?>?>(null)
     val stickerImport: StateFlow<Pair<app.bocadillo.data.StickerPacks.Report?, String?>?> = _stickerImport

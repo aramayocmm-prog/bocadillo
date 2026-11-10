@@ -123,6 +123,7 @@ fun ParamControls(specs: List<ParamSpec>, params: Params, onChange: ((Params) ->
             is ParamSpec.Color -> ColorRow(stringResource(Labels.param(spec.labelKey)), params.color(spec.key, spec.default)) { c ->
                 onChange { it.withColor(spec.key, c) }
             }
+            is ParamSpec.Data -> Unit // edited by the tool's own control (curve, warp, red-eye)
             is ParamSpec.Point -> Text(
                 stringResource(R.string.drag_point_hint), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 4.dp),
@@ -172,11 +173,23 @@ fun AdjustPanel(tool: ToolState.Adjust, onChange: ((Params) -> Params) -> Unit, 
     Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         PanelHeader(stringResource(Labels.op(tool.op.id)), onCancel, onApply, onCompare)
         // long effects (tilt-shift, focal blur…) scroll instead of covering the photo
-        Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
-            ParamControls(tool.op.params, tool.params, onChange)
+        when (tool.op.id) {
+            "curves" -> CurvesEditor(tool.params, onChange)
+            else -> Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
+                toolHint(tool.op.id)?.let { Text(stringResource(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(12.dp, 2.dp)) }
+                ParamControls(tool.op.params, tool.params, onChange)
+            }
         }
         if (tool.op.params.isNotEmpty()) TextButton(onClick = onReset, modifier = Modifier.padding(start = 8.dp)) { Text(stringResource(R.string.reset)) }
     }
+}
+
+/** Short instructions for tools that are used on the photo itself. */
+private fun toolHint(id: String): Int? = when (id) {
+    "warp_brush" -> R.string.warp_hint
+    "fix_red_eye" -> R.string.red_eye_hint
+    "pop_color" -> R.string.pop_hint
+    else -> null
 }
 
 @Composable

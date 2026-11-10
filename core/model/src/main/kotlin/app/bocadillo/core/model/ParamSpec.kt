@@ -65,6 +65,16 @@ sealed interface ParamSpec {
         val defaultY: Float = 0.5f,
     ) : ParamSpec
 
+    /**
+     * List of numbers edited by a dedicated control (curve points, warp strokes, red-eye
+     * circles); not shown by the generic panel.
+     */
+    data class Data(
+        override val key: String,
+        override val labelKey: String = key,
+        val default: List<Float> = emptyList(),
+    ) : ParamSpec
+
     enum class Unit { NONE, PERCENT, DEGREES, PIXELS }
 }
 
@@ -79,6 +89,7 @@ fun List<ParamSpec>.defaults(base: Params = Params.EMPTY): Params {
             is ParamSpec.Choice -> p.with(spec.key, spec.default)
             is ParamSpec.Color -> p.withColor(spec.key, spec.default)
             is ParamSpec.Point -> p.with(spec.key, floatArrayOf(spec.defaultX, spec.defaultY))
+            is ParamSpec.Data -> p.with(spec.key, spec.default.toFloatArray())
         }
     }
     return p

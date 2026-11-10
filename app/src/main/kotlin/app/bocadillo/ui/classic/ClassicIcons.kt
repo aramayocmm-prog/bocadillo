@@ -32,7 +32,7 @@ import kotlin.math.sin
 enum class ClassicIcon {
     EXPOSURE, SATURATION, TEMPERATURE, BOOST, SHARPEN, SMOOTH,
     CROP, RESIZE, ROTATE_FLIP, ROTATE_FREE, CURVES, RGB, BRIGHTNESS, BLUR, MASK, HISTORY, RESTORE,
-    BALLOON, TITLE, BRUSH, MARKER, ERASER,
+    BALLOON, TITLE, BRUSH, MARKER, ERASER, RED_EYE, BACKGROUND, LOCATION,
 }
 
 private val Gray1 = Color(0xFFE6E6E6)
@@ -143,6 +143,24 @@ private fun DrawScope.draw(icon: ClassicIcon) {
         ClassicIcon.BRUSH -> {
             drawLine(Color(0xFFBCAAA4), Offset(c.x + r * 0.8f, c.y - r * 0.8f), Offset(c.x - r * 0.1f, c.y + r * 0.1f), line * 1.1f, cap = StrokeCap.Round)
             drawCircle(Color(0xFFE53935), r * 0.38f, Offset(c.x - r * 0.4f, c.y + r * 0.45f))
+        }
+        ClassicIcon.RED_EYE -> {
+            drawOval(Color.White, Offset(c.x - r, c.y - r * 0.55f), Size(2 * r, r * 1.1f))
+            drawCircle(Color(0xFFD32F2F), r * 0.45f, c)
+            drawCircle(Color(0xFF212121), r * 0.2f, c)
+        }
+        ClassicIcon.BACKGROUND -> {
+            drawRect(Color.White, Offset(c.x - r * 0.85f, c.y - r * 0.85f), Size(r * 1.7f, r * 1.7f))
+        }
+        ClassicIcon.LOCATION -> {
+            val p = Path().apply {
+                moveTo(c.x, c.y + r)
+                cubicTo(c.x - r * 0.9f, c.y - r * 0.1f, c.x - r * 0.75f, c.y - r, c.x, c.y - r)
+                cubicTo(c.x + r * 0.75f, c.y - r, c.x + r * 0.9f, c.y - r * 0.1f, c.x, c.y + r)
+                close()
+            }
+            drawPath(p, Gray1)
+            drawCircle(Color(0xFF333333), r * 0.28f, Offset(c.x, c.y - r * 0.4f))
         }
         ClassicIcon.MARKER -> drawCircle(Color(0xFFE53935), r * 0.75f, c, style = Stroke(line * 1.4f))
         ClassicIcon.ERASER -> rotate(-35f, c) {

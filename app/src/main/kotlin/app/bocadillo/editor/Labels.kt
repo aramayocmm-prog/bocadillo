@@ -23,6 +23,11 @@ object Labels {
         "paint" -> R.string.brush
         "history_paint" -> R.string.history_paint
         "opened" -> R.string.history_opened
+        "curves" -> R.string.op_curves
+        "fix_red_eye" -> R.string.op_fix_red_eye
+        "add_background_color" -> R.string.op_add_background_color
+        "pop_color" -> R.string.op_pop_color
+        "warp_brush" -> R.string.op_warp_brush
         "boost" -> R.string.op_boost
         "sharpen" -> R.string.op_sharpen
         "smooth" -> R.string.op_smooth
@@ -88,6 +93,10 @@ object Labels {
         "height" -> R.string.p_height
         "expand_canvas" -> R.string.p_expand_canvas
         "background_color" -> R.string.p_background_color
+        "pick_color" -> R.string.p_pick_color
+        "tolerance" -> R.string.p_tolerance
+        "pop_rest" -> R.string.p_pop_rest
+        "brush_size" -> R.string.p_brush_size
         "background" -> R.string.p_background
         "band_size" -> R.string.p_band_size
         "blend_mode" -> R.string.p_blend_mode
@@ -127,6 +136,9 @@ object Labels {
         "soft_light" -> R.string.c_soft_light
         "color" -> R.string.c_color
         "clear" -> R.string.c_clear
+        "gray" -> R.string.c_gray
+        "invert" -> R.string.c_invert
+        "blur" -> R.string.c_blur
         else -> null
     }
 

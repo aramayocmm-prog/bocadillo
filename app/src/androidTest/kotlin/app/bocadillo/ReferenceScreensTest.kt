@@ -32,7 +32,7 @@ class ReferenceScreensTest {
 
     private val ctx get() = rule.activity
     private fun s(id: Int) = ctx.getString(id)
-    private val out by lazy { File(ctx.filesDir, "screens").apply { deleteRecursively(); mkdirs() } }
+    private val out by lazy { File(ctx.filesDir, "screens").apply { mkdirs() } }
 
     private fun shot(name: String, settle: Long = 1200) {
         rule.waitForIdle(); Thread.sleep(settle); rule.waitForIdle()

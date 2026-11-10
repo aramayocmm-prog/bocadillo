@@ -57,7 +57,7 @@ class OpRegistry(ops: List<ImageOp>) {
         /** All ops implemented so far (transforms, colour adjustments, painting, effects). */
         fun default(): OpRegistry = OpRegistry(
             TransformOps.all + ColorOps.all + PaintOps.all +
-                app.bocadillo.core.imaging.effects.Effects.all,
+                app.bocadillo.core.imaging.effects.Effects.all + app.bocadillo.core.imaging.effects.ExtraOps.all,
         )
     }
 }

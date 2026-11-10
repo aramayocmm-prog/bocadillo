@@ -91,9 +91,12 @@ class StickerPacks(private val context: Context) {
             // catalogue: manifest.json (any folder level) › SQLite › folders
             val manifestPath = files.keys.filter { it.substringAfterLast('/').equals(StickerManifest.FILE_NAME, true) }.minByOrNull { it.count { c -> c == '/' } }
             val sqlitePath = files.keys.firstOrNull { it.lowercase().endsWith(".sqlite") || it.lowercase().endsWith(".db") }
+            // an empty manifest/catalogue (as in the template) falls through to the next option
+            val fromManifest = manifestPath?.let { StickerManifest.parse(files.getValue(it).toString(Charsets.UTF_8)) }.orEmpty()
+            val fromSqlite = if (fromManifest.isEmpty() && sqlitePath != null) readSqlite(files.getValue(sqlitePath)) else emptyList()
             val (source, entries, base) = when {
-                manifestPath != null -> Triple("manifest.json", StickerManifest.parse(files.getValue(manifestPath).toString(Charsets.UTF_8)), manifestPath.substringBeforeLast('/', ""))
-                sqlitePath != null -> Triple(sqlitePath.substringAfterLast('/'), readSqlite(files.getValue(sqlitePath)), sqlitePath.substringBeforeLast('/', ""))
+                fromManifest.isNotEmpty() -> Triple("manifest.json", fromManifest, manifestPath!!.substringBeforeLast('/', ""))
+                fromSqlite.isNotEmpty() -> Triple(sqlitePath!!.substringAfterLast('/'), fromSqlite, sqlitePath.substringBeforeLast('/', ""))
                 else -> Triple("folders", StickerManifest.fromFolders(files.keys), "")
             }
             // paths in a manifest are relative to the manifest's folder

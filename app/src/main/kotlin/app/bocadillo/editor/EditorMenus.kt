@@ -66,6 +66,8 @@ sealed interface MenuAction {
     data class Draw(val kind: DrawKind) : MenuAction
     data object Mask : MenuAction
     data object Restore : MenuAction
+    data object InsertPicture : MenuAction
+    data object Location : MenuAction
 }
 
 /** A row: label and either a drawn icon or a preview thumbnail of the op. */
@@ -90,24 +92,28 @@ object EditorMenus {
         )),
         MenuSection(R.string.section_transform_picture, listOf(
             op("crop", ClassicIcon.CROP), op("resize", ClassicIcon.RESIZE), op("orient", ClassicIcon.ROTATE_FLIP),
-            op("rotate", ClassicIcon.ROTATE_FREE),
         )),
         MenuSection(R.string.cat_misc, listOf(
-            op("adjust_rgb", ClassicIcon.RGB), op("brightness", ClassicIcon.BRIGHTNESS), op("blur", ClassicIcon.BLUR),
+            op("curves", ClassicIcon.CURVES), op("adjust_rgb", ClassicIcon.RGB), op("brightness", ClassicIcon.BRIGHTNESS),
+            op("fix_red_eye", ClassicIcon.RED_EYE), op("blur", ClassicIcon.BLUR),
             MenuEntry(R.string.mask_title, MenuAction.Mask, ClassicIcon.MASK),
+            op("add_background_color", ClassicIcon.BACKGROUND),
             MenuEntry(R.string.history_paint, MenuAction.Draw(DrawKind.HISTORY), ClassicIcon.HISTORY),
+            MenuEntry(R.string.picture_location, MenuAction.Location, ClassicIcon.LOCATION),
+            // additions of this app (not in the original menu)
+            op("rotate", ClassicIcon.ROTATE_FREE),
             MenuEntry(R.string.restore_original, MenuAction.Restore, ClassicIcon.RESTORE),
         )),
     )
 
     val effect = listOf(
         MenuSection(null, listOf(
-            MenuEntry(R.string.brush, MenuAction.Draw(DrawKind.BRUSH)),
-            MenuEntry(R.string.marker, MenuAction.Draw(DrawKind.MARKER)),
-            MenuEntry(R.string.eraser_transparent, MenuAction.Draw(DrawKind.ERASER)),
+            MenuEntry(R.string.paint, MenuAction.Draw(DrawKind.BRUSH)),
+            MenuEntry(R.string.insert_picture, MenuAction.InsertPicture),
+            op("pop_color"),
         )),
-        MenuSection(R.string.cat_distort, listOf("spherize", "twirl", "bulge", "circle_splash", "stretch", "stretch_v", "stretch_h", "mirror").map { op(it) }),
-        MenuSection(R.string.menu_color, listOf("hue", "colorize", "grayscale", "black_white", "duotone", "rainbow", "blend_color").map { op(it) }),
+        MenuSection(R.string.cat_distort, listOf("warp_brush", "spherize", "twirl", "bulge", "circle_splash", "stretch", "stretch_v", "stretch_h", "mirror").map { op(it) }),
+        MenuSection(R.string.section_color_adjustments, listOf("hue", "colorize", "grayscale", "black_white", "duotone", "rainbow", "blend_color").map { op(it) }),
         MenuSection(R.string.cat_artistic, listOf("comic_print", "posterize", "pop_art", "pencil_sketch", "neon").map { op(it) }),
         MenuSection(R.string.cat_photo, listOf("lomo", "cross_process", "gritty", "fading_colors", "film_grain", "red_scale", "faux_hdr", "sepia", "invert", "tilt_shift", "soft_glow").map { op(it) }),
         MenuSection(R.string.cat_frames, listOf("vignette", "focal_blur", "top_lens", "edge_lens", "spotlight", "instant", "film", "rounded_corners", "solid_border", "matte").map { op(it) }),
@@ -135,6 +141,7 @@ fun MenuList(sections: List<MenuSection>, registry: OpRegistry, onAction: (MenuA
                         e.icon != null -> ClassicIconView(e.icon)
                         e.action is MenuAction.Op -> registry[e.action.id]?.let { OpThumb(it) }
                         e.action is MenuAction.Draw -> DrawThumb(ToolPreviews.DrawDemo.valueOf(e.action.kind.name))
+                        e.action is MenuAction.InsertPicture -> InsertThumb()
                         else -> Unit
                     }
                 }
@@ -149,6 +156,19 @@ private fun Thumb(key: String, compute: (app.bocadillo.core.imaging.PixelBuffer)
     Box(Modifier.size(ClassicDims.Thumb + 10.dp, ClassicDims.Thumb).clip(RoundedCornerShape(3.dp)).background(Classic.Cell)) {
         bmp?.let { androidx.compose.foundation.Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
     }
+}
+
+/** Insert Picture: the sample with a smaller copy of itself pasted on top. */
+@Composable
+fun InsertThumb() = Thumb("insert") { s ->
+    val small = app.bocadillo.core.imaging.Resample.resize(s, s.width / 2, s.height / 2)
+    val out = s.pixels.copyOf()
+    val ox = s.width / 2 - 6; val oy = s.height / 2 - 6
+    for (y in 0 until small.height) for (x in 0 until small.width) {
+        val edge = x < 2 || y < 2 || x >= small.width - 2 || y >= small.height - 2
+        out[(oy + y) * s.width + ox + x] = if (edge) 0xFFFFFFFF.toInt() else small.pixels[y * small.width + x]
+    }
+    app.bocadillo.core.imaging.PixelBuffer(s.width, s.height, out)
 }
 
 @Composable

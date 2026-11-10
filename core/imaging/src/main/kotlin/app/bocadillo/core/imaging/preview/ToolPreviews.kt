@@ -122,6 +122,10 @@ object ToolPreviews {
             "tilt_shift" -> { set("blur", 30f); set("center", floatArrayOf(0.5f, 0.7f)) }
             "soft_glow" -> set("amount", 1f)
             "top_lens", "edge_lens" -> set("amount", 1f)
+            "curves" -> set("curve_rgb", floatArrayOf(0f, 0f, 0.3f, 0.15f, 0.7f, 0.9f, 1f, 1f))
+            "fix_red_eye" -> { set("center", floatArrayOf(0.28f, 0.54f)); set("radius", 0.2f) }
+            "pop_color" -> set("pick", floatArrayOf(0.28f, 0.47f))
+            "warp_brush" -> set("warps", floatArrayOf(0.4f, 0.55f, 0.62f, 0.4f, 0.3f, 0.7f, 0.25f, 0.85f, 0.15f, 0.25f))
         }
         if (op.isIdentity(p)) {
             // generic fallback: move the first slider three quarters of the way to its maximum
@@ -134,6 +138,8 @@ object ToolPreviews {
     fun forOp(op: ImageOp, sample: PixelBuffer, ctx: RenderContext = RenderContext()): PixelBuffer = when (op.id) {
         TransformOps.Crop.id -> cropPicture(sample)
         TransformOps.Resize.id -> resizePicture(sample)
+        // only meaningful with transparency: show it on the sample with a transparent frame
+        "add_background_color" -> op.apply(transparentFrame(sample), demoParams(op).withColor("color", 0xFFFFC0CB.toInt()), ctx)
         else -> op.apply(sample, demoParams(op), ctx)
     }
 
@@ -199,6 +205,14 @@ object ToolPreviews {
                 inside -> c
                 else -> EffectKit.mixColor(c, 0xFF000000.toInt(), 0.6f)
             }
+        }
+    }
+
+    private fun transparentFrame(s: PixelBuffer): PixelBuffer {
+        val w = s.width; val h = s.height
+        return EffectKit.mapXY(s, RenderContext()) { x, y, c ->
+            val e = minOf(minOf(x, w - 1 - x), minOf(y, h - 1 - y))
+            if (e < h / 6) 0 else c
         }
     }
 

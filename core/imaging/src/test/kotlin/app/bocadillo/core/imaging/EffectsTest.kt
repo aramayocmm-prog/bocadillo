@@ -250,3 +250,58 @@ class EffectsTest {
         println(report)
     }
 }
+
+class ExtraOpsTest {
+    private val ctx = RenderContext()
+    private fun p(op: app.bocadillo.core.imaging.ops.ImageOp) = op.params.defaults()
+
+    @Test fun curvesIdentityAndShape() {
+        val lut = app.bocadillo.core.imaging.effects.ExtraOps.curveLut(null)
+        assertTrue(lut.withIndex().all { (i, v) -> i == v })
+        val s = app.bocadillo.core.imaging.effects.ExtraOps.curveLut(floatArrayOf(0f, 0f, 0.25f, 0.1f, 0.75f, 0.9f, 1f, 1f))
+        assertTrue(s[64] < 64 && s[192] > 192)
+        for (i in 1..255) assertTrue("monotone at $i", s[i] >= s[i - 1])
+        val op = app.bocadillo.core.imaging.effects.ExtraOps.Curves
+        assertTrue(op.isIdentity(p(op)))
+        val ramp = PixelBuffer(256, 1, IntArray(256) { (0xFF shl 24) or (it shl 16) or (it shl 8) or it })
+        val out = op.apply(ramp, p(op).with("curve_r", floatArrayOf(0f, 1f, 1f, 0f)), ctx)
+        assertEquals(255, red(out[0, 0])); assertEquals(0, red(out[255, 0])); assertEquals(0, green(out[0, 0]))
+    }
+
+    @Test fun redEyeOnlyTouchesRedInsideTheCircle() {
+        val op = app.bocadillo.core.imaging.effects.ExtraOps.FixRedEye
+        val img = PixelBuffer(100, 100, IntArray(10000) { i -> if (i % 2 == 0) 0xFFDD2020.toInt() else 0xFF305080.toInt() })
+        val out = op.apply(img, p(op).with("radius", 0.2f).with("center", floatArrayOf(0.5f, 0.5f)), ctx)
+        assertTrue(red(out[50, 50]) < 100)                  // red pupil fixed
+        assertEquals(img[51, 50], out[51, 50])              // blue untouched
+        assertEquals(img[0, 0], out[0, 0])                  // outside the circle
+    }
+
+    @Test fun backgroundColorFillsOnlyTransparency() {
+        val op = app.bocadillo.core.imaging.effects.ExtraOps.AddBackgroundColor
+        val img = PixelBuffer(2, 1, intArrayOf(0x00000000, 0xFF102030.toInt()))
+        val out = op.apply(img, p(op).withColor("color", 0xFF00FF00.toInt()), ctx)
+        assertEquals(0xFF00FF00.toInt(), out[0, 0]); assertEquals(0xFF102030.toInt(), out[1, 0])
+        assertTrue(app.bocadillo.core.imaging.effects.ExtraOps.hasTransparency(img))
+        assertTrue(!app.bocadillo.core.imaging.effects.ExtraOps.hasTransparency(out))
+    }
+
+    @Test fun popColorKeepsThePickedHue() {
+        val op = app.bocadillo.core.imaging.effects.ExtraOps.PopColor
+        val img = PixelBuffer(20, 10, IntArray(200) { i -> if (i % 20 < 10) 0xFFE02020.toInt() else 0xFF2040E0.toInt() })
+        val out = op.apply(img, p(op).with("pick", floatArrayOf(0.2f, 0.5f)), ctx)
+        assertEquals(img[2, 5], out[2, 5])                                     // red kept
+        assertTrue(red(out[15, 5]) == green(out[15, 5]) && green(out[15, 5]) == blue(out[15, 5])) // blue → grey
+        val inv = op.apply(img, p(op).with("pick", floatArrayOf(0.8f, 0.5f)).with("rest", "invert"), ctx)
+        assertEquals(img[15, 5], inv[15, 5]); assertEquals(0xFF1FDFDF.toInt(), inv[2, 5])
+    }
+
+    @Test fun warpBrushMovesPixelsAlongTheStroke() {
+        val op = app.bocadillo.core.imaging.effects.ExtraOps.WarpBrush
+        val img = PixelBuffer(100, 100, IntArray(10000) { i -> if (i % 100 in 40..44) 0xFF000000.toInt() else 0xFFFFFFFF.toInt() })
+        assertTrue(op.isIdentity(p(op)))
+        val out = op.apply(img, p(op).with("warps", floatArrayOf(0.42f, 0.5f, 0.6f, 0.5f, 0.15f)), ctx)
+        assertTrue(red(out[58, 50]) < 128)     // the black line was pushed right
+        assertEquals(img[42, 2], out[42, 2])   // far away untouched
+    }
+}
