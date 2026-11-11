@@ -43,6 +43,8 @@ jobs:
             mkdir -p screens && adb exec-out run-as app.bocadillo.debug tar c files/screens > screens/screens.tar || true
             cd screens && tar xf screens.tar && rm screens.tar; cd ..
             mkdir -p screens/files/screens
+            adb logcat -b crash -d > screens/files/screens/crash.txt 2>/dev/null || true
+            adb logcat -d -t 6000 > screens/files/screens/logcat_tail.txt 2>/dev/null || true
             grep -E 'TestRunner|AndroidRuntime|FATAL|app.bocadillo|ComposeTest|Exception|at app\.|Caused by' logcat_full.txt | tail -3000 > screens/files/screens/logcat.txt || true
             find app/build/outputs/androidTest-results -name '*.xml' -exec cp {} screens/files/screens/ \; || true
             test ! -f test_failed
