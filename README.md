@@ -5,7 +5,7 @@ aplicación se actualice sobre la versión instalada sin perder proyectos.)
 
 Editor de fotos para Android: textos, globos de diálogo, stickers, efectos, ajustes, dibujo y máscaras. Es una reconstrucción independiente de la experiencia de PicSay Pro, con código y recursos propios. Funciona sin conexión, sin anuncios, sin cuentas y sin permisos especiales.
 
-- Versión: **0.9.0** (versionCode 12) — logotipo de MAC PRODUCCIONES suministrado por su titular
+- Versión: **1.0.0** (versionCode 13) — logotipo de MAC PRODUCCIONES suministrado por su titular. Cambios de esta versión: `docs/mac/INFORME_MAC_1_0.md`
 - Paquete: `app.bocadillo` (la versión de depuración usa `app.bocadillo.debug`)
 - Android 10 (API 29) a Android 15 (API 35)
 
