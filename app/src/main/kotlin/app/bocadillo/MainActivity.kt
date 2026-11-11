@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 class MainActivity : ComponentActivity() {
 
     /** Picture shared/sent to the app (ACTION_SEND / ACTION_EDIT), consumed by the home screen. */
-    private val incoming = MutableStateFlow<Uri?>(null)
+    internal val incoming = MutableStateFlow<Uri?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

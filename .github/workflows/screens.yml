@@ -10,7 +10,7 @@ permissions:
 jobs:
   screens:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -38,11 +38,12 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
             adb shell settings put global hide_error_dialogs 1
-            ./gradlew :app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --stacktrace || touch test_failed
+            adb logcat -c || true
+            (adb logcat -v time > logcat_full.txt 2>/dev/null &) ; timeout 35m ./gradlew :app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --stacktrace || touch test_failed
             mkdir -p screens && adb exec-out run-as app.bocadillo.debug tar c files/screens > screens/screens.tar || true
             cd screens && tar xf screens.tar && rm screens.tar; cd ..
             mkdir -p screens/files/screens
-            adb logcat -d -t 4000 '*:W' > screens/files/screens/logcat.txt || true
+            grep -E 'TestRunner|AndroidRuntime|FATAL|app.bocadillo|ComposeTest|Exception|at app\.|Caused by' logcat_full.txt | tail -3000 > screens/files/screens/logcat.txt || true
             find app/build/outputs/androidTest-results -name '*.xml' -exec cp {} screens/files/screens/ \; || true
             test ! -f test_failed
       - name: Subir capturas

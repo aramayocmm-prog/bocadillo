@@ -203,4 +203,25 @@ class MacFlowsTest {
         waitFor(s(R.string.export_done_gallery), 60_000)
         shot("40_exported")
     }
+
+    @Test fun largePictureAsksForSize() {
+        val app = ctx.application as BocadilloApp
+        // a 4000×3000 photo (12 MP): more than Normal, so the dialog must appear
+        val f = File(ctx.cacheDir, "big.jpg")
+        val b = Bitmap.createBitmap(4000, 3000, Bitmap.Config.ARGB_8888)
+        Canvas(b).apply { drawColor(Color.rgb(40, 120, 200)); drawCircle(2000f, 1500f, 1200f, Paint().apply { color = Color.YELLOW }) }
+        f.outputStream().use { b.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+        b.recycle()
+        val before = app.projects.index.value.entries.map { it.id }.toSet()
+        rule.runOnUiThread { ctx.incoming.value = Uri.fromFile(f) }
+        waitFor(s(R.string.import_large_title), 30_000)
+        assertTrue(rule.onAllNodesWithText("768×1024").fetchSemanticsNodes().isNotEmpty() || rule.onAllNodesWithText("1024×768").fetchSemanticsNodes().isNotEmpty())
+        assertTrue(rule.onAllNodesWithText("1773×1330").fetchSemanticsNodes().isNotEmpty() || rule.onAllNodesWithText("2048×1536").fetchSemanticsNodes().isNotEmpty())
+        shot("41_import_large")
+        tap(s(R.string.import_fast))
+        waitFor(s(R.string.menu_adjust), 30_000)
+        val created = app.projects.index.value.entries.first { it.id !in before }
+        val doc = runBlocking { app.projects.load(created.id) }.document
+        assertEquals(1024, doc.source.width); assertEquals(768, doc.source.height)
+    }
 }

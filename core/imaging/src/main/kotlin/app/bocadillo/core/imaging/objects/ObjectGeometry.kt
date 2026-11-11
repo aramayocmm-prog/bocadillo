@@ -113,7 +113,9 @@ object ObjectGeometry {
     fun dragSkew(t: ObjectTransform, w: Float, h: Float, hw: Float, hh: Float, x: Float, y: Float): ObjectTransform {
         val (lx, ly) = toLocal(t.copy(skewX = 0f, skewY = 0f), w, h, x, y)
         if (hw < 1f || hh < 1f) return t
-        return t.copy(skewX = ((lx - hw) / hh).coerceIn(-2f, 2f), skewY = ((ly - hh) / hw).coerceIn(-2f, 2f))
+        val kx = ((lx - hw) / hh).coerceIn(-2f, 2f); val ky = ((ly - hh) / hw).coerceIn(-2f, 2f)
+        // the shear must stay invertible (1 − kx·ky far from 0), or the object would collapse to a line
+        return if (1f - kx * ky < 0.15f) t else t.copy(skewX = kx, skewY = ky)
     }
 
     /** Perspective: moves corner [index] (0 TL, 1 TR, 2 BR, 3 BL) to canvas (x,y); invalid (non-convex) results are refused. */
