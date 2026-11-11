@@ -9,10 +9,14 @@ log() { echo "$*" >> $R; }
 inst() { # inst <label> <seconds> <am instrument args...>
   local label=$1 secs=$2; shift 2
   log "=== $label"
-  T=$secs a shell am instrument -w -r "$@" $RUNNER >> $R 2>&1 || log "TIMEOUT_OR_ERROR $label"
+  if ! T=$secs a shell am instrument -w -r "$@" $RUNNER >> $R 2>&1; then
+    log "TIMEOUT_OR_ERROR $label"
+    T=30 a logcat -d -t 400 > "screens/files/screens/logcat_$(echo "$label" | tr -c 'A-Za-z0-9_\n' '_').txt" 2>&1 || true
+    a shell am force-stop app.bocadillo.debug || true
+  fi
   a logcat -b crash -d >> crash.txt 2>/dev/null || true
   a logcat -b crash -c 2>/dev/null || true
-  T=60 adb wait-for-device 2>/dev/null || log "DEVICE_LOST after $label"
+  T=60 a wait-for-device 2>/dev/null || { log "DEVICE_LOST after $label"; T=20 a reconnect >/dev/null 2>&1; T=90 a wait-for-device || true; }
   pull_screens
 }
 pull_screens() { # keep what exists so far, even if a later step hangs
@@ -38,11 +42,6 @@ T=180 a install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest
 a shell dumpsys package app.bocadillo.debug | grep -E 'versionName|versionCode' >> $R 2>&1 || true
 inst app.bocadillo.LayoutAndUpgradeTest#dataSurvivedUpgrade 300 -e class app.bocadillo.LayoutAndUpgradeTest#dataSurvivedUpgrade
 
-for t in app.bocadillo.ReferenceScreensTest app.bocadillo.StickerLibraryFlowTest \
-         app.bocadillo.MacFlowsTest#largePictureAsksForSize app.bocadillo.MacFlowsTest#homeTitleAndPaint \
-         app.bocadillo.MacFlowsTest#insertedPictureSkewPerspectiveSaveReopenExport app.bocadillo.MacFlowsTest#svgShapeAndLineStyle; do
-  inst "$t" 420 -e class "$t"
-done
 
 # the 1.0 flows run with the app in Spanish (per-app language, Android 13+)
 a shell cmd locale set-app-locales app.bocadillo.debug --locales es-ES >> $R 2>&1 || true
@@ -58,7 +57,7 @@ for t in insertPictureCropPlaceCutOut liveStrokeEqualsAppliedStroke; do
 done
 a logcat -d -s LiveStroke:I Upgrade:I >> $R 2>/dev/null || true
 
-for v in 1.3 2.0; do
+for v in 1.0 1.3 2.0; do
   a shell settings put system font_scale $v; sleep 2
   inst "homeVariants font $v (es)" 300 -e class app.bocadillo.LayoutAndUpgradeTest#homeVariants -e variant font$v
 done
@@ -67,6 +66,14 @@ a shell settings put system accelerometer_rotation 0
 a shell settings put system user_rotation 1; sleep 2
 inst "homeVariants landscape (es)" 300 -e class app.bocadillo.LayoutAndUpgradeTest#homeVariants -e variant landscape
 a shell settings put system user_rotation 0
+
+# regression tests of 0.8/0.9 (system language)
+a shell cmd locale set-app-locales app.bocadillo.debug --locales en-US >> $R 2>&1 || true
+for t in app.bocadillo.ReferenceScreensTest app.bocadillo.StickerLibraryFlowTest \
+         app.bocadillo.MacFlowsTest#largePictureAsksForSize app.bocadillo.MacFlowsTest#homeTitleAndPaint \
+         app.bocadillo.MacFlowsTest#insertedPictureSkewPerspectiveSaveReopenExport app.bocadillo.MacFlowsTest#svgShapeAndLineStyle; do
+  inst "$t" 420 -e class "$t"
+done
 
 pull_screens
 ! grep -q 'TIMEOUT_OR_ERROR\|FAILURES!!!\|INSTRUMENTATION_FAILED\|Process crashed\|DEVICE_LOST' $R
