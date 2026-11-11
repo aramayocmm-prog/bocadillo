@@ -498,4 +498,5 @@ Longitud: %2$s</string>
     <string name="transform_handle">Punto de transformación</string>
     <string name="tmode_done">Terminar transformación</string>
     <string name="tmode_cancel">Deshacer esta transformación</string>
+    <string name="crop_short">Recortar</string>
 </resources>

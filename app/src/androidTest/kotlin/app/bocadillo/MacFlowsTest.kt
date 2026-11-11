@@ -92,8 +92,17 @@ class MacFlowsTest {
         return doc.id
     }
     private fun openProject(title: String) {
-        desc(s(R.string.home_more))
-        tap(s(R.string.more_recent_projects)); tap(title); waitFor(s(R.string.menu_adjust)); Thread.sleep(2500)
+        // back from the editor the home screen may still show the recent-projects page
+        if (rule.onAllNodesWithText(title, useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) {
+            desc(s(R.string.home_more))
+            tap(s(R.string.more_recent_projects))
+        }
+        tap(title); waitFor(s(R.string.menu_adjust)); Thread.sleep(2500)
+    }
+    /** Deselects the object (its menu replaces the Adjust/Effect bar). */
+    private fun deselect() {
+        if (rule.onAllNodesWithText(s(R.string.action_duplicate), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() ||
+            rule.onAllNodesWithContentDescription(s(R.string.show_options), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()) systemBack()
     }
 
     @Test fun homeTitleAndPaint() {
@@ -126,6 +135,7 @@ class MacFlowsTest {
         desc(s(R.string.apply)); Thread.sleep(800)
 
         // Paint: panels open and close, eyedropper is an icon
+        deselect()
         tap(s(R.string.menu_effect)); tap(s(R.string.paint)); Thread.sleep(800)
         desc(s(R.string.brush_color))
         assertTrue(rule.onAllNodesWithContentDescription(s(R.string.eyedropper)).fetchSemanticsNodes().isNotEmpty())

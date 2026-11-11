@@ -498,4 +498,5 @@ Longitude: %2$s</string>
     <string name="transform_handle">Transform handle</string>
     <string name="tmode_done">Done transforming</string>
     <string name="tmode_cancel">Undo this transformation</string>
+    <string name="crop_short">Crop</string>
 </resources>

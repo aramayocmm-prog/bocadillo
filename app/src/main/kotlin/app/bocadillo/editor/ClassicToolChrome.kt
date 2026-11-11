@@ -172,7 +172,7 @@ fun CropTopBar(
             Modifier.weight(1f).padding(horizontal = 4.dp).height(46.dp).background(ToolChrome.Bar, androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).padding(start = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(stringResource(R.string.op_crop) + "  $w × $h", color = Classic.Text, fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.crop_short) + "  $w × $h", color = Classic.Text, fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Filled.CropFree, stringResource(R.string.crop_proportions), tint = Classic.Text) }
                 DropdownMenu(menu, { menu = false }) {

@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Colorize
+import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
@@ -156,6 +157,7 @@ private fun SquareButton(label: String, enabled: Boolean = true, onClick: () -> 
  * The open drop-down panel, below the bar and over the picture (as in the reference). Its
  * content scrolls, so nothing is cut on small screens, in landscape or with large text.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun PaintDropPanel(
     panel: PaintPanel,
@@ -180,8 +182,8 @@ fun PaintDropPanel(
         Row(Modifier.fillMaxWidth().height(48.dp).padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             when (panel) {
                 PaintPanel.SETTINGS -> {
+                    Text(stringResource(R.string.brush_settings), color = Classic.Text, fontSize = 19.sp, modifier = Modifier.weight(1f))
                     CompareSquare(onCompare)
-                    Text(stringResource(R.string.brush_settings), color = Classic.Text, fontSize = 19.sp, modifier = Modifier.weight(1f).padding(start = 8.dp))
                 }
                 PaintPanel.BRUSH -> Text(stringResource(R.string.brush), color = Classic.Text, fontSize = 19.sp, modifier = Modifier.weight(1f))
                 PaintPanel.COLOR -> {
@@ -194,15 +196,15 @@ fun PaintDropPanel(
             }
             IconButton(onClick = onClose) { Icon(Icons.Filled.KeyboardArrowUp, stringResource(R.string.collapse), tint = Classic.Text) }
         }
-        Column(Modifier.heightIn(max = 330.dp).verticalScroll(rememberScrollState()).padding(start = 12.dp, end = 12.dp, bottom = 10.dp)) {
+        Column(Modifier.heightIn(max = 430.dp).verticalScroll(rememberScrollState()).padding(start = 12.dp, end = 12.dp, bottom = 10.dp)) {
             when (panel) {
                 PaintPanel.SETTINGS -> {
                     Check(stringResource(R.string.brush_relative_screen), b.relativeToScreen) { onBrush(b.copy(relativeToScreen = it)) }
                     Check(stringResource(R.string.pressure_strength), b.pressureOpacity) { onBrush(b.copy(pressureOpacity = it)) }
                     Check(stringResource(R.string.pressure_size_long), b.pressureSize) { onBrush(b.copy(pressureSize = it)) }
                     Text(stringResource(R.string.paint_mode), color = Classic.SectionText, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
-                    // modes: wraps by scrolling sideways, never truncated
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // modes wrap onto a second line: every name stays whole
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         for ((k, label) in listOf(DrawKind.BRUSH to R.string.brush, DrawKind.MARKER to R.string.marker, DrawKind.ERASER to R.string.eraser_transparent, DrawKind.HISTORY to R.string.history_paint))
                             ModeChip(stringResource(label), tool.kind == k) { onKind(k) }
                     }
@@ -268,7 +270,7 @@ private fun CompareSquare(onCompare: (Boolean) -> Unit) {
             awaitEachGesture { awaitFirstDown(); onCompare(true); waitForUpOrCancellation(); onCompare(false) }
         },
         contentAlignment = Alignment.Center,
-    ) { Box(Modifier.size(18.dp).border(2.dp, Classic.TextDim)) }
+    ) { Icon(Icons.Filled.Compare, null, tint = Classic.TextDim) }
 }
 
 @Composable
