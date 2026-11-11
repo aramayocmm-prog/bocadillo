@@ -14,6 +14,11 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -56,6 +61,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -290,8 +296,18 @@ fun HomeScreen(vm: HomeViewModel, onOpen: (String) -> Unit) {
     }
     if (aboutOpen) androidx.compose.ui.window.Dialog(
         onDismissRequest = { aboutOpen = false },
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-    ) { CreditsScreen(onClose = { aboutOpen = false }) }
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        // full screen also in landscape: let the dialog window reach the display-cutout side
+        val view = androidx.compose.ui.platform.LocalView.current
+        SideEffect {
+            (view.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window?.let { w ->
+                w.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
+                w.attributes = w.attributes.apply { layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES }
+            }
+        }
+        CreditsScreen(onClose = { aboutOpen = false })
+    }
     if (getPicture) GetPictureDialog(
         onDismiss = { getPicture = false },
         onGallery = { getPicture = false; picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
@@ -550,7 +566,7 @@ private fun CreditsScreen(onClose: () -> Unit) {
             runCatching { context.assets.open(path).bufferedReader().use { it.readText() } }.getOrDefault("")
         }
     }
-    Column(Modifier.fillMaxSize().background(Classic.Menu)) {
+    Column(Modifier.fillMaxSize().background(Classic.Menu).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
         ClassicTopBar(stringResource(R.string.licenses), onBack = onClose)
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).navigationBarsPadding().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Image(painterResource(R.drawable.logo_mac_circle), stringResource(R.string.logo_description), Modifier.size(120.dp))
