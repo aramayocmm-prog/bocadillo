@@ -26,6 +26,7 @@ import app.bocadillo.core.imaging.preview.SampleScene
 import app.bocadillo.core.model.StickerObject
 import app.bocadillo.core.model.TextObject
 import app.bocadillo.data.ImageIo
+import app.bocadillo.home.HomeViewModel
 import app.bocadillo.editor.TITLE_STYLES
 import app.bocadillo.editor.applyPreset
 import kotlinx.coroutines.runBlocking
@@ -225,8 +226,8 @@ class MacFlowsTest {
         Canvas(b).apply { drawColor(Color.rgb(40, 120, 200)); drawCircle(1300f, 1000f, 800f, Paint().apply { color = Color.YELLOW }) }
         f.outputStream().use { b.compress(Bitmap.CompressFormat.JPEG, 80, it) }
         b.recycle()
-        val fast = ImageIo.fitPixels(2600, 2000, app.bocadillo.home.HomeViewModel.FAST_PIXELS)
-        val normal = ImageIo.fitPixels(2600, 2000, app.bocadillo.home.HomeViewModel.NORMAL_PIXELS)
+        val fast = ImageIo.fitPixels(2600, 2000, HomeViewModel.FAST_PIXELS)
+        val normal = ImageIo.fitPixels(2600, 2000, HomeViewModel.NORMAL_PIXELS)
         val before = app.projects.index.value.entries.map { it.id }.toSet()
         rule.runOnUiThread { ctx.incoming.value = Uri.fromFile(f) }
         waitFor(s(R.string.import_large_title), 30_000)
