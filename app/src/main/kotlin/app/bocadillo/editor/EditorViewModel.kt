@@ -19,7 +19,6 @@ import app.bocadillo.core.imaging.objects.StickerDef
 import app.bocadillo.core.imaging.ops.Geometry
 import app.bocadillo.core.imaging.ops.ImageOp
 import app.bocadillo.core.imaging.ops.MaskParams
-import PaintOps
 import app.bocadillo.core.imaging.ops.TransformOps
 import app.bocadillo.core.imaging.paint.Stroke
 import app.bocadillo.data.FontRepository
@@ -28,7 +27,6 @@ import app.bocadillo.core.imaging.ops.PaintOps
 import app.bocadillo.core.imaging.paint.StrokePainter
 import app.bocadillo.render.processPicture
 import app.bocadillo.core.imaging.objects.Cutout
-import StrokeCodec
 import app.bocadillo.core.imaging.paint.StrokeMode
 import app.bocadillo.core.imaging.paint.StrokeRasterizer
 import app.bocadillo.core.model.Arrange
