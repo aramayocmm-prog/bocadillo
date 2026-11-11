@@ -488,7 +488,7 @@ Longitude: %2$s</string>
     <string name="tmode_rotate_hint">The handle only turns the object</string>
     <string name="tmode_scale">Scale</string>
     <string name="tmode_scale_hint">The handle only resizes, keeping proportions</string>
-    <string name="tmode_scale_rotate">Scale & Rotate</string>
+    <string name="tmode_scale_rotate">Scale &amp; Rotate</string>
     <string name="tmode_scale_rotate_hint">The handle resizes and turns</string>
     <string name="tmode_skew">Skew</string>
     <string name="tmode_skew_hint">The handle slants the object (parallel sides stay parallel)</string>
