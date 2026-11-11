@@ -2,6 +2,7 @@ package app.bocadillo.core.imaging
 
 import app.bocadillo.core.imaging.objects.BalloonGeometry
 import app.bocadillo.core.imaging.objects.ObjectGeometry
+import app.bocadillo.core.imaging.objects.Cutout
 import app.bocadillo.core.imaging.objects.PaintRef
 import app.bocadillo.core.imaging.objects.PathCmd
 import app.bocadillo.core.imaging.objects.PathData
@@ -210,5 +211,49 @@ class BalloonShapesExtraTest {
         val folded = ObjectGeometry.dragCorner(t, w, h, hw, hh, 0, before[2].first + 50f, before[2].second + 50f)
         assertEquals(t, folded)
         assertFalse(ObjectGeometry.hitQuad(after, 0f, 0f, 4f))
+    }
+
+    @Test fun canvasToUnitInvertsRotationFlipAndPerspective() {
+        val w = 1000f; val h = 800f; val hw = 120f; val hh = 80f
+        val base = ObjectTransform(0.4f, 0.55f, scale = 1.4f, rotation = 33f, flipH = true)
+        val p = ObjectGeometry.dragCorner(base, w, h, hw, hh, 1, 0f, 0f).let { ObjectGeometry.dragCorner(it, w, h, hw, hh, 3,
+            ObjectGeometry.corners(it, w, h, hw, hh)[3].first - 25f, ObjectGeometry.corners(it, w, h, hw, hh)[3].second + 40f) }
+        for (t in listOf(base, base.copy(skewX = 0.3f), p)) {
+            val cs = ObjectGeometry.corners(t, w, h, hw, hh)
+            val expect = listOf(0f to 0f, 1f to 0f, 1f to 1f, 0f to 1f)
+            for (i in 0 until 4) {
+                val (u, v) = ObjectGeometry.canvasToUnit(t, w, h, hw, hh, cs[i].first, cs[i].second)
+                assertEquals(expect[i].first, u, 0.002f); assertEquals(expect[i].second, v, 0.002f)
+            }
+            // centre of the box maps to (0.5, 0.5) for affine transforms
+            if (!t.hasPerspective) {
+                val (u, v) = ObjectGeometry.canvasToUnit(t, w, h, hw, hh, t.cx * w, t.cy * h)
+                assertEquals(0.5f, u, 0.002f); assertEquals(0.5f, v, 0.002f)
+            }
+        }
+    }
+
+    @Test fun cutoutEraseThenRestore() {
+        val w = 200; val h = 100
+        val pic = app.bocadillo.core.imaging.PixelBuffer(w, h, IntArray(w * h) { 0xFF336699.toInt() })
+        val line = floatArrayOf(0.1f, 0.5f, 1f, 0.9f, 0.5f, 1f)
+        val erased = Cutout.mask(listOf(Cutout.eraser(line, 0.3f, 1f)), w, h)
+        assertEquals(0f, erased[50 * w + 100], 0.001f)      // centre of the line: gone
+        assertEquals(1f, erased[5 * w + 100], 0.001f)       // far from it: kept
+        val restored = Cutout.mask(listOf(Cutout.eraser(line, 0.3f, 1f), Cutout.restore(floatArrayOf(0.5f, 0.5f, 1f), 0.2f, 1f)), w, h)
+        assertEquals(1f, restored[50 * w + 100], 0.001f)    // restored spot
+        assertEquals(0f, restored[50 * w + 30], 0.001f)     // rest of the line still cut
+        val out = Cutout.apply(pic, restored)
+        assertEquals(0, out.pixels[50 * w + 30] ushr 24)
+        assertEquals(0x336699, out.pixels[50 * w + 30] and 0xFFFFFF) // colour kept for restoring
+        // soft edge: intermediate alpha exists
+        val soft = Cutout.mask(listOf(Cutout.eraser(line, 0.3f, 0f)), w, h)
+        assertTrue(soft.any { it > 0.05f && it < 0.95f })
+        // crop rect and raster size
+        assertTrue(Cutout.cropRect(listOf(0.25f, 0f, 0.75f, 0.5f), 400, 200).contentEquals(intArrayOf(100, 0, 200, 100)))
+        assertEquals(1024 to 512, Cutout.rasterSize(3000, 1500))
+        // encode / decode round trip
+        val enc = Cutout.encode(listOf(Cutout.eraser(line, 0.3f, 0.5f)))
+        assertEquals(1, Cutout.strokes(enc).size)
     }
 }

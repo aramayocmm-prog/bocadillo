@@ -5,3 +5,20 @@ Bundled fonts (unmodified), licensed under the SIL Open Font License 1.1 (see OF
 - Lora-Variable.ttf
   Copyright 2011 The Lora Project Authors (https://github.com/cyrealtype/Lora-Cyrillic),
   with Reserved Font Name "Lora".
+- BebasNeue-Regular.ttf
+  Copyright © 2010 by Dharma Type (designer Ryoichi Tsunekawa). SIL Open Font License 1.1.
+- Comfortaa-Light.ttf, Comfortaa-Regular.ttf, Comfortaa-Bold.ttf
+  Copyright 2011 The Comfortaa Project Authors, with Reserved Font Name "Comfortaa"
+  (designer Johan Aakerlund). SIL Open Font License 1.1.
+- CreatoDisplay-*.otf (14 styles)
+  Copyright (c) 2021 by Anugrah Pasau. Licence URL in the font: http://scripts.sil.org/OFL
+  (SIL Open Font License 1.1).
+
+Public domain:
+- Bradley Gratis.ttf
+  Digitized by Justin Callaghan, dedicated to the public domain by its author (statement in the
+  font file, http://creativecommons.org/licenses/publicdomain/).
+
+Only fonts whose licence permits redistribution are shipped in the app. Other fonts (trial,
+demo, personal-use or "all rights reserved") can be imported by each user on their own device
+from "More Fonts"; they stay on that device and are not distributed with the app.

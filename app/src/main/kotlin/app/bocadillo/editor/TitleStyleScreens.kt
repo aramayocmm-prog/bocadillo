@@ -3,6 +3,16 @@ package app.bocadillo.editor
 import android.graphics.Typeface
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
+import androidx.compose.material.icons.automirrored.filled.FormatAlignRight
+import androidx.compose.material.icons.filled.FormatAlignCenter
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -213,3 +223,164 @@ fun BalloonStyleScreen(
         }
     }
 }
+
+/**
+ * Classic Title Style panel (reference FUENTES_ORIGINAL_TITLE_STYLE): a white card over the ABC
+ * grid with, in this order, Font · Text Size · Alignment · Line Height · Fill Color · Outline
+ * Color. Numbers and colours open a small control under their row. "More options…" opens the
+ * full style screen kept from 0.9 (gradient, shadow, curve…).
+ */
+@Composable
+fun TitleStylePanel(
+    draft: TextObject,
+    fonts: List<FontOption>,
+    typeface: (String) -> Typeface,
+    onDraft: (TextObject) -> Unit,
+    onFonts: () -> Unit,
+    onMore: () -> Unit,
+    onClose: () -> Unit,
+) {
+    val st = draft.style
+    fun style(f: (TextStyle) -> TextStyle) = onDraft(draft.copy(style = f(st)))
+    var open by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    val ink = androidx.compose.ui.graphics.Color(0xFF111111)
+    val line = androidx.compose.ui.graphics.Color(0xFFDDDDDD)
+    androidx.compose.foundation.layout.Box(
+        Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0x33000000)).clickable(
+            interactionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClick = onClose,
+        ),
+    ) {
+        Column(
+            Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp).widthIn(max = 420.dp).fillMaxWidth()
+                .androidxShadow().background(androidx.compose.ui.graphics.Color.White)
+                .clickable(interactionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) { }
+                .heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+        ) {
+            @Composable fun row(label: String, key: String?, onClick: (() -> Unit)? = null, value: @Composable () -> Unit) {
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 52.dp).clickable(role = Role.Button) { if (onClick != null) onClick() else open = if (open == key) null else key }
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(label, color = ink, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                    value()
+                }
+                HorizontalDivider(color = line)
+            }
+            val fontName = fonts.firstOrNull { it.ref == st.font }?.displayName ?: st.font.substringAfter(':')
+            row(stringResource(R.string.tab_font), null, onClick = onFonts) {
+                Text(fontName, color = ink, fontSize = 18.sp, fontFamily = FontFamily(typeface(st.font)), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 200.dp))
+            }
+            row(stringResource(R.string.text_size), "size") { Text("${(st.size * 100).roundToInt()}", color = ink, fontSize = 18.sp) }
+            if (open == "size") Column(Modifier.padding(horizontal = 12.dp)) {
+                LabeledSlider(stringResource(R.string.text_size), st.size, 0.02f..0.4f, { "${(it * 100).roundToInt()}" }) { v -> style { it.copy(size = v) } }
+            }
+            Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.alignment), color = ink, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                for ((a, icon, label) in listOf(
+                    Triple(TextAlign.LEFT, androidx.compose.material.icons.Icons.AutoMirrored.Filled.FormatAlignLeft, R.string.align_left),
+                    Triple(TextAlign.CENTER, androidx.compose.material.icons.Icons.Filled.FormatAlignCenter, R.string.align_center),
+                    Triple(TextAlign.RIGHT, androidx.compose.material.icons.Icons.AutoMirrored.Filled.FormatAlignRight, R.string.align_right),
+                )) {
+                    androidx.compose.material3.IconButton(onClick = { style { it.copy(align = a) } }) {
+                        androidx.compose.material3.Icon(icon, stringResource(label), tint = if (st.align == a) androidx.compose.ui.graphics.Color(0xFF1E88E5) else ink)
+                    }
+                }
+            }
+            HorizontalDivider(color = line)
+            row(stringResource(R.string.line_height), "line") { Text("${(st.lineHeight * 100).roundToInt()} %", color = ink, fontSize = 18.sp) }
+            if (open == "line") Column(Modifier.padding(horizontal = 12.dp)) {
+                LabeledSlider(stringResource(R.string.line_height), st.lineHeight, 0.6f..2.5f, { "${(it * 100).roundToInt()} %" }) { v -> style { it.copy(lineHeight = v) } }
+            }
+            row(stringResource(R.string.fill_color), "fill") { Swatch(st.color) }
+            if (open == "fill") Column(Modifier.background(androidx.compose.ui.graphics.Color(0xFF262626)).padding(12.dp)) { HsbSliders(st.color) { c -> style { it.copy(color = c) } } }
+            row(stringResource(R.string.outline_color), "outline") { Swatch(st.outlineColor) }
+            if (open == "outline") Column(Modifier.background(androidx.compose.ui.graphics.Color(0xFF262626)).padding(12.dp)) {
+                HsbSliders(st.outlineColor) { c -> style { it.copy(outlineColor = c, outlineWidth = if (it.outlineWidth <= 0f) 0.08f else it.outlineWidth) } }
+                LabeledSlider(stringResource(R.string.outline_width), st.outlineWidth, 0f..0.4f, { "${(it * 100).roundToInt()}%" }) { v -> style { it.copy(outlineWidth = v) } }
+            }
+            row(stringResource(R.string.more_options) + "…", null, onClick = onMore) { Text("›", color = ink, fontSize = 22.sp) }
+        }
+    }
+}
+
+private fun Modifier.androidxShadow() = this.shadow(8.dp, androidx.compose.foundation.shape.RoundedCornerShape(2.dp))
+
+@Composable
+private fun Swatch(c: Int) {
+    androidx.compose.foundation.layout.Box(
+        Modifier.padding(end = 2.dp).size(26.dp).background(androidx.compose.ui.graphics.Color(c or 0xFF000000.toInt()))
+            .border(1.dp, androidx.compose.ui.graphics.Color(0xFF9E9E9E)),
+    )
+}
+
+/**
+ * "More Fonts" (reference FUENTES_ORIGINAL_MORE_FONTS): vertical list with grey headers — Custom
+ * Font Files (imported by the user, with how to import), fonts included with the app, System
+ * Fonts — each name drawn in its own typeface, separators and scroll. Long-press an imported
+ * font to delete it from this device.
+ */
+@Composable
+fun MoreFontsScreen(
+    fonts: List<FontOption>,
+    selected: String,
+    typeface: (String) -> Typeface,
+    onPick: (String) -> Unit,
+    onImport: () -> Unit,
+    onDelete: (String) -> Unit,
+) {
+    val L = Classic
+    val ink = androidx.compose.ui.graphics.Color(0xFF111111)
+    var confirm by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<FontOption?>(null) }
+    androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxSize().background(L.LightRow).navigationBarsPadding()) {
+        @Composable fun header(t: Int) = Text(stringResource(t), color = L.LightHeaderText, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            modifier = Modifier.fillMaxWidth().background(L.LightHeader).padding(horizontal = 8.dp, vertical = 4.dp))
+        item { header(R.string.fonts_custom_files) }
+        item {
+            Text(stringResource(R.string.fonts_custom_help), color = androidx.compose.ui.graphics.Color(0xFF555555), fontSize = 14.sp,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp))
+        }
+        item {
+            Row(
+                Modifier.fillMaxWidth().background(L.LightMore).clickable(role = Role.Button, onClick = onImport).padding(horizontal = 12.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.fonts_import_files), color = ink, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                Text("+", color = ink, fontSize = 22.sp)
+            }
+            HorizontalDivider(color = L.LightDivider)
+        }
+        val groups = listOf(FontOption.Kind.IMPORTED to null, FontOption.Kind.BUNDLED to R.string.fonts_bundled, FontOption.Kind.SYSTEM to R.string.fonts_system_header)
+        for ((kind, title) in groups) {
+            val list = fonts.filter { it.kind == kind }
+            if (title != null) item { header(title) }
+            if (kind == FontOption.Kind.IMPORTED && list.isEmpty()) item {
+                Text(stringResource(R.string.fonts_none_imported), color = androidx.compose.ui.graphics.Color(0xFF888888), fontSize = 14.sp, modifier = Modifier.padding(12.dp))
+            }
+            items(list.size, key = { kind.name + list[it].ref }) { i ->
+                val f = list[i]
+                val sel = f.ref == selected
+                Text(
+                    f.displayName, fontFamily = FontFamily(typeface(f.ref)), fontSize = 22.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = ink,
+                    modifier = Modifier.fillMaxWidth().background(if (sel) L.LightMore else L.LightRow)
+                        .combinedClickableCompat(onClick = { onPick(f.ref) }, onLongClick = if (kind == FontOption.Kind.IMPORTED) ({ confirm = f }) else null)
+                        .semantics { this.selected = sel }
+                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                )
+                HorizontalDivider(color = L.LightDivider)
+            }
+        }
+    }
+    confirm?.let { f ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirm = null },
+            text = { Text(stringResource(R.string.fonts_delete_q, f.displayName)) },
+            confirmButton = { androidx.compose.material3.TextButton({ onDelete(f.ref); confirm = null }) { Text(stringResource(R.string.action_delete)) } },
+            dismissButton = { androidx.compose.material3.TextButton({ confirm = null }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+private fun Modifier.combinedClickableCompat(onClick: () -> Unit, onLongClick: (() -> Unit)?) =
+    this.combinedClickable(onClick = onClick, onLongClick = onLongClick)

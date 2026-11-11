@@ -22,6 +22,10 @@ class AppSettings(context: Context) {
     fun updateShareSubject(v: String) { shareSubject = v; prefs.edit().putString("share_subject", v).apply() }
     fun updateShareSignature(v: String) { shareSignature = v; prefs.edit().putString("share_signature", v).apply() }
 
+    /** Insert Picture's step guides were turned off ("Don't show again"). */
+    var insertGuideOff by mutableStateOf(prefs.getBoolean("insert_guide_off", false)); private set
+    fun updateInsertGuideOff(v: Boolean) { insertGuideOff = v; prefs.edit().putBoolean("insert_guide_off", v).apply() }
+
     /** Colours the user added to the Paint palette (most recent first, at most 14). */
     var paintColors by mutableStateOf(
         (prefs.getString("paint_colors", "") ?: "").split(',').mapNotNull { it.toLongOrNull()?.toInt() }

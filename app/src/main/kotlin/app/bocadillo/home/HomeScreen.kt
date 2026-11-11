@@ -10,6 +10,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
@@ -172,11 +175,30 @@ fun HomeScreen(vm: HomeViewModel, onOpen: (String) -> Unit) {
                                 .border(2.dp, Classic.Text).clickable { onOpen(last.id) },
                         )
                     }
-                    Column(Modifier.align(Alignment.Center).fillMaxWidth().padding(horizontal = 24.dp).offset(y = (-40).dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        AppLogo(Modifier.fillMaxWidth(0.66f).widthIn(max = 320.dp))
-                        Spacer(Modifier.height(32.dp))
-                        GlassOpenButton(stringResource(R.string.open_image), enabled = !busy) { getPicture = true }
-                        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth(0.66f).padding(top = 16.dp))
+                    // logo, two-line title, glass button and, at the bottom, the short description;
+                    // scrolls when space is short (landscape, very large text) instead of overlapping
+                    BoxWithConstraints(Modifier.fillMaxSize().padding(top = 56.dp)) {
+                        val minH = maxHeight
+                        val logo = minOf(maxWidth * 0.62f, maxHeight * 0.36f, 320.dp)
+                        Column(
+                            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = minH).navigationBarsPadding().padding(horizontal = 20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Spacer(Modifier.height(4.dp))
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                AppLogo(Modifier.size(logo))
+                                Spacer(Modifier.height(14.dp))
+                                AppTitle(Modifier.fillMaxWidth())
+                                Spacer(Modifier.height(28.dp))
+                                GlassOpenButton(stringResource(R.string.open_image), enabled = !busy) { getPicture = true }
+                                if (busy) LinearProgressIndicator(Modifier.fillMaxWidth(0.66f).padding(top = 16.dp))
+                            }
+                            Text(
+                                stringResource(R.string.home_tagline_mac), color = Classic.TextDim, fontSize = 13.sp, lineHeight = 18.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.widthIn(max = 460.dp).padding(top = 24.dp, bottom = 16.dp),
+                            )
+                        }
                     }
                 }
                 page == HomePage.MORE -> {
@@ -266,20 +288,10 @@ fun HomeScreen(vm: HomeViewModel, onOpen: (String) -> Unit) {
             dismissButton = { TextButton(onClick = { crash = null; app.crashFile.delete() }) { Text(stringResource(R.string.close)) } },
         )
     }
-    if (aboutOpen) {
-        val text = remember {
-            listOf("fonts/CREDITS.txt", "noto/NOTICE.txt").joinToString("\n\n") { path ->
-                runCatching { context.assets.open(path).bufferedReader().use { it.readText() } }.getOrDefault("")
-            } + "\n\nAndroidSVG (com.caverock:androidsvg) — Apache License 2.0.\n" +
-                "Full license texts: assets/fonts/OFL.txt, assets/noto/LICENSE-APACHE-2.0.txt, assets/noto/LICENSE-region-flags.txt."
-        }
-        AlertDialog(
-            onDismissRequest = { aboutOpen = false },
-            title = { Text(stringResource(R.string.licenses)) },
-            text = { Text(text, Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), style = MaterialTheme.typography.bodySmall) },
-            confirmButton = { TextButton(onClick = { aboutOpen = false }) { Text(stringResource(R.string.close)) } },
-        )
-    }
+    if (aboutOpen) androidx.compose.ui.window.Dialog(
+        onDismissRequest = { aboutOpen = false },
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) { CreditsScreen(onClose = { aboutOpen = false }) }
     if (getPicture) GetPictureDialog(
         onDismiss = { getPicture = false },
         onGallery = { getPicture = false; picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
@@ -373,18 +385,49 @@ private fun GetPictureDialog(onDismiss: () -> Unit, onGallery: () -> Unit, onCam
 
 /**
  * Official MAC PRODUCCIONES logo (supplied by the owner), shown unchanged. The circular variant
- * has the black outside of the ring made transparent so it reads on dark and light backgrounds;
- * the app name sits below it.
+ * only has the black outside of the ring made transparent.
  */
 @Composable
 private fun AppLogo(modifier: Modifier) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Image(
-            painterResource(R.drawable.logo_mac_circle), contentDescription = stringResource(R.string.logo_description),
-            modifier = Modifier.fillMaxWidth().aspectRatio(1f), contentScale = ContentScale.Fit,
-        )
-        Spacer(Modifier.height(10.dp))
-        Text(stringResource(R.string.app_name), color = Classic.Text, fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, maxLines = 1, softWrap = false)
+    Image(
+        painterResource(R.drawable.logo_mac_circle), contentDescription = stringResource(R.string.logo_description),
+        modifier = modifier.aspectRatio(1f), contentScale = ContentScale.Fit,
+    )
+}
+
+/**
+ * Title in two centred lines: "MAC" large with the logo's blue → violet → magenta glow, and
+ * "Editor para MEMES" smaller on one line. Each line shrinks to fit its width (never cut or
+ * ellipsized), whatever the screen size or system font scale.
+ */
+@Composable
+private fun AppTitle(modifier: Modifier) {
+    BoxWithConstraints(modifier) {
+        val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+        val dens = androidx.compose.ui.platform.LocalDensity.current
+        val maxPx = with(dens) { maxWidth.toPx() }
+        fun fit(text: String, start: Float, style: androidx.compose.ui.text.TextStyle): androidx.compose.ui.unit.TextUnit {
+            var sz = start
+            while (sz > 10f) {
+                val w = measurer.measure(text, style.copy(fontSize = sz.sp), maxLines = 1, softWrap = false).size.width
+                if (w <= maxPx * 0.96f) break
+                sz -= 1f
+            }
+            return sz.sp
+        }
+        val glow = androidx.compose.ui.graphics.Brush.linearGradient(listOf(
+            androidx.compose.ui.graphics.Color(0xFF5EC8FF), androidx.compose.ui.graphics.Color(0xFFB07BFF), androidx.compose.ui.graphics.Color(0xFFFF4FD8),
+        ))
+        val big = androidx.compose.ui.text.TextStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.Black, letterSpacing = 6.sp, brush = glow,
+            shadow = androidx.compose.ui.graphics.Shadow(androidx.compose.ui.graphics.Color(0x996A3DE8), androidx.compose.ui.geometry.Offset(0f, 4f), 18f))
+        val small = androidx.compose.ui.text.TextStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, letterSpacing = 1.5.sp, color = androidx.compose.ui.graphics.Color(0xFFEDE7FF))
+        val l1 = "MAC"; val l2 = stringResource(R.string.app_title_line2)
+        val s1 = remember(maxPx, dens.fontScale) { fit(l1, 54f, big) }
+        val s2 = remember(maxPx, dens.fontScale, l2) { fit(l2, 22f, small) }
+        Column(Modifier.fillMaxWidth().semantics(mergeDescendants = true) { }, horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(l1, style = big.copy(fontSize = s1), maxLines = 1, softWrap = false)
+            Text(l2, style = small.copy(fontSize = s2), maxLines = 1, softWrap = false)
+        }
     }
 }
 
@@ -488,4 +531,48 @@ private fun BlankDialog(onDismiss: () -> Unit, onCreate: (Int, Int, Int) -> Unit
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
+}
+
+/**
+ * "Licencias y créditos" (☰ → Más… → Licencias y créditos): app name and real version from the
+ * build, the project manager, the logo credit, a note that the app is independent, and the
+ * third-party licences that must be shown (fonts, emoji artwork, libraries).
+ */
+@Composable
+private fun CreditsScreen(onClose: () -> Unit) {
+    val context = LocalContext.current
+    val info = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull() }
+    val version = info?.versionName ?: "?"
+    val code = info?.let { androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(it) } ?: 0L
+    var thirdParty by remember { mutableStateOf(false) }
+    val notices = remember {
+        listOf("fonts/CREDITS.txt", "noto/NOTICE.txt").joinToString("\n\n") { path ->
+            runCatching { context.assets.open(path).bufferedReader().use { it.readText() } }.getOrDefault("")
+        }
+    }
+    Column(Modifier.fillMaxSize().background(Classic.Menu)) {
+        ClassicTopBar(stringResource(R.string.licenses), onBack = onClose)
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).navigationBarsPadding().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Image(painterResource(R.drawable.logo_mac_circle), stringResource(R.string.logo_description), Modifier.size(120.dp))
+            Spacer(Modifier.height(12.dp))
+            Text(stringResource(R.string.app_name), color = Classic.Text, fontSize = 22.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Text(stringResource(R.string.credits_version, version, code), color = Classic.TextDim, fontSize = 14.sp)
+            Spacer(Modifier.height(24.dp))
+            Text("Marcelo Aramayo", color = Classic.Text, fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+            Text(stringResource(R.string.credits_role), color = Classic.TextDim, fontSize = 15.sp)
+            Spacer(Modifier.height(20.dp))
+            Text(stringResource(R.string.credits_logo), color = Classic.TextDim, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Spacer(Modifier.height(12.dp))
+            Text(stringResource(R.string.credits_independent), color = Classic.TextDim, fontSize = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Spacer(Modifier.height(24.dp))
+            TextButton(onClick = { thirdParty = !thirdParty }) {
+                Text(stringResource(if (thirdParty) R.string.credits_hide_third_party else R.string.credits_third_party))
+            }
+            if (thirdParty) {
+                Text(stringResource(R.string.credits_libraries), color = Classic.Text, fontSize = 13.sp, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                Text(notices, color = Classic.TextDim, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(top = 12.dp))
+                Text(stringResource(R.string.credits_full_texts), color = Classic.TextDim, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(top = 12.dp))
+            }
+        }
+    }
 }

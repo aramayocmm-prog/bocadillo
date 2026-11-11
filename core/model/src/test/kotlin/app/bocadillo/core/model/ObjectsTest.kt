@@ -125,4 +125,14 @@ class ObjectsTest {
         val d = docWithObjects().copy(objects = listOf(svg, png))
         assertEquals(d.objects, DocumentJson.decode(DocumentJson.encode(d)).objects)
     }
+
+    @Test fun insertedPictureCropAndCutoutRoundTrip() {
+        val o = StickerObject("i", source = "asset:stickers/insert_x.jpg", crop = listOf(0.1f, 0.2f, 0.9f, 0.8f), cutout = listOf(1f, 1f, 0.1f, 0.8f, 1f, 0f, 0f, 2f, 1f, 0.5f, 0.5f, 1f))
+        val d = docWithObjects().copy(objects = listOf(o))
+        assertEquals(d.objects, DocumentJson.decode(DocumentJson.encode(d)).objects)
+        assertTrue(o.hasCrop && o.isRasterPicture)
+        // without crop / cut-out nothing is written (0.9 projects unchanged)
+        val plain = DocumentJson.encode(docWithObjects().copy(objects = listOf(StickerObject("p", source = "asset:a.png"))))
+        assertTrue(!plain.contains("cutout") && !plain.contains("\"crop\""))
+    }
 }

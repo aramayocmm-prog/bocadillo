@@ -200,4 +200,55 @@ object ObjectGeometry {
         if (r <= -180f) r += 360f
         return r
     }
+
+    /**
+     * Canvas point → position inside the object's box as fractions (0..1 across, 0..1 down;
+     * outside the box gives values beyond that range). Inverts the whole transform, including
+     * flips, skew and the four-point perspective (exact projective inverse).
+     */
+    fun canvasToUnit(t: ObjectTransform, w: Float, h: Float, hw: Float, hh: Float, x: Float, y: Float): Pair<Float, Float> {
+        val (lx, ly) = toLocal(t.copy(perspective = emptyList()), w, h, x, y)
+        var px = lx; var py = ly
+        if (t.hasPerspective) {
+            val q = localCorners(t, hw, hh)
+            val box = listOf(-hw to -hh, hw to -hh, hw to hh, -hw to hh)
+            val inv = Homography.fromQuads(q, box)
+            if (inv != null) { val m = inv.map(lx, ly); px = m.first; py = m.second }
+        }
+        return ((px + hw) / (2f * hw)) to ((py + hh) / (2f * hh))
+    }
+}
+
+/** 3×3 projective map (h33 = 1) from four point correspondences. */
+class Homography(private val m: DoubleArray) {
+    fun map(x: Float, y: Float): Pair<Float, Float> {
+        val d = m[6] * x + m[7] * y + 1.0
+        return ((m[0] * x + m[1] * y + m[2]) / d).toFloat() to ((m[3] * x + m[4] * y + m[5]) / d).toFloat()
+    }
+
+    companion object {
+        /** Map taking src[i] to dst[i]; null if the points are degenerate. */
+        fun fromQuads(src: List<Pair<Float, Float>>, dst: List<Pair<Float, Float>>): Homography? {
+            val a = Array(8) { DoubleArray(9) }
+            for (i in 0 until 4) {
+                val (x, y) = src[i]; val (u, v) = dst[i]
+                a[2 * i] = doubleArrayOf(x.toDouble(), y.toDouble(), 1.0, 0.0, 0.0, 0.0, -u.toDouble() * x, -u.toDouble() * y, u.toDouble())
+                a[2 * i + 1] = doubleArrayOf(0.0, 0.0, 0.0, x.toDouble(), y.toDouble(), 1.0, -v.toDouble() * x, -v.toDouble() * y, v.toDouble())
+            }
+            // Gauss-Jordan with partial pivoting
+            for (c in 0 until 8) {
+                var p = c
+                for (r in c + 1 until 8) if (kotlin.math.abs(a[r][c]) > kotlin.math.abs(a[p][c])) p = r
+                if (kotlin.math.abs(a[p][c]) < 1e-12) return null
+                val tmp = a[c]; a[c] = a[p]; a[p] = tmp
+                val piv = a[c][c]
+                for (k in c until 9) a[c][k] /= piv
+                for (r in 0 until 8) if (r != c) {
+                    val f = a[r][c]
+                    if (f != 0.0) for (k in c until 9) a[r][k] -= f * a[c][k]
+                }
+            }
+            return Homography(DoubleArray(8) { a[it][8] })
+        }
+    }
 }

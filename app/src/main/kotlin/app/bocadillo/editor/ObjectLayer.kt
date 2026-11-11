@@ -67,6 +67,10 @@ fun ObjectLayer(
     onTapSelected: () -> Unit,
     /** Tap (no drag) on the blue handle: choose the transformation mode. */
     onHandleTap: () -> Unit = {},
+    /** Insert Picture's Perspective Tool draws blue diamonds instead of circles. */
+    diamonds: Boolean = false,
+    /** Changes when a picture's pixels change without the object changing (live Cut Out). */
+    redraw: Any? = null,
 ) {
     val objs by rememberUpdatedState(objects)
     val sel by rememberUpdatedState(selectedId)
@@ -211,6 +215,7 @@ fun ObjectLayer(
                 }
             },
     ) {
+        @Suppress("UNUSED_EXPRESSION") redraw // read so that a new value redraws the layer
         drawIntoCanvas { c -> renderer.drawAll(c.nativeCanvas, objects, size.width, size.height) }
         // guide lines
         for (g in guides) {
@@ -239,8 +244,16 @@ fun ObjectLayer(
         }
         val handles = if (mode == TransformMode.PERSPECTIVE) corners else listOf(corners[2])
         for ((x, y) in handles) {
-            drawCircle(Color.White, r * 1.25f, Offset(x, y))
-            drawCircle(modeColor, r, Offset(x, y))
+            if (diamonds) {
+                val d = r * 0.95f
+                val pth = Path().apply { moveTo(x, y - d * 1.25f); lineTo(x + d * 1.25f, y); lineTo(x, y + d * 1.25f); lineTo(x - d * 1.25f, y); close() }
+                drawPath(pth, Color.White)
+                val inner = Path().apply { moveTo(x, y - d); lineTo(x + d, y); lineTo(x, y + d); lineTo(x - d, y); close() }
+                drawPath(inner, handleColor)
+            } else {
+                drawCircle(Color.White, r * 1.25f, Offset(x, y))
+                drawCircle(modeColor, r, Offset(x, y))
+            }
         }
         if (o is BalloonObject && o.hasTail) {
             val u = ObjectGeometry.unit(w, h)

@@ -39,6 +39,8 @@ internal object ObjectJson {
                 put("type", "sticker"); put("source", o.source); put("size", o.size); put("aspect", o.aspect)
                 put("outlineScale", o.outlineScale)
                 put("colors", buildJsonArray { o.colors.forEach { add(JsonPrimitive(it.toLong() and 0xffffffffL)) } })
+                if (o.hasCrop) put("crop", buildJsonArray { o.crop.forEach { add(JsonPrimitive(it)) } })
+                if (o.cutout.isNotEmpty()) put("cutout", buildJsonArray { o.cutout.forEach { add(JsonPrimitive(it)) } })
                 o.vectorStyle?.let { v ->
                     put("vectorStyle", buildJsonObject {
                         putColor("fill", v.fill); putColor("stroke", v.stroke); put("strokeWidth", v.strokeWidth); put("roundCap", v.roundCap)
@@ -75,6 +77,8 @@ internal object ObjectJson {
                 size = j.f("size", 0.35f), aspect = j.f("aspect", 1f),
                 colors = j["colors"]?.jsonArray?.map { it.jsonPrimitive.long.toInt() } ?: emptyList(),
                 outlineScale = j.f("outlineScale", 1f), opacity = opacity,
+                crop = j["crop"]?.jsonArray?.mapNotNull { it.jsonPrimitive.floatOrNull }?.takeIf { it.size == 4 } ?: emptyList(),
+                cutout = j["cutout"]?.jsonArray?.mapNotNull { it.jsonPrimitive.floatOrNull } ?: emptyList(),
                 vectorStyle = j["vectorStyle"]?.jsonObject?.let { v ->
                     VectorStyle(v.color("fill", 0), v.color("stroke", 0), v.f("strokeWidth", 0f), v["roundCap"]?.jsonPrimitive?.booleanOrNull ?: true)
                 },

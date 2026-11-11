@@ -54,22 +54,23 @@ import kotlin.math.roundToInt
  * Touch layer for drawing tools (inside the zoomed picture box). One finger draws; a second
  * finger cancels the stroke so the canvas can zoom/pan. Stylus pressure is recorded; fingers
  * always count as full pressure. In eyedropper mode a tap samples a colour instead.
+ *
+ * This layer draws nothing itself: every move is sent to [onLive] and the editor paints the
+ * stroke in progress with the same brush engine as the final result (same colour, opacity,
+ * size, hardness, blending and smoothing from the first touch to the release).
  */
 @Composable
 fun DrawLayer(
-    brushSize: Float,
-    color: Color,
     eyedropper: Boolean,
     maskOverlay: ImageBitmap?,
+    onLive: (FloatArray) -> Unit,
     onStroke: (FloatArray) -> Unit,
     onSample: (Float, Float) -> Unit,
 ) {
-    val points = remember { mutableStateListOf<Offset>() }
     val pick by rememberUpdatedState(eyedropper)
-    val brushDiameter by rememberUpdatedState(brushSize)
     Box(Modifier.fillMaxSize()) {
         maskOverlay?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds) }
-        Canvas(
+        Box(
             Modifier.fillMaxSize().pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -80,38 +81,34 @@ fun DrawLayer(
                         return@awaitEachGesture
                     }
                     val data = ArrayList<Float>()
+                    var last = down.position
                     fun add(o: Offset, pressure: Float, stylus: Boolean) {
-                        points += o
+                        last = o
                         data += (o.x / w).coerceIn(-0.2f, 1.2f); data += (o.y / h).coerceIn(-0.2f, 1.2f)
                         data += if (stylus) pressure.coerceIn(0.05f, 1f) else 1f
                     }
-                    points.clear()
                     add(down.position, down.pressure, down.type == PointerType.Stylus)
                     down.consume()
+                    onLive(data.toFloatArray()) // the dab under the finger shows at once
                     var cancelled = false
                     while (true) {
                         val ev = awaitPointerEvent()
                         val pressed = ev.changes.filter { it.pressed }
                         if (pressed.isEmpty()) break
-                        if (pressed.size > 1) { cancelled = true; points.clear(); continue } // two fingers: navigate
+                        if (pressed.size > 1) { if (!cancelled) { cancelled = true; onLive(FloatArray(0)) }; continue } // two fingers: navigate
                         if (cancelled) continue
                         val c = pressed.first()
-                        if ((c.position - points.last()).getDistance() >= 1.5f) add(c.position, c.pressure, c.type == PointerType.Stylus)
+                        // every historical sample of the event, so fast moves keep their shape
+                        var moved = false
+                        for (hp in c.historical) if ((hp.position - last).getDistance() >= 1.5f) { add(hp.position, c.pressure, c.type == PointerType.Stylus); moved = true }
+                        if ((c.position - last).getDistance() >= 1.5f) { add(c.position, c.pressure, c.type == PointerType.Stylus); moved = true }
+                        if (moved) onLive(data.toFloatArray())
                         c.consume()
                     }
                     if (!cancelled && data.isNotEmpty()) onStroke(data.toFloatArray())
-                    points.clear()
                 }
             },
-        ) {
-            if (points.isEmpty()) return@Canvas
-            val widthPx = brushDiameter * min(this.size.width, this.size.height)
-            if (points.size == 1) {
-                drawCircle(color, widthPx / 2f, points[0]); return@Canvas
-            }
-            val path = Path().apply { moveTo(points[0].x, points[0].y); for (i in 1 until points.size) lineTo(points[i].x, points[i].y) }
-            drawPath(path, color, style = Stroke(widthPx, cap = StrokeCap.Round, join = StrokeJoin.Round))
-        }
+        )
     }
 }
 

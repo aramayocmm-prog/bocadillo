@@ -96,6 +96,30 @@ sealed interface ToolState {
     /** Sticker colours / outline / opacity. */
     data class StyleSticker(val draft: StickerObject, val vector: VectorStyleKind? = null) : ToolState
 
+    /**
+     * Insert Picture in the classic three steps: CROP the picked image (its own crop, the canvas is
+     * untouched), PLACE it (move, scale, rotate, perspective, opacity) and CUT OUT parts with the
+     * Eraser / Restore Brush. The document only changes at the final ✓ of Cut Out.
+     * [undo]/[redo] hold earlier drafts; going back to an earlier step keeps everything.
+     */
+    data class InsertPicture(
+        val stage: InsertStage,
+        val draft: StickerObject,
+        val imageW: Int,
+        val imageH: Int,
+        val cropRect: List<Float> = listOf(0f, 0f, 1f, 1f),
+        val perspective: Boolean = false,
+        val showStickers: Boolean = true,
+        val erase: Boolean = true,
+        /** Brush diameter as a fraction of the canvas' smaller side (as in Paint). */
+        val brushSize: Float = 0.06f,
+        val brushHardness: Float = 0.5f,
+        val brushSquare: Boolean = false,
+        val undo: List<StickerObject> = emptyList(),
+        val redo: List<StickerObject> = emptyList(),
+        val isNew: Boolean = true,
+    ) : ToolState
+
     /** Brush, Marker, Eraser (make transparent) or History Paint; strokes are pending until Apply. */
     data class Draw(
         val kind: DrawKind,
@@ -122,6 +146,8 @@ sealed interface ToolState {
 }
 
 enum class DrawKind { BRUSH, MARKER, ERASER, HISTORY }
+
+enum class InsertStage { CROP, PLACE, CUTOUT }
 
 /** "Set Shape Style" (fill + outline) or "Set Line Style" (line colour, width and ends). */
 enum class VectorStyleKind { SHAPE, LINE }
@@ -183,6 +209,13 @@ data class EditorUiState(
             is ToolState.EditText -> t.draft
             is ToolState.EditBalloon -> t.draft
             is ToolState.StyleSticker -> t.draft
+            is ToolState.InsertPicture -> {
+                if (t.stage == InsertStage.CROP) return objects.filter { it.id != t.draft.id }
+                val others = if (t.showStickers) objects.filter { it.id != t.draft.id } else emptyList()
+                return if (objects.any { it.id == t.draft.id }) {
+                    if (t.showStickers) objects.map { if (it.id == t.draft.id) t.draft else it } else listOf(t.draft)
+                } else others + t.draft
+            }
             else -> return objects
         }
         return if (objects.any { it.id == draft.id }) objects.map { if (it.id == draft.id) draft else it } else objects + draft
@@ -274,6 +307,10 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
             }
             val photoDate = withContext(Dispatchers.IO) { exifDate(sourceBytes) }
             repo.markOpen(projectId)
+            // never replace a user's font silently: say which ones are missing
+            val missing = d.objects.mapNotNull { o -> when (o) { is TextObject -> o.style.font; is BalloonObject -> o.style.font; else -> null } }
+                .distinct().filter { !app.fonts.isAvailable(it, assets) }
+            if (missing.isNotEmpty()) _messages.send(UiMessage.Res(R.string.fonts_missing, listOf(missing.joinToString { it.substringAfterLast('/').substringAfter(':') })))
             _state.update { it.copy(loading = false, title = d.title, sourceHasAlpha = d.source.hasAlpha, photoDate = photoDate, assetsVersion = it.assetsVersion + 1) }
             syncHistoryState()
             requestRender()
@@ -309,10 +346,15 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         val job = coroutineContext[Job]
         val ctx = RenderContext(scale = proxyScale, isCancelled = { job?.isActive == false })
         try {
+            val count = (_state.value.tool as? ToolState.Draw)?.strokes?.size ?: -1
             val result = renderer.render(proxy, PROXY_TOKEN, previewOps(), masks, ctx)
             val bmp = ImageIo.toBitmap(result).asImageBitmap()
             lastPreview = result
+            previewStrokeCount = count
             _state.update { it.copy(preview = bmp) }
+            // the rendered picture now contains every finished stroke: the live view can go
+            val now = (_state.value.tool as? ToolState.Draw)?.strokes?.size ?: -1
+            if (count == now) _livePaint.value = null
         } catch (_: CancellationException) {
             // superseded by a newer render request
         }
@@ -396,6 +438,11 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
             is ToolState.EditText -> applyObjectDraft(t.draft, t.isNew, blank = t.draft.text.isBlank(), label = "text")
             is ToolState.EditBalloon -> applyObjectDraft(t.draft, t.isNew, blank = false, label = "balloon")
             is ToolState.StyleSticker -> applyObjectDraft(t.draft, isNew = false, blank = false, label = "sticker_style")
+            is ToolState.InsertPicture -> when (t.stage) {
+                InsertStage.CROP -> insertGoTo(InsertStage.PLACE)
+                InsertStage.PLACE -> insertGoTo(InsertStage.CUTOUT)
+                InsertStage.CUTOUT -> { clearInsertLive(); applyObjectDraft(t.draft, t.isNew, blank = false, label = "insert_picture") }
+            }
             is ToolState.Draw -> {
                 closeTool(render = false)
                 if (t.strokes.isNotEmpty()) commit(doc.withOp(OpInstance.create(drawOpId(t), drawParams(t)), now()), drawOpId(t)) else requestRender()
@@ -405,9 +452,10 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         }
     }
 
-    fun cancelTool() = closeTool()
+    fun cancelTool() { if (_state.value.tool is ToolState.InsertPicture) clearInsertLive(); closeTool() }
 
     private fun closeTool(render: Boolean = true) {
+        _livePaint.value = null; paintBaseCount = -1; historySource = null
         _state.update { it.copy(tool = null, before = null, maskOverlay = null) }
         if (render) requestRender()
     }
@@ -599,7 +647,8 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         when (val o = selected()) {
             is TextObject -> _state.update { it.copy(tool = ToolState.EditText(o, false)) }
             is BalloonObject -> _state.update { it.copy(tool = ToolState.EditBalloon(o, false)) }
-            is StickerObject -> _state.update { it.copy(tool = ToolState.StyleSticker(o)) }
+            // an inserted photo re-opens Insert Picture (crop, place and cut-out stay editable)
+            is StickerObject -> if (o.source.contains("stickers/insert_")) editPicture(o) else _state.update { it.copy(tool = ToolState.StyleSticker(o)) }
             null -> Unit
         }
     }
@@ -750,28 +799,204 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     fun insertPicture(uri: Uri) {
         viewModelScope.launch {
             try {
-                val (bytes, ext, aspect) = withContext(Dispatchers.IO) {
+                val (bytes, ext, size) = withContext(Dispatchers.IO) {
                     val imported = ImageIo.read(app.contentResolver, uri)
                     val dec = ImageIo.decode(imported.bytes, maxSide = 2048)
                     val bmp = dec.bitmap
                     val alpha = bmp.hasAlpha()
                     val out = java.io.ByteArrayOutputStream()
                     bmp.compress(if (alpha) android.graphics.Bitmap.CompressFormat.PNG else android.graphics.Bitmap.CompressFormat.JPEG, 92, out)
-                    val ar = bmp.width.toFloat() / bmp.height
+                    val wh = bmp.width to bmp.height
                     bmp.recycle()
-                    Triple(out.toByteArray(), if (alpha) "png" else "jpg", ar)
+                    Triple(out.toByteArray(), if (alpha) "png" else "jpg", wh)
                 }
                 val path = "stickers/insert_${java.util.UUID.randomUUID()}.$ext"
                 assets[path] = bytes
                 bumpAssets()
-                val o = StickerObject(newObjectId(), center(), "asset:$path", aspect = aspect)
-                _state.update { it.copy(selectedId = o.id) }
-                commit(doc.addObject(o, now()), "insert")
+                // step 1: crop the picture first; nothing enters the document before Cut Out's ✓
+                val o = StickerObject(newObjectId(), center(), "asset:$path", size = 0.6f, aspect = size.first.toFloat() / size.second)
+                insertRaw = null
+                _state.update { it.copy(tool = ToolState.InsertPicture(InsertStage.CROP, o, size.first, size.second), selectedId = null) }
             } catch (e: Exception) {
                 _messages.send(UiMessage.Res(R.string.error_import))
             }
         }
     }
+
+    /** Re-opens Insert Picture (Place step) on an inserted picture: its crop and cut-out stay editable. */
+    fun editPicture(o: StickerObject) {
+        val bytes = assets[o.source.removePrefix("asset:")] ?: return
+        val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+        insertRaw = null
+        _state.update {
+            it.copy(tool = ToolState.InsertPicture(InsertStage.PLACE, o, opts.outWidth, opts.outHeight,
+                cropRect = o.crop.takeIf { c -> c.size == 4 } ?: listOf(0f, 0f, 1f, 1f), isNew = false), selectedId = null)
+        }
+    }
+
+    private fun insertTool() = _state.value.tool as? ToolState.InsertPicture
+
+    private fun updateInsert(f: (ToolState.InsertPicture) -> ToolState.InsertPicture) {
+        _state.update { s -> (s.tool as? ToolState.InsertPicture)?.let { s.copy(tool = f(it)) } ?: s }
+    }
+
+    /** New draft as one undoable step of the Insert Picture tool. */
+    private fun pushInsert(next: StickerObject) = updateInsert { t ->
+        if (next == t.draft) t else t.copy(draft = next, undo = (t.undo + t.draft).takeLast(60), redo = emptyList())
+    }
+
+    fun insertUndo() = updateInsert { t ->
+        if (t.undo.isEmpty()) t else t.copy(draft = t.undo.last(), undo = t.undo.dropLast(1), redo = t.redo + t.draft)
+    }.also { refreshInsertLive() }
+
+    fun insertRedo() = updateInsert { t ->
+        if (t.redo.isEmpty()) t else t.copy(draft = t.redo.last(), redo = t.redo.dropLast(1), undo = t.undo + t.draft)
+    }.also { refreshInsertLive() }
+
+    /** Step 1: the crop rectangle on the picked image (fractions). */
+    fun setInsertCrop(rect: FloatArray) = updateInsert { t ->
+        val r = listOf(rect[0].coerceIn(0f, 1f), rect[1].coerceIn(0f, 1f), rect[2].coerceIn(0f, 1f), rect[3].coerceIn(0f, 1f))
+        if (r[2] - r[0] < 0.02f || r[3] - r[1] < 0.02f) t else t.copy(cropRect = r)
+    }
+
+    fun resetInsertCrop() = updateInsert { it.copy(cropRect = listOf(0f, 0f, 1f, 1f)) }
+
+    /** Moves between the steps; leaving Crop applies the crop to the draft (aspect follows it). */
+    fun insertGoTo(stage: InsertStage) {
+        val t = insertTool() ?: return
+        var d = t.draft
+        if (t.stage == InsertStage.CROP && stage != InsertStage.CROP) {
+            val r = t.cropRect
+            val full = r[0] <= 0f && r[1] <= 0f && r[2] >= 1f && r[3] >= 1f
+            val px = app.bocadillo.core.imaging.objects.Cutout.cropRect(r, t.imageW, t.imageH)
+            val newCrop = if (full) emptyList() else r
+            // a different crop invalidates a cut-out made on the old one
+            d = d.copy(crop = newCrop, aspect = px[2].toFloat() / px[3], cutout = if (newCrop == d.crop) d.cutout else emptyList())
+        }
+        updateInsert { it.copy(stage = stage, draft = d, undo = if (d != t.draft) it.undo + t.draft else it.undo) }
+        refreshInsertLive()
+    }
+
+    /** Place step, during a drag (no undo step yet). */
+    fun insertLive(o: CanvasObject) = updateInsert { t ->
+        if (o is StickerObject && o.id == t.draft.id) { if (insertDragStart == null) insertDragStart = t.draft; t.copy(draft = o) } else t
+    }
+
+    private var insertDragStart: StickerObject? = null
+    fun insertDragBegin() { insertDragStart = insertTool()?.draft }
+    fun insertDragEnd() {
+        val start = insertDragStart ?: return
+        insertDragStart = null
+        updateInsert { t -> if (t.draft == start) t else t.copy(undo = (t.undo + start).takeLast(60), redo = emptyList()) }
+    }
+
+    /** Box of the draft in picture pixels at stretch 1 (for Stretch to Fit / Scale to Fill). */
+    private fun draftBox(d: StickerObject): Pair<Float, Float> {
+        val (w, h) = outputSize(doc.ops)
+        val longest = d.size * minOf(w, h)
+        return if (d.aspect >= 1f) longest to longest / d.aspect else longest * d.aspect to longest
+    }
+
+    /** Stretch to Fit: the picture covers the whole canvas exactly (proportions not kept). */
+    fun stretchToFit() {
+        val t = insertTool() ?: return
+        val (w, h) = outputSize(doc.ops)
+        val (bw, bh) = draftBox(t.draft)
+        pushInsert(t.draft.copy(transform = ObjectTransform(0.5f, 0.5f, scale = 1f, stretchX = w / bw, stretchY = h / bh, flipH = t.draft.transform.flipH)))
+        updateInsert { it.copy(perspective = false) }
+    }
+
+    /** Scale to Fill: same proportions, scaled until the canvas is fully covered. */
+    fun scaleToFill() {
+        val t = insertTool() ?: return
+        val (w, h) = outputSize(doc.ops)
+        val (bw, bh) = draftBox(t.draft)
+        pushInsert(t.draft.copy(transform = ObjectTransform(0.5f, 0.5f, scale = maxOf(w / bw, h / bh), flipH = t.draft.transform.flipH)))
+        updateInsert { it.copy(perspective = false) }
+    }
+
+    fun insertMirror() { val t = insertTool() ?: return; pushInsert(t.draft.copy(transform = t.draft.transform.copy(flipH = !t.draft.transform.flipH))); refreshInsertLive() }
+
+    /** ▶|◀ and "Perspective Tool": blue circles (move/scale/rotate) ↔ blue diamonds (four corners). */
+    fun setInsertPerspective(on: Boolean) = updateInsert { it.copy(perspective = on) }
+
+    fun toggleInsertStickers() = updateInsert { it.copy(showStickers = !it.showStickers) }
+
+    /** Bottom slider of Place Picture: the picture's opacity ("Place Picture 100%"). */
+    fun setInsertOpacity(v: Float, commit: Boolean) {
+        val t = insertTool() ?: return
+        if (!commit) { updateInsert { it.copy(draft = it.draft.copy(opacity = v.coerceIn(0f, 1f))) }; return }
+        insertDragEnd()
+    }
+
+    fun setCutBrush(size: Float = insertTool()?.brushSize ?: 0.06f, hardness: Float = insertTool()?.brushHardness ?: 0.5f, square: Boolean = insertTool()?.brushSquare ?: false) =
+        updateInsert { it.copy(brushSize = size.coerceIn(0.004f, 0.3f), brushHardness = hardness.coerceIn(0f, 1f), brushSquare = square) }
+
+    fun setCutErase(erase: Boolean) = updateInsert { it.copy(erase = erase) }
+
+    // ---- Cut Out: live mask (same code as the export: processPicture / core Cutout)
+    private var insertRaw: android.graphics.Bitmap? = null
+    private val _insertLive = MutableStateFlow<Pair<String, android.graphics.Bitmap>?>(null)
+    /** Processed picture of the draft (crop + mask incl. the stroke in progress) for the screen. */
+    val insertLive: StateFlow<Pair<String, android.graphics.Bitmap>?> = _insertLive
+    private var liveJob: Job? = null
+    private val liveStrokes = kotlinx.coroutines.channels.Channel<Stroke?>(kotlinx.coroutines.channels.Channel.CONFLATED)
+
+    private fun rawPicture(d: StickerObject): android.graphics.Bitmap? {
+        insertRaw?.let { return it }
+        val bytes = assets[d.source.removePrefix("asset:")] ?: return null
+        return android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.also { insertRaw = it }
+    }
+
+    private fun ensureLiveWorker() {
+        if (liveJob?.isActive == true) return
+        liveJob = viewModelScope.launch(Dispatchers.Default) {
+            for (extra in liveStrokes) {
+                val t = insertTool() ?: continue
+                val raw = rawPicture(t.draft) ?: continue
+                val bmp = runCatching { app.bocadillo.render.processPicture(raw, t.draft.crop, t.draft.cutout, extra) }.getOrNull() ?: continue
+                _insertLive.value = t.draft.id to bmp
+            }
+        }
+    }
+
+    private fun refreshInsertLive() {
+        val t = insertTool() ?: return
+        if (t.draft.cutout.isEmpty() && t.stage != InsertStage.CUTOUT) { _insertLive.value = null; return }
+        ensureLiveWorker(); liveStrokes.trySend(null)
+    }
+
+    private fun clearInsertLive() { _insertLive.value = null; insertRaw = null }
+
+    /** Stroke in progress (image coordinates): the screen shows its real effect at once. */
+    fun cutStrokeLive(points: FloatArray, imageSize: Float) {
+        val t = insertTool() ?: return
+        ensureLiveWorker()
+        liveStrokes.trySend(if (points.isEmpty()) null else cutStroke(t, points, imageSize))
+    }
+
+    /** The picked picture, whole (for the Crop step). */
+    suspend fun insertSourceBitmap(): androidx.compose.ui.graphics.ImageBitmap? = withContext(Dispatchers.Default) {
+        val t = insertTool() ?: return@withContext null
+        val bytes = assets[t.draft.source.removePrefix("asset:")] ?: return@withContext null
+        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+    }
+
+    /** End of a stroke: one undo step; the mask stays editable in the project. */
+    fun cutStrokeCommit(points: FloatArray, imageSize: Float) {
+        val t = insertTool() ?: return
+        val strokes = app.bocadillo.core.imaging.objects.Cutout.strokes(t.draft.cutout) + cutStroke(t, points, imageSize)
+        pushInsert(t.draft.copy(cutout = app.bocadillo.core.imaging.objects.Cutout.encode(strokes)))
+        refreshInsertLive()
+    }
+
+    /** Removes the whole cut-out (one undo step). */
+    fun resetCutout() { val t = insertTool() ?: return; pushInsert(t.draft.copy(cutout = emptyList())); refreshInsertLive() }
+
+    private fun cutStroke(t: ToolState.InsertPicture, points: FloatArray, imageSize: Float) =
+        if (t.erase) app.bocadillo.core.imaging.objects.Cutout.eraser(points, imageSize, t.brushHardness, t.brushSquare)
+        else app.bocadillo.core.imaging.objects.Cutout.restore(points, imageSize, t.brushHardness, t.brushSquare)
 
     /** Last sticker-library import result (shown in a dialog). */
     private val _stickerImport = MutableStateFlow<Pair<app.bocadillo.data.StickerPacks.Report?, String?>?>(null)
@@ -824,6 +1049,30 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     }
 
     /** Imports a TTF/OTF into the font library. Returns the font reference via [onDone]. */
+    private val _fontReport = MutableStateFlow<app.bocadillo.data.FontRepository.ImportReport?>(null)
+    val fontReport: StateFlow<app.bocadillo.data.FontRepository.ImportReport?> = _fontReport
+    fun dismissFontReport() { _fontReport.value = null }
+
+    /** Imports .ttf / .otf files and .zip archives; shows a report; applies the first font. */
+    fun importFonts(uris: List<Uri>, onDone: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val report = withContext(Dispatchers.IO) {
+                    val items = uris.map { u -> ImageIo.read(app.contentResolver, u).let { it.displayName to it.bytes } }
+                    app.fonts.importAll(items)
+                }
+                report.firstRef?.let { ref -> app.fonts.libraryBytes(ref)?.let { assets[ref.removePrefix("asset:")] = it } }
+                bumpAssets()
+                _fontReport.value = report
+                report.firstRef?.let(onDone)
+            } catch (e: Exception) {
+                _messages.send(UiMessage.Res(R.string.font_import_failed))
+            }
+        }
+    }
+
+    fun deleteFont(ref: String) { app.fonts.delete(ref); bumpAssets() }
+
     fun importFont(uri: Uri, onDone: (String) -> Unit) {
         viewModelScope.launch {
             try {
@@ -879,25 +1128,113 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     }
 
     /** Adds a finished stroke (normalized points x,y,pressure) from the canvas. */
+    /** The stroke exactly as it will be applied (shared by the live preview and Apply). */
+    private fun drawStroke(t: ToolState.Draw, points: FloatArray, zoom: Float): Stroke {
+        val b = t.brush.let { if (it.relativeToScreen && zoom > 0f) it.copy(size = (it.size / zoom).coerceAtLeast(0.0005f)) else it }
+        val mode = when (t.kind) { DrawKind.MARKER -> StrokeMode.MARKER; DrawKind.ERASER -> StrokeMode.ERASE; else -> StrokeMode.PAINT }
+        val color = if (t.kind == DrawKind.MARKER) (b.color and 0x00FFFFFF) or 0xFF000000.toInt() else b.color
+        val opacity = if (t.kind == DrawKind.MARKER) b.opacity * 0.6f else b.opacity
+        return Stroke(points, b.size, b.hardness, opacity, color, mode, b.pressureSize, b.pressureOpacity)
+    }
+
+    private fun maskStroke(t: ToolState.Mask, points: FloatArray): Stroke {
+        val b = t.brush
+        return Stroke(points, b.size, b.hardness, 1f, 0xFFFFFFFF.toInt(), if (t.erasing) StrokeMode.ERASE else StrokeMode.PAINT, b.pressureSize, false)
+    }
+
     fun addStroke(points: FloatArray, zoom: Float = 1f) {
         when (val t = _state.value.tool) {
             is ToolState.Draw -> {
-                val b = t.brush.let { if (it.relativeToScreen && zoom > 0f) it.copy(size = (it.size / zoom).coerceAtLeast(0.0005f)) else it }
-                val mode = when (t.kind) { DrawKind.MARKER -> StrokeMode.MARKER; DrawKind.ERASER -> StrokeMode.ERASE; else -> StrokeMode.PAINT }
-                val color = if (t.kind == DrawKind.MARKER) (b.color and 0x00FFFFFF) or 0xFF000000.toInt() else b.color
-                val opacity = if (t.kind == DrawKind.MARKER) b.opacity * 0.6f else b.opacity
-                val s = Stroke(points, b.size, b.hardness, opacity, color, mode, b.pressureSize, b.pressureOpacity)
+                val s = drawStroke(t, points, zoom)
                 _state.update { it.copy(tool = t.copy(strokes = t.strokes + s, redo = emptyList())) }
+                // the live view finishes this stroke with the same painter, then the render confirms it
+                livePaintMsgs.trySend(LivePaint(s, t.strokes.size, final = true))
                 requestRender()
             }
             is ToolState.Mask -> {
-                val b = t.brush
-                val s = Stroke(points, b.size, b.hardness, 1f, 0xFFFFFFFF.toInt(), if (t.erasing) StrokeMode.ERASE else StrokeMode.PAINT, b.pressureSize, false)
+                val s = maskStroke(t, points)
                 _state.update { it.copy(tool = t.copy(strokes = t.strokes + s, redo = emptyList())) }
                 updateMaskOverlay()
             }
             else -> Unit
         }
+    }
+
+    // ---- live strokes (change 17): what is seen while the finger moves is the real result
+    private class LivePaint(val stroke: Stroke?, val baseCount: Int, val final: Boolean)
+    private val livePaintMsgs = Channel<LivePaint>(Channel.UNLIMITED)
+    private var livePaintJob: Job? = null
+    private val _livePaint = MutableStateFlow<ImageBitmap?>(null)
+    /** Preview with the stroke in progress painted by the same code as the final render (null = none). */
+    val livePaint: StateFlow<ImageBitmap?> = _livePaint
+    /** Buffer that already contains the committed strokes, and how many. */
+    @Volatile private var paintBase: PixelBuffer? = null
+    @Volatile private var paintBaseCount = -1
+    @Volatile private var previewStrokeCount = -1
+    private var historySource: Pair<Int, PixelBuffer>? = null
+    private val liveBitmaps = arrayOfNulls<Bitmap>(2)
+    private var liveFlip = 0
+
+    /** Stroke in progress (one finger moving). */
+    fun strokeLive(points: FloatArray, zoom: Float = 1f) {
+        when (val t = _state.value.tool) {
+            is ToolState.Draw -> {
+                if (t.eyedropper) return
+                ensureLivePaint()
+                livePaintMsgs.trySend(LivePaint(if (points.isEmpty()) null else drawStroke(t, points, zoom), t.strokes.size, final = false))
+            }
+            is ToolState.Mask -> updateMaskOverlay(if (points.isEmpty()) null else maskStroke(t, points))
+            else -> Unit
+        }
+    }
+
+    private fun ensureLivePaint() {
+        if (livePaintJob?.isActive == true) return
+        livePaintJob = viewModelScope.launch(Dispatchers.Default) {
+            var work: IntArray? = null
+            var workFor = -1
+            while (true) {
+                var m = livePaintMsgs.receive()
+                // drop stale intermediate frames, never a final one
+                while (!m.final) { m = livePaintMsgs.tryReceive().getOrNull() ?: break }
+                val t = _state.value.tool as? ToolState.Draw ?: continue
+                val base = when {
+                    previewStrokeCount == m.baseCount -> lastPreview
+                    paintBaseCount == m.baseCount -> paintBase
+                    else -> lastPreview
+                } ?: continue
+                val w = base.width; val h = base.height
+                if (work == null || work.size != base.pixels.size || workFor != m.baseCount || m.final) { work = base.pixels.copyOf(); workFor = m.baseCount }
+                else System.arraycopy(base.pixels, 0, work, 0, work.size)
+                val st = m.stroke
+                if (st != null) {
+                    if (t.kind == DrawKind.HISTORY) historyLive(work, w, h, base, st, t.stage)
+                    else app.bocadillo.core.imaging.paint.StrokePainter.paintInPlace(work, w, h, st)
+                }
+                if (m.final) {
+                    paintBase = PixelBuffer(w, h, work.copyOf()); paintBaseCount = m.baseCount + 1
+                    workFor = -1
+                }
+                val bmp = liveBitmaps[liveFlip]?.takeIf { it.width == w && it.height == h } ?: Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { liveBitmaps[liveFlip] = it }
+                liveFlip = 1 - liveFlip
+                bmp.setPixels(work, 0, w, 0, 0, w, h)
+                _livePaint.value = if (st == null && !m.final) null else bmp.asImageBitmap()
+            }
+        }
+    }
+
+    /** History Paint, live: the same lerp towards the chosen stage as PaintOps.HistoryPaint. */
+    private fun historyLive(px: IntArray, w: Int, h: Int, base: PixelBuffer, st: Stroke, stage: Int) {
+        val src = historySource?.takeIf { it.first == stage && it.second.width == w && it.second.height == h }?.second ?: run {
+            val ops = doc.ops.take(stage)
+            val r = kotlinx.coroutines.runBlocking { renderer.render(proxy, PROXY_TOKEN, ops, masks, RenderContext(scale = proxyScale)) }
+            historySource = stage to r; r
+        }
+        if (src.width != w || src.height != h) return
+        val out = app.bocadillo.core.imaging.ops.PaintOps.HistoryPaint.apply(
+            base, Params.of("stage" to stage).with("strokes", app.bocadillo.core.imaging.paint.StrokeCodec.encode(listOf(st))), RenderContext(scale = 1f),
+        ) { if (it == stage) src else null }
+        System.arraycopy(out.pixels, 0, px, 0, px.size)
     }
 
     fun undoStroke() {
@@ -908,6 +1245,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
                 else -> s
             }
         }
+        _livePaint.value = null; paintBaseCount = -1
         if (_state.value.tool is ToolState.Mask) updateMaskOverlay() else requestRender()
     }
 
@@ -971,13 +1309,13 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     private var overlayJob: Job? = null
 
     /** Renders the mask as a translucent red (protected) / green (selected) overlay. */
-    private fun updateMaskOverlay() {
+    private fun updateMaskOverlay(live: Stroke? = null) {
         val t = _state.value.tool as? ToolState.Mask ?: return
         val p = lastPreview ?: return
         overlayJob?.cancel()
         overlayJob = viewModelScope.launch(Dispatchers.Default) {
             val w = p.width; val h = p.height
-            var m = StrokeRasterizer.maskCoverage(t.strokes, w, h, if (t.protect) 1f else 0f)
+            var m = StrokeRasterizer.maskCoverage(t.strokes + listOfNotNull(live), w, h, if (t.protect) 1f else 0f)
             m = StrokeRasterizer.feather(m, w, h, (t.feather * minOf(w, h)).roundToInt())
             val tint = if (t.protect) 0xE53935 else 0x43A047
             val px = IntArray(w * h) { i ->

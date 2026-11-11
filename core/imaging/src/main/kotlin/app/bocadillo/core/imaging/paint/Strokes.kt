@@ -35,13 +35,15 @@ data class Stroke(
     val mode: StrokeMode = StrokeMode.PAINT,
     val pressureSize: Boolean = true,
     val pressureOpacity: Boolean = false,
+    /** Square tip (Cut Out brushes); round otherwise. */
+    val square: Boolean = false,
 ) {
     init { require(points.size % 3 == 0) { "points must be x,y,p triplets" } }
     val pointCount: Int get() = points.size / 3
 
     override fun equals(other: Any?) = other is Stroke && points.contentEquals(other.points) && size == other.size &&
         hardness == other.hardness && opacity == other.opacity && color == other.color && mode == other.mode &&
-        pressureSize == other.pressureSize && pressureOpacity == other.pressureOpacity
+        pressureSize == other.pressureSize && pressureOpacity == other.pressureOpacity && square == other.square
 
     override fun hashCode() = points.contentHashCode() * 31 + size.hashCode() * 7 + color
 }
@@ -63,7 +65,7 @@ object StrokeCodec {
             out[i] = s.pointCount.toFloat(); out[i + 1] = s.size; out[i + 2] = s.hardness; out[i + 3] = s.opacity
             out[i + 4] = ((s.color ushr 16) and 0xFFFF).toFloat(); out[i + 5] = (s.color and 0xFFFF).toFloat()
             out[i + 6] = s.mode.code.toFloat()
-            out[i + 7] = ((if (s.pressureSize) 1 else 0) or (if (s.pressureOpacity) 2 else 0)).toFloat()
+            out[i + 7] = ((if (s.pressureSize) 1 else 0) or (if (s.pressureOpacity) 2 else 0) or (if (s.square) 4 else 0)).toFloat()
             System.arraycopy(s.points, 0, out, i + HEADER, s.points.size)
             i += HEADER + s.points.size
         }
@@ -85,6 +87,7 @@ object StrokeCodec {
                 points = data.copyOfRange(i + HEADER, i + HEADER + n * 3),
                 size = data[i + 1], hardness = data[i + 2], opacity = data[i + 3], color = color,
                 mode = StrokeMode.of(data[i + 6].toInt()), pressureSize = flags and 1 != 0, pressureOpacity = flags and 2 != 0,
+                square = flags and 4 != 0,
             )
             i += HEADER + n * 3
         }
@@ -121,7 +124,7 @@ object StrokeRasterizer {
             val p = pts[3 * k + 2].coerceIn(0.05f, 1f)
             val r = max(0.5f, maxR * (if (s.pressureSize) p else 1f))
             val a = if (s.pressureOpacity) p else 1f
-            dab(cov, bw, bh, pts[3 * k] - bx0, pts[3 * k + 1] - by0, r, hard, a)
+            dab(cov, bw, bh, pts[3 * k] - bx0, pts[3 * k + 1] - by0, r, hard, a, s.square)
         }
         return Coverage(bx0, by0, bw, bh, cov)
     }
@@ -129,7 +132,7 @@ object StrokeRasterizer {
     class Coverage(val x: Int, val y: Int, val w: Int, val h: Int, val values: FloatArray)
 
     /** Round dab: full inside r*hardness, smooth falloff to 0 at r. */
-    private fun dab(cov: FloatArray, w: Int, h: Int, cx: Float, cy: Float, r: Float, hardness: Float, alpha: Float) {
+    private fun dab(cov: FloatArray, w: Int, h: Int, cx: Float, cy: Float, r: Float, hardness: Float, alpha: Float, square: Boolean = false) {
         val inner = r * hardness
         val xa = max(0, floor(cx - r).toInt()); val xb = min(w - 1, ceil(cx + r).toInt())
         val ya = max(0, floor(cy - r).toInt()); val yb = min(h - 1, ceil(cy + r).toInt())
@@ -138,9 +141,15 @@ object StrokeRasterizer {
             val dy = y + 0.5f - cy
             for (x in xa..xb) {
                 val dx = x + 0.5f - cx
-                val d2 = dx * dx + dy * dy
-                if (d2 > r2) continue
-                val d = sqrt(d2)
+                val d: Float
+                if (square) {
+                    d = max(kotlin.math.abs(dx), kotlin.math.abs(dy))
+                    if (d > r + 0.5f) continue
+                } else {
+                    val d2 = dx * dx + dy * dy
+                    if (d2 > r2) continue
+                    d = sqrt(d2)
+                }
                 var v = when {
                     d <= inner - 0.5f -> 1f
                     r - inner < 1f -> (r + 0.5f - d).coerceIn(0f, 1f) // hard brush: 1 px antialiasing
@@ -231,27 +240,36 @@ object StrokeRasterizer {
 object StrokePainter {
     fun paint(src: PixelBuffer, strokes: List<Stroke>, ctx: RenderContext): PixelBuffer {
         val out = src.copy()
-        val w = src.width; val h = src.height; val px = out.pixels
         for (s in strokes) {
             ctx.checkCancelled()
-            val c = StrokeRasterizer.coverage(s, w, h) ?: continue
-            val ca = ((s.color ushr 24) and 0xFF) / 255f
-            val cr = (s.color shr 16) and 0xFF; val cg = (s.color shr 8) and 0xFF; val cb = s.color and 0xFF
-            for (yy in 0 until c.h) {
-                val row = (c.y + yy) * w + c.x
-                for (xx in 0 until c.w) {
-                    val cov = c.values[yy * c.w + xx]
-                    if (cov <= 0f) continue
-                    val i = row + xx
-                    px[i] = when (s.mode) {
-                        StrokeMode.ERASE -> eraseOver(px[i], cov * s.opacity)
-                        StrokeMode.PAINT -> over(px[i], cr, cg, cb, cov * s.opacity * ca)
-                        StrokeMode.MARKER -> multiply(px[i], cr, cg, cb, cov * s.opacity * ca)
-                    }
+            paintInPlace(out.pixels, src.width, src.height, s)
+        }
+        return out
+    }
+
+    /**
+     * Paints one stroke directly into [px] (w×h) and returns the touched area (x, y, w, h) or
+     * null. Used by the final render above and by the editor's live preview, so the stroke in
+     * progress and the applied stroke are computed by the very same code.
+     */
+    fun paintInPlace(px: IntArray, w: Int, h: Int, s: Stroke): IntArray? {
+        val c = StrokeRasterizer.coverage(s, w, h) ?: return null
+        val ca = ((s.color ushr 24) and 0xFF) / 255f
+        val cr = (s.color shr 16) and 0xFF; val cg = (s.color shr 8) and 0xFF; val cb = s.color and 0xFF
+        for (yy in 0 until c.h) {
+            val row = (c.y + yy) * w + c.x
+            for (xx in 0 until c.w) {
+                val cov = c.values[yy * c.w + xx]
+                if (cov <= 0f) continue
+                val i = row + xx
+                px[i] = when (s.mode) {
+                    StrokeMode.ERASE -> eraseOver(px[i], cov * s.opacity)
+                    StrokeMode.PAINT -> over(px[i], cr, cg, cb, cov * s.opacity * ca)
+                    StrokeMode.MARKER -> multiply(px[i], cr, cg, cb, cov * s.opacity * ca)
                 }
             }
         }
-        return out
+        return intArrayOf(c.x, c.y, c.w, c.h)
     }
 
     private fun over(d: Int, r: Int, g: Int, b: Int, a: Float): Int {

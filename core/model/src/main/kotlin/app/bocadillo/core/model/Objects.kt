@@ -173,12 +173,28 @@ data class StickerObject(
     override val opacity: Float = 1f,
     /** Restyling of a vector sticker (null = as designed). Raster PNG/WebP stickers never get one. */
     val vectorStyle: VectorStyle? = null,
+    /**
+     * Insert Picture, step 1: non-destructive crop of the inserted image (left, top, right,
+     * bottom as fractions of the source image). Empty = whole image.
+     */
+    val crop: List<Float> = emptyList(),
+    /**
+     * Insert Picture, step 3 (Cut Out): editable alpha mask as Eraser / Restore Brush strokes in
+     * the cropped image's own coordinates (flat stroke encoding of core.imaging StrokeCodec).
+     * Empty = nothing cut. The image file itself is never modified.
+     */
+    val cutout: List<Float> = emptyList(),
 ) : CanvasObject {
     override fun withTransform(t: ObjectTransform) = copy(transform = t)
     override fun withOpacity(o: Float) = copy(opacity = o.coerceIn(0f, 1f))
     override fun withId(newId: String) = copy(id = newId)
 
     val isVector: Boolean get() = source.startsWith("builtin:")
+
+    /** A raster picture (inserted photo or PNG/WebP sticker) that can be cropped and cut out. */
+    val isRasterPicture: Boolean get() = source.startsWith("asset:") && !source.endsWith(".svg", ignoreCase = true)
+
+    val hasCrop: Boolean get() = crop.size == 4 && (crop[0] > 0f || crop[1] > 0f || crop[2] < 1f || crop[3] < 1f)
 
     /** Vector stickers whose shape and line style can be changed: built-in vectors and imported SVG. */
     val isRestylable: Boolean get() = isVector || (source.startsWith("asset:") && source.endsWith(".svg", ignoreCase = true))

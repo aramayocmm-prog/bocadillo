@@ -334,11 +334,30 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
         } else if (o.source.endsWith(".svg", ignoreCase = true)) {
             drawSvgAsset(c, o, bw, bh)
         } else {
-            val bmp = bitmaps.getOrPut(o.source) {
-                assets[o.source.removePrefix("asset:")]?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-            } ?: return
+            val bmp = liveBitmaps[o.id] ?: pictureBitmap(o) ?: return
             c.drawBitmap(bmp, null, RectF(-bw / 2, -bh / 2, bw / 2, bh / 2), bmpPaint)
         }
+    }
+
+    /**
+     * While Insert Picture's Cut Out is being edited, the editor supplies the processed picture
+     * (crop + mask incl. the stroke in progress) computed with [processPicture] — the same code
+     * the export uses — so the live view and the result are the same pixels.
+     */
+    val liveBitmaps = java.util.concurrent.ConcurrentHashMap<String, Bitmap>()
+    private val processed = LruCache<String, Bitmap>(12)
+
+    /** Raster picture with its crop and Cut Out mask applied (cached). */
+    private fun pictureBitmap(o: StickerObject): Bitmap? {
+        val raw = bitmaps.getOrPut(o.source) {
+            assets[o.source.removePrefix("asset:")]?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+        } ?: return null
+        if (!o.hasCrop && o.cutout.isEmpty()) return raw
+        val key = o.source + "|" + o.crop.hashCode() + "|" + o.cutout.hashCode()
+        processed.get(key)?.let { return it }
+        return runCatching { processPicture(raw, o.crop, o.cutout) }.getOrNull()?.also { processed.put(key, it) }
+    }
+
     }
 
     /**
@@ -381,8 +400,15 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
         val path = o.source.removePrefix("asset:")
         val dst = RectF(-bw / 2, -bh / 2, bw / 2, bh / 2)
         try {
-            val svg = svgAssets.get(path) ?: assets[path]?.let { com.caverock.androidsvg.SVG.getFromString(it.toString(Charsets.UTF_8)) }?.also { svgAssets.put(path, it) } ?: return
-            val options = svgOptions(svg, o.vectorStyle)
+            // with a Shape/Line Style, inline style="fill:…; stroke:…" declarations would win over
+            // the override, so a copy without them is parsed (the file itself is not changed)
+            val vs = o.vectorStyle
+            val svgKey = if (vs != null) "$path#restyle" else path
+            val svg = svgAssets.get(svgKey) ?: assets[path]?.let {
+                val text = it.toString(Charsets.UTF_8)
+                com.caverock.androidsvg.SVG.getFromString(if (vs != null) stripInlinePaint(text) else text)
+            }?.also { svgAssets.put(svgKey, it) } ?: return
+            val options = svgOptions(svg, vs)
             if (!c.isHardwareAccelerated) {
                 if (options == null) svg.renderToCanvas(c, dst) else svg.renderToCanvas(c, options.viewPort(dst.left, dst.top, dst.width(), dst.height()))
                 return
@@ -413,6 +439,15 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
      * Shape / line style of an SVG sticker as a CSS override applied while rendering (the file is
      * not modified). Width is a fraction of the sticker's longer side, in viewBox units.
      */
+    /** Removes paint properties from inline style attributes (only those a Shape/Line Style sets). */
+    internal fun stripInlinePaint(svg: String): String {
+        val props = Regex("""(?i)\b(fill|fill-opacity|stroke|stroke-opacity|stroke-width|stroke-linecap|stroke-linejoin)\s*:[^;"']*;?""")
+        return Regex("""style\s*=\s*(["'])(.*?)\1""", RegexOption.DOT_MATCHES_ALL).replace(svg) { m ->
+            val q = m.groupValues[1]
+            "style=" + q + props.replace(m.groupValues[2], "").trim() + q
+        }
+    }
+
     private fun svgOptions(svg: com.caverock.androidsvg.SVG, vs: app.bocadillo.core.model.VectorStyle?): com.caverock.androidsvg.RenderOptions? {
         if (vs == null) return null
         fun hex(c: Int) = "#%06X".format(c and 0xFFFFFF)
@@ -456,4 +491,18 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
 
         private fun alpha(c: Int) = c ushr 24
     }
+}
+
+/** Crop, scale to the Cut Out raster size and apply the mask (see core Cutout). */
+fun processPicture(raw: Bitmap, crop: List<Float>, cutout: List<Float>, extra: app.bocadillo.core.imaging.paint.Stroke? = null): Bitmap {
+    val r = app.bocadillo.core.imaging.objects.Cutout.cropRect(crop, raw.width, raw.height)
+    val cropped = if (r[0] == 0 && r[1] == 0 && r[2] == raw.width && r[3] == raw.height) raw else Bitmap.createBitmap(raw, r[0], r[1], r[2], r[3])
+    val strokes = app.bocadillo.core.imaging.objects.Cutout.strokes(cutout) + listOfNotNull(extra)
+    if (strokes.isEmpty()) return cropped
+    val (w, h) = app.bocadillo.core.imaging.objects.Cutout.rasterSize(cropped.width, cropped.height)
+    val scaled = if (w == cropped.width && h == cropped.height) cropped else Bitmap.createScaledBitmap(cropped, w, h, true)
+    val px = IntArray(w * h); scaled.getPixels(px, 0, w, 0, 0, w, h)
+    val mask = app.bocadillo.core.imaging.objects.Cutout.mask(strokes, w, h)
+    val out = app.bocadillo.core.imaging.objects.Cutout.apply(app.bocadillo.core.imaging.PixelBuffer(w, h, px), mask)
+    return Bitmap.createBitmap(out.pixels, w, h, Bitmap.Config.ARGB_8888)
 }
