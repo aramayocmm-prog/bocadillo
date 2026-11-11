@@ -147,8 +147,16 @@ class Mac10FlowsTest {
         assertTrue(!(vm().state.value.tool as ToolState.InsertPicture).showStickers)
         desc(s(R.string.more_options)); tap(s(R.string.ins_show_stickers))
         // make it smaller again with the blue handle, then perspective with the diamonds
-        rule.runOnUiThread { vm().insertUndo(); vm().insertUndo() } // back before Scale to Fill / Stretch to Fit (mirror kept)
+        // undo is last-in first-out: two steps undo Mirror and Scale to Fill, back to Stretch to Fit
+        rule.runOnUiThread { vm().insertUndo(); vm().insertUndo() }
         rule.waitForIdle(); Thread.sleep(500)
+        val undone = (vm().state.value.tool as ToolState.InsertPicture).draft.transform
+        assertTrue("undo removed the mirror", !undone.flipH); assertEquals(stretched, undone)
+        rule.runOnUiThread { vm().insertRedo() } // redo brings Scale to Fill back
+        rule.waitForIdle()
+        assertEquals(filled, (vm().state.value.tool as ToolState.InsertPicture).draft.transform)
+        rule.runOnUiThread { vm().insertUndo() }
+        desc(s(R.string.more_options)); tap(s(R.string.ins_mirror)) // mirror again, kept to the end
         desc(s(R.string.more_options)); tap(s(R.string.ins_perspective_tool))
         waitDesc(s(R.string.transform_handle) + " 2"); shot("57_perspective_diamonds")
         val c2 = boundsOf(s(R.string.transform_handle) + " 2").center
