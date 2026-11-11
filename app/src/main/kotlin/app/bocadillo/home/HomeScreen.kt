@@ -203,7 +203,7 @@ fun HomeScreen(vm: HomeViewModel, onOpen: (String) -> Unit) {
                 }
                 page == HomePage.MORE -> {
                     ClassicTopBar(stringResource(R.string.home_more), onBack = { page = HomePage.MAIN })
-                    Column(Modifier.fillMaxSize().background(Classic.Menu)) {
+                    Column(Modifier.fillMaxSize().background(Classic.Menu).verticalScroll(rememberScrollState())) {
                         val ic = Modifier.size(28.dp)
                         ClassicMenuRow(stringResource(R.string.more_new_blank), { blankDialog = true }) { Icon(Icons.Filled.NoteAdd, null, ic, tint = Classic.Text) }
                         ClassicMenuRow(stringResource(R.string.more_open_project), { openArchive.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) }) { Icon(Icons.Filled.FolderOpen, null, ic, tint = Classic.Text) }

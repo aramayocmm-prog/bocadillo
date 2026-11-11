@@ -22,7 +22,7 @@ inst() { # inst <label> <seconds> <am instrument args...>
 revive() { # the emulator process can die (host GL context lost); start it again with the same AVD
   log "REVIVE: restarting the emulator"
   pkill -f qemu-system 2>/dev/null; sleep 3
-  nohup "$ANDROID_HOME/emulator/emulator" -port 5554 -avd test -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim > emulator_revive.log 2>&1 &
+  nohup "$ANDROID_HOME/emulator/emulator" -port 5554 -avd test -no-window -gpu swangle_indirect -no-snapshot -noaudio -no-boot-anim > emulator_revive.log 2>&1 &
   T=300 a wait-for-device || return 1
   for i in $(seq 1 90); do [ "$(T=10 a shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ] && break; sleep 2; done
   a shell settings put global window_animation_scale 0; a shell settings put global transition_animation_scale 0; a shell settings put global animator_duration_scale 0

@@ -85,6 +85,8 @@ class Mac10FlowsTest {
     }
 
     private fun newProject(title: String): String {
+        // a previous test may have left the editor open: dismiss the recovery offer first
+        if (has(s(R.string.home_recover_title))) { tap(s(R.string.cancel)); Thread.sleep(300) }
         val sample = SampleScene.render(1200, 900)
         val png = ByteArrayOutputStream().also { ImageIo.toBitmap(sample).compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
         val doc = runBlocking { app.projects.create(ImageIo.Imported(png, "image/png", title), 1200, 900, false, title, ImageIo.thumbnail(sample)) }
@@ -229,7 +231,8 @@ class Mac10FlowsTest {
         val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
         val a = Offset(root.width * 0.25f, root.height * 0.62f); val b = Offset(root.width * 0.78f, root.height * 0.40f)
         rule.onRoot().performTouchInput { down(a) }
-        for (i in 1..40) { val p = a + (b - a) * (i / 40f); rule.onRoot().performTouchInput { moveTo(p) }; Thread.sleep(20) }
+        // slow enough for the screen recording to show the stroke growing under the finger
+        for (i in 1..90) { val p = a + (b - a) * (i / 90f); rule.onRoot().performTouchInput { moveTo(p) }; Thread.sleep(45) }
         Thread.sleep(700)
         shot("70_live_finger_down", 300)
         val live = vm().livePaint.value
