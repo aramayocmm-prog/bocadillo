@@ -41,6 +41,9 @@ jobs:
             ./gradlew :app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --stacktrace || touch test_failed
             mkdir -p screens && adb exec-out run-as app.bocadillo.debug tar c files/screens > screens/screens.tar || true
             cd screens && tar xf screens.tar && rm screens.tar; cd ..
+            mkdir -p screens/files/screens
+            adb logcat -d -t 4000 '*:W' > screens/files/screens/logcat.txt || true
+            find app/build/outputs/androidTest-results -name '*.xml' -exec cp {} screens/files/screens/ \; || true
             test ! -f test_failed
       - name: Subir capturas
         if: always()
@@ -55,7 +58,7 @@ jobs:
         run: |
           set -e
           [ -d screens/files/screens ] || exit 0
-          mkdir -p /tmp/out && cp screens/files/screens/*.png /tmp/out/
+          mkdir -p /tmp/out && cp screens/files/screens/* /tmp/out/ 2>/dev/null || true
           cd /tmp/out
           git init -q -b screens-output
           git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
