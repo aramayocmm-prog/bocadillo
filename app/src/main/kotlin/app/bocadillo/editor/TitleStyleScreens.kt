@@ -301,7 +301,7 @@ fun TitleStylePanel(
                 HsbSliders(st.outlineColor) { c -> style { it.copy(outlineColor = c, outlineWidth = if (it.outlineWidth <= 0f) 0.08f else it.outlineWidth) } }
                 LabeledSlider(stringResource(R.string.outline_width), st.outlineWidth, 0f..0.4f, { "${(it * 100).roundToInt()}%" }) { v -> style { it.copy(outlineWidth = v) } }
             }
-            row(stringResource(R.string.more_options) + "…", null, onClick = onMore) { Text("›", color = ink, fontSize = 22.sp) }
+            row(stringResource(R.string.more_options), null, onClick = onMore) { Text("›", color = ink, fontSize = 22.sp) }
         }
     }
 }

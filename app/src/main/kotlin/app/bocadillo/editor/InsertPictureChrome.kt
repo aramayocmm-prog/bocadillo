@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -126,7 +127,8 @@ fun InsertTopBar(t: ToolState.InsertPicture, panelOpen: Boolean, onPanel: (Boole
                 IconButton(onClick = { menu = true }, modifier = Modifier.size(40.dp)) { Icon(Icons.Filled.MoreVert, stringResource(R.string.more_options), tint = Classic.Text) }
                 DropdownMenu(menu, { menu = false }, modifier = Modifier.background(Color(0xFF2A2A2A))) {
                     @Composable fun item(label: Int, checked: Boolean? = null, onClick: () -> Unit) = DropdownMenuItem(
-                        text = { Text((if (checked == true) "✓ " else if (checked == false) "    " else "") + stringResource(label), color = Classic.Text, fontSize = 18.sp) },
+                        text = { Text(stringResource(label), color = Classic.Text, fontSize = 18.sp) },
+                        leadingIcon = if (checked == null) null else ({ Text(if (checked) "✓" else "", color = Classic.Text, fontSize = 18.sp, modifier = Modifier.width(18.dp)) }),
                         onClick = { menu = false; onClick() },
                     )
                     if (t.stage == InsertStage.PLACE) {

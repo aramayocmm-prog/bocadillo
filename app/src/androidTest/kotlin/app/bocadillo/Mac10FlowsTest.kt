@@ -10,6 +10,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -18,7 +20,6 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -282,7 +283,10 @@ class Mac10FlowsTest {
         desc(s(R.string.title_preview_hint)); waitFor(s(R.string.alignment)); shot("80_title_style_panel")
         assertTrue(has(s(R.string.line_height)) && has(s(R.string.fill_color)) && has(s(R.string.outline_color)) && has(s(R.string.text_size)))
         tap(s(R.string.tab_font)); waitFor(s(R.string.fonts_custom_files)); shot("81_more_fonts")
-        assertTrue(has(s(R.string.fonts_system_header)))
+        // the System Fonts header lies further down the list: scroll to it, then back up
+        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText(s(R.string.fonts_system_header)))
+        assertTrue("System Fonts header", has(s(R.string.fonts_system_header))); shot("81b_more_fonts_system")
+        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText("Creato Display Black"))
         tap("Creato Display Black"); systemBack()
         Thread.sleep(500); shot("82_title_with_font")
         systemBack() // close the panel
