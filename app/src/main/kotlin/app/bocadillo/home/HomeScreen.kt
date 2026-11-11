@@ -455,7 +455,7 @@ internal fun GlassOpenButton(text: String, enabled: Boolean = true, onClick: () 
     val size = (19f / maxOf(1f, fontScale / 1.15f)).sp
     Row(
         Modifier
-            .fillMaxWidth(0.86f).widthIn(max = 420.dp).heightIn(min = 56.dp)
+            .widthIn(max = 420.dp).fillMaxWidth(0.86f).heightIn(min = 56.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .shadow(14.dp, shape, ambientColor = violet, spotColor = violet)
             .clip(shape)

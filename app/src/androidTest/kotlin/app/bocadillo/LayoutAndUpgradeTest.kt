@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
@@ -56,7 +57,7 @@ class LayoutAndUpgradeTest {
         shot("90_home_$variant")
         rule.onAllNodesWithContentDescription(s(R.string.home_more), useUnmergedTree = true).onFirst().performClick()
         shot("91_more_$variant")
-        rule.onAllNodesWithText(s(R.string.licenses), useUnmergedTree = true).onFirst().performClick()
+        rule.onAllNodesWithText(s(R.string.licenses), useUnmergedTree = true).onFirst().performScrollTo().performClick()
         rule.waitUntil(10_000) { rule.onAllNodesWithText("Marcelo Aramayo", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         assertTrue(rule.onAllNodesWithText(s(R.string.credits_role), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         val version = ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName!!
