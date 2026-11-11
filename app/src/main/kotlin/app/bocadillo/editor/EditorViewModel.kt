@@ -19,10 +19,16 @@ import app.bocadillo.core.imaging.objects.StickerDef
 import app.bocadillo.core.imaging.ops.Geometry
 import app.bocadillo.core.imaging.ops.ImageOp
 import app.bocadillo.core.imaging.ops.MaskParams
-import app.bocadillo.core.imaging.ops.PaintOps
+import PaintOps
 import app.bocadillo.core.imaging.ops.TransformOps
 import app.bocadillo.core.imaging.paint.Stroke
+import app.bocadillo.data.FontRepository
 import app.bocadillo.core.imaging.paint.StrokeCodec
+import app.bocadillo.core.imaging.ops.PaintOps
+import app.bocadillo.core.imaging.paint.StrokePainter
+import app.bocadillo.render.processPicture
+import app.bocadillo.core.imaging.objects.Cutout
+import StrokeCodec
 import app.bocadillo.core.imaging.paint.StrokeMode
 import app.bocadillo.core.imaging.paint.StrokeRasterizer
 import app.bocadillo.core.model.Arrange
@@ -272,6 +278,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     private var dirty = false
 
     init {
+        lastInstance = this
         viewModelScope.launch { load() }
         viewModelScope.launch(Dispatchers.Default) {
             renderTrigger.collectLatest { if (::proxy.isInitialized) renderPreview() }
@@ -869,7 +876,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         if (t.stage == InsertStage.CROP && stage != InsertStage.CROP) {
             val r = t.cropRect
             val full = r[0] <= 0f && r[1] <= 0f && r[2] >= 1f && r[3] >= 1f
-            val px = app.bocadillo.core.imaging.objects.Cutout.cropRect(r, t.imageW, t.imageH)
+            val px = Cutout.cropRect(r, t.imageW, t.imageH)
             val newCrop = if (full) emptyList() else r
             // a different crop invalidates a cut-out made on the old one
             d = d.copy(crop = newCrop, aspect = px[2].toFloat() / px[3], cutout = if (newCrop == d.crop) d.cutout else emptyList())
@@ -955,7 +962,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
             for (extra in liveStrokes) {
                 val t = insertTool() ?: continue
                 val raw = rawPicture(t.draft) ?: continue
-                val bmp = runCatching { app.bocadillo.render.processPicture(raw, t.draft.crop, t.draft.cutout, extra) }.getOrNull() ?: continue
+                val bmp = runCatching { processPicture(raw, t.draft.crop, t.draft.cutout, extra) }.getOrNull() ?: continue
                 _insertLive.value = t.draft.id to bmp
             }
         }
@@ -986,8 +993,8 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     /** End of a stroke: one undo step; the mask stays editable in the project. */
     fun cutStrokeCommit(points: FloatArray, imageSize: Float) {
         val t = insertTool() ?: return
-        val strokes = app.bocadillo.core.imaging.objects.Cutout.strokes(t.draft.cutout) + cutStroke(t, points, imageSize)
-        pushInsert(t.draft.copy(cutout = app.bocadillo.core.imaging.objects.Cutout.encode(strokes)))
+        val strokes = Cutout.strokes(t.draft.cutout) + cutStroke(t, points, imageSize)
+        pushInsert(t.draft.copy(cutout = Cutout.encode(strokes)))
         refreshInsertLive()
     }
 
@@ -995,8 +1002,8 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     fun resetCutout() { val t = insertTool() ?: return; pushInsert(t.draft.copy(cutout = emptyList())); refreshInsertLive() }
 
     private fun cutStroke(t: ToolState.InsertPicture, points: FloatArray, imageSize: Float) =
-        if (t.erase) app.bocadillo.core.imaging.objects.Cutout.eraser(points, imageSize, t.brushHardness, t.brushSquare)
-        else app.bocadillo.core.imaging.objects.Cutout.restore(points, imageSize, t.brushHardness, t.brushSquare)
+        if (t.erase) Cutout.eraser(points, imageSize, t.brushHardness, t.brushSquare)
+        else Cutout.restore(points, imageSize, t.brushHardness, t.brushSquare)
 
     /** Last sticker-library import result (shown in a dialog). */
     private val _stickerImport = MutableStateFlow<Pair<app.bocadillo.data.StickerPacks.Report?, String?>?>(null)
@@ -1049,8 +1056,8 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     }
 
     /** Imports a TTF/OTF into the font library. Returns the font reference via [onDone]. */
-    private val _fontReport = MutableStateFlow<app.bocadillo.data.FontRepository.ImportReport?>(null)
-    val fontReport: StateFlow<app.bocadillo.data.FontRepository.ImportReport?> = _fontReport
+    private val _fontReport = MutableStateFlow<FontRepository.ImportReport?>(null)
+    val fontReport: StateFlow<FontRepository.ImportReport?> = _fontReport
     fun dismissFontReport() { _fontReport.value = null }
 
     /** Imports .ttf / .otf files and .zip archives; shows a report; applies the first font. */
@@ -1209,7 +1216,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
                 val st = m.stroke
                 if (st != null) {
                     if (t.kind == DrawKind.HISTORY) historyLive(work, w, h, base, st, t.stage)
-                    else app.bocadillo.core.imaging.paint.StrokePainter.paintInPlace(work, w, h, st)
+                    else StrokePainter.paintInPlace(work, w, h, st)
                 }
                 if (m.final) {
                     paintBase = PixelBuffer(w, h, work.copyOf()); paintBaseCount = m.baseCount + 1
@@ -1231,8 +1238,8 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
             historySource = stage to r; r
         }
         if (src.width != w || src.height != h) return
-        val out = app.bocadillo.core.imaging.ops.PaintOps.HistoryPaint.apply(
-            base, Params.of("stage" to stage).with("strokes", app.bocadillo.core.imaging.paint.StrokeCodec.encode(listOf(st))), RenderContext(scale = 1f),
+        val out = PaintOps.HistoryPaint.apply(
+            base, Params.of("stage" to stage).with("strokes", StrokeCodec.encode(listOf(st))), RenderContext(scale = 1f),
         ) { if (it == stage) src else null }
         System.arraycopy(out.pixels, 0, px, 0, px.size)
     }
@@ -1434,6 +1441,8 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     private fun now() = System.currentTimeMillis()
 
     companion object {
+        /** For instrumented tests: the editor most recently opened (no effect on the app). */
+        @Volatile var lastInstance: EditorViewModel? = null
         private const val PENDING_UID = "pending"
         private const val PROXY_TOKEN = "proxy"
 

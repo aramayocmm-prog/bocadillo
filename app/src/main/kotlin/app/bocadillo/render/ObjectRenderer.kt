@@ -358,8 +358,6 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
         return runCatching { processPicture(raw, o.crop, o.cutout) }.getOrNull()?.also { processed.put(key, it) }
     }
 
-    }
-
     /**
      * Noto Emoji. On hardware-accelerated (screen) canvases the SVG is rasterized into a cached
      * software bitmap first — AndroidSVG is only drawn directly on software canvases (export,

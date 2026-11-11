@@ -59,6 +59,7 @@ import kotlin.math.roundToInt
  * stroke in progress with the same brush engine as the final result (same colour, opacity,
  * size, hardness, blending and smoothing from the first touch to the release).
  */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun DrawLayer(
     eyedropper: Boolean,

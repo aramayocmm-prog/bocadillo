@@ -30,6 +30,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -357,8 +359,7 @@ fun MoreFontsScreen(
             if (kind == FontOption.Kind.IMPORTED && list.isEmpty()) item {
                 Text(stringResource(R.string.fonts_none_imported), color = androidx.compose.ui.graphics.Color(0xFF888888), fontSize = 14.sp, modifier = Modifier.padding(12.dp))
             }
-            items(list.size, key = { kind.name + list[it].ref }) { i ->
-                val f = list[i]
+            for (f in list) item(key = kind.name + f.ref) {
                 val sel = f.ref == selected
                 Text(
                     f.displayName, fontFamily = FontFamily(typeface(f.ref)), fontSize = 22.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = ink,
