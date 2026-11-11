@@ -34,6 +34,14 @@ class LayoutAndUpgradeTest {
 
     /** Home, More… and Licencias y créditos in the current variant; the title is never cut. */
     @Test fun homeVariants() {
+        val ui = InstrumentationRegistry.getInstrumentation().uiAutomation
+        if (variant == "landscape") { ui.setRotation(android.app.UiAutomation.ROTATION_FREEZE_90); Thread.sleep(2500); rule.waitForIdle() }
+        try { homeVariantsChecks() } finally {
+            if (variant == "landscape") ui.setRotation(android.app.UiAutomation.ROTATION_FREEZE_0)
+        }
+    }
+
+    private fun homeVariantsChecks() {
         rule.waitUntil(20_000) { rule.onAllNodesWithText(s(R.string.open_image), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         // a previous test may have left the editor open: dismiss the recovery offer first
         if (rule.onAllNodesWithText(s(R.string.home_recover_title), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()) {
@@ -44,6 +52,7 @@ class LayoutAndUpgradeTest {
             val n = rule.onAllNodesWithText(t, useUnmergedTree = true).fetchSemanticsNodes().first()
             assertTrue("'$t' inside the screen (${n.boundsInRoot})", n.boundsInRoot.left >= -1f && n.boundsInRoot.right <= screenW + 1f)
         }
+        if (variant == "landscape") assertTrue("landscape", ctx.resources.displayMetrics.widthPixels > ctx.resources.displayMetrics.heightPixels)
         shot("90_home_$variant")
         rule.onAllNodesWithContentDescription(s(R.string.home_more), useUnmergedTree = true).onFirst().performClick()
         shot("91_more_$variant")

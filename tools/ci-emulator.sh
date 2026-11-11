@@ -27,6 +27,9 @@ revive() { # the emulator process can die (host GL context lost); start it again
   for i in $(seq 1 90); do [ "$(T=10 a shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ] && break; sleep 2; done
   a shell settings put global window_animation_scale 0; a shell settings put global transition_animation_scale 0; a shell settings put global animator_duration_scale 0
   a shell settings put global hide_error_dialogs 1; a shell input keyevent 82
+  # make sure the app and the test APK are there (the restarted emulator may have lost them)
+  T=180 a install -r app/build/outputs/apk/debug/app-debug.apk >> $R 2>&1
+  T=180 a install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >> $R 2>&1
   a shell cmd locale set-app-locales app.bocadillo.debug --locales ${LOC:-es-ES} || true
   log "REVIVE: emulator back"
 }
