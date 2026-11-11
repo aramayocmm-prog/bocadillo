@@ -1,5 +1,6 @@
 package app.bocadillo
 
+import app.bocadillo.render.processPicture
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -192,7 +193,7 @@ class Mac10FlowsTest {
         assertTrue("perspective saved", o.transform.hasPerspective)
         // mask: cut pixels, kept pixels and soft (semi-transparent) edges
         val raw = android.graphics.BitmapFactory.decodeByteArray(saved.assets[o.source.removePrefix("asset:")]!!, 0, saved.assets[o.source.removePrefix("asset:")]!!.size)
-        val out = app.bocadillo.render.processPicture(raw, o.crop, o.cutout)
+        val out = processPicture(raw, o.crop, o.cutout)
         val px = IntArray(out.width * out.height).also { out.getPixels(it, 0, out.width, 0, 0, out.width, out.height) }
         val alphas = px.map { it ushr 24 }
         assertTrue("erased area", alphas.count { it == 0 } > 100)
