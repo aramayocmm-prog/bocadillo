@@ -16,8 +16,19 @@ inst() { # inst <label> <seconds> <am instrument args...>
   fi
   a logcat -b crash -d >> crash.txt 2>/dev/null || true
   a logcat -b crash -c 2>/dev/null || true
-  T=60 a wait-for-device 2>/dev/null || { log "DEVICE_LOST after $label"; T=20 a reconnect >/dev/null 2>&1; T=90 a wait-for-device || true; }
+  T=60 a wait-for-device 2>/dev/null || { log "DEVICE_LOST after $label"; revive || log "REVIVE failed"; }
   pull_screens
+}
+revive() { # the emulator process can die (host GL context lost); start it again with the same AVD
+  log "REVIVE: restarting the emulator"
+  pkill -f qemu-system 2>/dev/null; sleep 3
+  nohup "$ANDROID_HOME/emulator/emulator" -port 5554 -avd test -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim > emulator_revive.log 2>&1 &
+  T=300 a wait-for-device || return 1
+  for i in $(seq 1 90); do [ "$(T=10 a shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ] && break; sleep 2; done
+  a shell settings put global window_animation_scale 0; a shell settings put global transition_animation_scale 0; a shell settings put global animator_duration_scale 0
+  a shell settings put global hide_error_dialogs 1; a shell input keyevent 82
+  a shell cmd locale set-app-locales app.bocadillo.debug --locales ${LOC:-es-ES} || true
+  log "REVIVE: emulator back"
 }
 pull_screens() { # keep what exists so far, even if a later step hangs
   T=120 a exec-out run-as app.bocadillo.debug tar c files/screens > screens/screens.tar 2>/dev/null && (cd screens && tar xf screens.tar 2>/dev/null); rm -f screens/screens.tar
@@ -46,7 +57,7 @@ inst app.bocadillo.LayoutAndUpgradeTest#dataSurvivedUpgrade 300 -e class app.boc
 # the 1.0 flows run with the app in Spanish (per-app language, Android 13+)
 a shell cmd locale set-app-locales app.bocadillo.debug --locales es-ES >> $R 2>&1 || true
 inst "app.bocadillo.Mac10FlowsTest#fontsImportPickAndPersist (es)" 420 -e class app.bocadillo.Mac10FlowsTest#fontsImportPickAndPersist
-for t in insertPictureCropPlaceCutOut liveStrokeEqualsAppliedStroke; do
+for t in liveStrokeEqualsAppliedStroke; do
   a shell rm -f /sdcard/$t.mp4
   (timeout 200 adb shell screenrecord --bit-rate 6000000 --time-limit 170 /sdcard/$t.mp4 >/dev/null 2>&1 &)
   sleep 1
@@ -66,14 +77,25 @@ a shell settings put system accelerometer_rotation 0
 a shell settings put system user_rotation 1; sleep 2
 inst "homeVariants landscape (es)" 300 -e class app.bocadillo.LayoutAndUpgradeTest#homeVariants -e variant landscape
 a shell settings put system user_rotation 0
+inst "app.bocadillo.Mac10FlowsTest#insertPictureCropPlaceCutOut (es)" 420 -e class app.bocadillo.Mac10FlowsTest#insertPictureCropPlaceCutOut
 
 # regression tests of 0.8/0.9 (system language)
-a shell cmd locale set-app-locales app.bocadillo.debug --locales en-US >> $R 2>&1 || true
+LOC=en-US; a shell cmd locale set-app-locales app.bocadillo.debug --locales en-US >> $R 2>&1 || true
 for t in app.bocadillo.ReferenceScreensTest app.bocadillo.StickerLibraryFlowTest \
          app.bocadillo.MacFlowsTest#largePictureAsksForSize app.bocadillo.MacFlowsTest#homeTitleAndPaint \
          app.bocadillo.MacFlowsTest#insertedPictureSkewPerspectiveSaveReopenExport app.bocadillo.MacFlowsTest#svgShapeAndLineStyle; do
   inst "$t" 420 -e class "$t"
 done
 
+# video of Cut Out last: screen recording while the emulator renders has been the least stable part
+LOC=es-ES; a shell cmd locale set-app-locales app.bocadillo.debug --locales es-ES >> $R 2>&1 || true
+t=insertPictureCropPlaceCutOut
+a shell rm -f /sdcard/$t.mp4
+(timeout 200 adb shell screenrecord --bit-rate 4000000 --time-limit 170 /sdcard/$t.mp4 >/dev/null 2>&1 &)
+sleep 1
+inst "app.bocadillo.Mac10FlowsTest#$t (es, recorded)" 420 -e class "app.bocadillo.Mac10FlowsTest#$t"
+a shell pkill -INT screenrecord || true; sleep 3
+T=120 a pull /sdcard/$t.mp4 screens/files/screens/$t.mp4 >/dev/null 2>&1 || true
+cp emulator_revive.log screens/files/screens/ 2>/dev/null || true
 pull_screens
 ! grep -q 'TIMEOUT_OR_ERROR\|FAILURES!!!\|INSTRUMENTATION_FAILED\|Process crashed\|DEVICE_LOST' $R

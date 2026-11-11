@@ -286,7 +286,8 @@ class Mac10FlowsTest {
         // the System Fonts header lies further down the list: scroll to it, then back up
         rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText(s(R.string.fonts_system_header)))
         assertTrue("System Fonts header", has(s(R.string.fonts_system_header))); shot("81b_more_fonts_system")
-        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText("Creato Display Black"))
+        // back to the Custom Font Files section: the imported copy comes before the bundled one
+        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText(s(R.string.fonts_import_files)))
         tap("Creato Display Black"); systemBack()
         Thread.sleep(500); shot("82_title_with_font")
         systemBack() // close the panel
