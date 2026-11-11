@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
@@ -168,7 +169,7 @@ fun BalloonStyleScreen(
                 text = b.text.ifBlank { hint }, style = st.copy(size = 0.11f),
             )
             androidx.compose.foundation.Canvas(Modifier.align(Alignment.Center).fillMaxWidth(0.6f).height(120.dp)) {
-                androidx.compose.ui.graphics.drawscope.drawIntoCanvas { renderer.draw(it.nativeCanvas, preview, size.width, size.height) }
+                drawIntoCanvas { renderer.draw(it.nativeCanvas, preview, size.width, size.height) }
             }
         }
         Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding()) {

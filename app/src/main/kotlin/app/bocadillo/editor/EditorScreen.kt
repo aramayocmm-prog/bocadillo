@@ -84,6 +84,7 @@ import app.bocadillo.R
 import app.bocadillo.core.imaging.ops.ImageOp
 import app.bocadillo.core.imaging.ops.OpCategory
 import app.bocadillo.core.imaging.ops.TransformOps
+import app.bocadillo.core.imaging.ops.Geometry
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.runtime.mutableIntStateOf
 import app.bocadillo.core.model.BalloonObject
@@ -150,7 +151,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
     var transformMenu by remember { mutableStateOf(false) }
     var cropRatioDialog by remember { mutableStateOf(false) }
     var resizeMore by remember { mutableStateOf(false) }
-    if (cropRatioDialog) RatioDialog(onDismiss = { cropRatioDialog = false }) { w, h -> cropRatioDialog = false; vm.setCropPreset(app.bocadillo.core.imaging.ops.Geometry.CropPreset.CUSTOM, w / h) }
+    if (cropRatioDialog) RatioDialog(onDismiss = { cropRatioDialog = false }) { w, h -> cropRatioDialog = false; vm.setCropPreset(Geometry.CropPreset.CUSTOM, w / h) }
     // Title / Word Balloon composers: detailed style screen and its Font screen
     var styleDetails by rememberSaveable { mutableStateOf(false) }
     var fontPage by rememberSaveable { mutableStateOf(false) }
