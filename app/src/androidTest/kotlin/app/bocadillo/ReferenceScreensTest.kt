@@ -81,7 +81,7 @@ class ReferenceScreensTest {
         rule.waitForIdle()
 
         shot("01_home")
-        tap(s(R.string.get_a_picture)); shot("01b_get_picture"); InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK); rule.waitForIdle()
+        tap(s(R.string.open_image)); shot("01b_get_picture"); cancelTool()
         desc(s(R.string.home_more)); shot("18_more")
         tap(s(R.string.more_recent_projects)); tap("Sample"); waitFor(s(R.string.menu_adjust)); shot("02_editor", 4000)
 
@@ -95,17 +95,21 @@ class ReferenceScreensTest {
         tap(s(R.string.menu_sticker)); shot("07_sticker", 1500)
         tap(s(R.string.word_balloon)); shot("08_balloon_shapes")
         desc(s(R.string.balloon_speech).uppercase()); shot("09_new_word_balloon", 2000)
-        desc(s(R.string.balloon_preview_hint)); shot("09b_balloon_style", 2000); hideKeyboard(); back()
+        desc(s(R.string.balloon_preview_hint)); shot("09b_balloon_style", 2000); hideKeyboard(); cancelTool(); cancelTool()
 
-        tap(s(R.string.menu_effect)); tapInList(s(R.string.paint)); expandPanel(); shot("12_paint", 2000); back()
+        // classic Paint: bar, then each drop-down panel
+        tap(s(R.string.menu_effect)); tapInList(s(R.string.paint)); shot("12_paint", 2000)
+        tap(s(R.string.paint)); shot("12b_brush_settings", 1200)
+        desc(s(R.string.brush)); shot("12c_brush", 1200)
+        desc(s(R.string.brush_color)); shot("12d_color", 1200)
+        cancelTool(); cancelTool()
         tap(s(R.string.export)); shot("13_export"); back()
-        tap(s(R.string.menu_adjust)); tap(s(R.string.op_crop)); expandPanel(); shot("14_crop", 2500); back()
+        tap(s(R.string.menu_adjust)); tap(s(R.string.op_crop)); shot("14_crop", 2500); cancelTool()
         tap(s(R.string.menu_adjust)); tapInList(s(R.string.op_rotate)); shot("15_rotate", 2000); cancelTool()
-        tap(s(R.string.menu_adjust)); tap(s(R.string.op_resize)); shot("16_resize")
-        rule.onAllNodesWithText(s(R.string.cancel), useUnmergedTree = true).onFirst().performClick(); rule.waitForIdle()
-        // the title editor opens the keyboard: keep it for the end
+        tap(s(R.string.menu_adjust)); tap(s(R.string.op_resize)); shot("16_resize"); cancelTool()
+        // New Title: classic composer, its style screen and the Font screen
         tap(s(R.string.menu_sticker)); tap(s(R.string.title_sticker)); shot("10_new_title", 1500)
-        desc(s(R.string.title_preview_hint)); hideKeyboard(); tap(s(R.string.tab_font)); shot("10b_font_list", 1500)
-        tap(s(R.string.tab_outline)); shot("11_text_styles")
+        desc(s(R.string.title_preview_hint)); hideKeyboard(); shot("11_title_style", 1500)
+        tap(s(R.string.tab_font)); shot("10b_font_list", 1500)
     }
 }

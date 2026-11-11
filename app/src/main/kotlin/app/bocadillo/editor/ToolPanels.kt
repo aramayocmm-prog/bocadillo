@@ -229,7 +229,7 @@ fun CropPanel(tool: ToolState.Crop, onPreset: (Geometry.CropPreset, Float?) -> U
 }
 
 @Composable
-private fun RatioDialog(onDismiss: () -> Unit, onSet: (Float, Float) -> Unit) {
+internal fun RatioDialog(onDismiss: () -> Unit, onSet: (Float, Float) -> Unit) {
     var w by remember { mutableStateOf("4") }
     var h by remember { mutableStateOf("3") }
     val wv = w.toFloatOrNull(); val hv = h.toFloatOrNull()

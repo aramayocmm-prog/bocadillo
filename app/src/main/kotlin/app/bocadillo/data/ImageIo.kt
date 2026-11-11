@@ -97,6 +97,14 @@ object ImageIo {
     }
 
     /** Working size for a picture of [w]×[h]: full size unless it exceeds [maxWorkingPixels]. */
+    /** Size of a w×h picture scaled down (never up) to at most [maxPixels], proportions kept. */
+    fun fitPixels(w: Int, h: Int, maxPixels: Long): Pair<Int, Int> {
+        val px = w.toLong() * h
+        if (px <= maxPixels) return w to h
+        val k = sqrt(maxPixels.toDouble() / px)
+        return max(1, (w * k).toInt()) to max(1, (h * k).toInt())
+    }
+
     fun workingSize(w: Int, h: Int): Pair<Int, Int> {
         val max = maxWorkingPixels()
         val px = w.toLong() * h

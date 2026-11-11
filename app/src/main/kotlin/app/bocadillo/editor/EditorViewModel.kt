@@ -94,7 +94,7 @@ sealed interface ToolState {
     /** Sticker catalogue; [replaceId] set when replacing the selected sticker. */
     data class PickSticker(val replaceId: String?, val tab: Int = 1, val category: String? = null) : ToolState
     /** Sticker colours / outline / opacity. */
-    data class StyleSticker(val draft: StickerObject) : ToolState
+    data class StyleSticker(val draft: StickerObject, val vector: VectorStyleKind? = null) : ToolState
 
     /** Brush, Marker, Eraser (make transparent) or History Paint; strokes are pending until Apply. */
     data class Draw(
@@ -123,6 +123,9 @@ sealed interface ToolState {
 
 enum class DrawKind { BRUSH, MARKER, ERASER, HISTORY }
 
+/** "Set Shape Style" (fill + outline) or "Set Line Style" (line colour, width and ends). */
+enum class VectorStyleKind { SHAPE, LINE }
+
 /** Brush settings; [size] is the diameter in u (fraction of the picture's smaller side). */
 data class BrushSettings(
     val size: Float = 0.03f,
@@ -131,6 +134,8 @@ data class BrushSettings(
     val color: Int = 0xFFE53935.toInt(),
     val pressureSize: Boolean = true,
     val pressureOpacity: Boolean = false,
+    /** "Brush size is relative to screen": the size stays the same on screen at any zoom. */
+    val relativeToScreen: Boolean = false,
 )
 
 sealed interface UiMessage {
@@ -156,8 +161,10 @@ data class EditorUiState(
     /** Overlay objects as currently shown (committed, or live while dragging). */
     val objects: List<CanvasObject> = emptyList(),
     val selectedId: String? = null,
-    /** Corner handle stretches instead of scale/rotate ("Stretch Tool"). */
-    val stretchMode: Boolean = false,
+    /** What the selected object's blue handle does (Scale & Rotate, Stretch, Skew, Perspective…). */
+    val transformMode: TransformMode = TransformMode.SCALE_ROTATE,
+    /** The object as it was when a transformation mode was chosen (for Cancel). */
+    val transformStart: CanvasObject? = null,
     /** Bumped whenever project assets (fonts, imported stickers) change. */
     val assetsVersion: Int = 0,
     /** Capture date from EXIF (ms), for "Insert date and time". */
@@ -168,6 +175,9 @@ data class EditorUiState(
     val maskOverlay: ImageBitmap? = null,
 ) {
     /** Objects to draw: drafts of the open object tool replace (or are added to) the list. */
+    /** Corner handle stretches instead of scale/rotate ("Stretch Tool"). */
+    val stretchMode: Boolean get() = transformMode == TransformMode.STRETCH
+
     fun displayObjects(): List<CanvasObject> {
         val draft: CanvasObject = when (val t = tool) {
             is ToolState.EditText -> t.draft
@@ -440,6 +450,13 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         return (1f - Geometry.straightenScale(w, h, angle)) / 2f
     }
 
+    /** ↶ of the Crop bar: whole picture, no straightening, free proportions. */
+    fun resetCrop() {
+        val t = _state.value.tool as? ToolState.Crop ?: return
+        _state.update { it.copy(tool = t.copy(rect = floatArrayOf(0f, 0f, 1f, 1f), angle = 0f, preset = Geometry.CropPreset.FREEFORM, ratio = null)) }
+        requestRender()
+    }
+
     fun setCropRect(rect: FloatArray) {
         val t = _state.value.tool as? ToolState.Crop ?: return
         val m = allowedInset(t.angle)
@@ -491,7 +508,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
 
     fun selectObject(id: String?) {
         if (_state.value.tool != null) return
-        _state.update { it.copy(selectedId = id) }
+        _state.update { if (it.selectedId == id) it else it.copy(selectedId = id, transformMode = TransformMode.SCALE_ROTATE, transformStart = null) }
     }
 
     /** Live update while dragging (no history step yet). */
@@ -505,7 +522,26 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         if (objs != doc.objects) commit(doc.copy(objects = objs, modifiedAt = now()), label)
     }
 
-    fun toggleStretchMode() { _state.update { it.copy(stretchMode = !it.stretchMode) } }
+    fun toggleStretchMode() = setTransformMode(if (_state.value.stretchMode) TransformMode.SCALE_ROTATE else TransformMode.STRETCH)
+
+    /** Chooses what the blue handle does; remembers the object for Cancel. */
+    fun setTransformMode(m: TransformMode) {
+        _state.update { s ->
+            val sel = s.selectedId?.let { doc.objectById(it) }
+            if (m == TransformMode.SCALE_ROTATE && s.transformStart == null) s.copy(transformMode = m)
+            else s.copy(transformMode = m, transformStart = s.transformStart ?: sel)
+        }
+    }
+
+    /** ✓ of the transformation bar: keep the result (each drag is already one undo step). */
+    fun finishTransform() { _state.update { it.copy(transformMode = TransformMode.SCALE_ROTATE, transformStart = null) } }
+
+    /** ✕ of the transformation bar: back to the object as it was when the mode was chosen. */
+    fun cancelTransform() {
+        val start = _state.value.transformStart
+        finishTransform()
+        if (start != null && doc.objectById(start.id) != null && doc.objectById(start.id) != start) commit(doc.updateObject(start, now()), "transform_cancel")
+    }
 
     private fun selected(): CanvasObject? = _state.value.selectedId?.let { doc.objectById(it) }
 
@@ -566,6 +602,13 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
             is StickerObject -> _state.update { it.copy(tool = ToolState.StyleSticker(o)) }
             null -> Unit
         }
+    }
+
+    /** Opens Set Shape Style / Set Line Style for the selected vector sticker (SVG or built-in vector). */
+    fun openVectorStyle(kind: VectorStyleKind) {
+        val o = selected() as? StickerObject ?: return
+        if (!o.isRestylable) return
+        _state.update { it.copy(tool = ToolState.StyleSticker(o, kind)) }
     }
 
     fun updateDraft(o: CanvasObject) {
@@ -836,10 +879,10 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     }
 
     /** Adds a finished stroke (normalized points x,y,pressure) from the canvas. */
-    fun addStroke(points: FloatArray) {
+    fun addStroke(points: FloatArray, zoom: Float = 1f) {
         when (val t = _state.value.tool) {
             is ToolState.Draw -> {
-                val b = t.brush
+                val b = t.brush.let { if (it.relativeToScreen && zoom > 0f) it.copy(size = (it.size / zoom).coerceAtLeast(0.0005f)) else it }
                 val mode = when (t.kind) { DrawKind.MARKER -> StrokeMode.MARKER; DrawKind.ERASER -> StrokeMode.ERASE; else -> StrokeMode.PAINT }
                 val color = if (t.kind == DrawKind.MARKER) (b.color and 0x00FFFFFF) or 0xFF000000.toInt() else b.color
                 val opacity = if (t.kind == DrawKind.MARKER) b.opacity * 0.6f else b.opacity

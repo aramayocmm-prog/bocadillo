@@ -147,13 +147,44 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
         onDispose { ctl?.show(androidx.core.view.WindowInsetsCompat.Type.statusBars()) }
     }
 
+    var transformMenu by remember { mutableStateOf(false) }
+    var cropRatioDialog by remember { mutableStateOf(false) }
+    var resizeMore by remember { mutableStateOf(false) }
+    if (cropRatioDialog) RatioDialog(onDismiss = { cropRatioDialog = false }) { w, h -> cropRatioDialog = false; vm.setCropPreset(app.bocadillo.core.imaging.ops.Geometry.CropPreset.CUSTOM, w / h) }
+    // Title / Word Balloon composers: detailed style screen and its Font screen
+    var styleDetails by rememberSaveable { mutableStateOf(false) }
+    var fontPage by rememberSaveable { mutableStateOf(false) }
+    var composerDate by remember { mutableStateOf(false) }
+    LaunchedEffect(state.selectedId) { if (state.selectedId == null) transformMenu = false }
+    // classic Paint: open drop-down panel; eyedropper returns to the colour panel after a pick
+    var paintPanel by rememberSaveable { mutableStateOf<PaintPanel?>(null) }
+    var discardPaint by remember { mutableStateOf(false) }
+    val drawTool = state.tool as? ToolState.Draw
+    var wasPicking by remember { mutableStateOf(false) }
+    LaunchedEffect(drawTool?.eyedropper) {
+        if (drawTool?.eyedropper == true) { wasPicking = true; paintPanel = null }
+        else if (wasPicking) { wasPicking = false; paintPanel = PaintPanel.COLOR }
+    }
+    LaunchedEffect(drawTool == null) { if (drawTool == null) paintPanel = null }
+    if (discardPaint) AlertDialog(
+        onDismissRequest = { discardPaint = false },
+        text = { Text(stringResource(R.string.paint_discard)) },
+        confirmButton = { TextButton({ discardPaint = false; vm.cancelTool() }) { Text(stringResource(R.string.discard)) } },
+        dismissButton = { TextButton({ discardPaint = false }) { Text(stringResource(R.string.cancel)) } },
+    )
     val leave = { vm.closeEditor(); onBack() }
     BackHandler {
         when {
             openMenu == EditorMenu.BALLOON_SHAPES -> openMenu = EditorMenu.STICKER
             openMenu != null -> openMenu = null
             (state.tool as? ToolState.PickSticker)?.category != null -> vm.showStickerCategory(null)
+            state.tool is ToolState.Draw && paintPanel != null -> paintPanel = null
+            fontPage && (state.tool is ToolState.EditText || state.tool is ToolState.EditBalloon) -> fontPage = false
+            styleDetails && (state.tool is ToolState.EditText || state.tool is ToolState.EditBalloon) -> styleDetails = false
+            (state.tool as? ToolState.Draw)?.strokes?.isNotEmpty() == true -> discardPaint = true
             state.tool != null -> vm.cancelTool()
+            transformMenu -> transformMenu = false
+            state.transformStart != null -> vm.finishTransform()
             state.selectedId != null -> vm.selectObject(null)
             else -> leave()
         }
@@ -162,12 +193,11 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
     // classic tool chrome: which slider the bottom bar controls, and whether all options show
     var activeParam by rememberSaveable { mutableStateOf("") }
     var allOptions by rememberSaveable { mutableStateOf(false) }
-    var styleDetails by rememberSaveable { mutableStateOf(false) }
     var composerPhrases by remember { mutableStateOf(false) }
     // a new composer always starts in the light screen
     val toolKind = state.tool?.let { it::class.simpleName + ((it as? ToolState.EditBalloon)?.draft?.id ?: (it as? ToolState.EditText)?.draft?.id ?: "") }
     androidx.compose.runtime.LaunchedEffect(toolKind) {
-        styleDetails = false; allOptions = false
+        styleDetails = false; fontPage = false; allOptions = false
         activeParam = (state.tool as? ToolState.Adjust)?.op?.params?.filterIsInstance<ParamSpec.Slider>()?.firstOrNull()?.key ?: ""
     }
     var needsTransparency by rememberSaveable { mutableStateOf(false) }
@@ -240,6 +270,10 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
             remove = { i -> app.phrases.remove(i).also { phrasesVersion++ } },
         )
     }
+    if (composerDate) DateTimeDialog(state.photoDate, onDismiss = { composerDate = false }) { s ->
+        composerDate = false
+        (state.tool as? ToolState.EditText)?.let { t -> vm.updateDraft(t.draft.copy(text = if (t.draft.text.isEmpty()) s else t.draft.text + " " + s)) }
+    }
     if (composerPhrases) PhrasesDialog(app.phrases.list(), phraseOps, {}, onDismiss = { composerPhrases = false }) { phrase ->
         composerPhrases = false
         when (val t = state.tool) {
@@ -269,13 +303,31 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                     // the Export list shows the file name instead of a title
                     actions = {},
                 )
+                state.tool is ToolState.Crop -> {
+                    val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+                    val wallpaper = minOf(cfg.screenWidthDp, cfg.screenHeightDp).toFloat() / maxOf(cfg.screenWidthDp, cfg.screenHeightDp)
+                    CropTopBar(state.tool as ToolState.Crop, state.outputWidth, state.outputHeight, wallpaper, vm::resetCrop, vm::setCropPreset,
+                        onCustomRatio = { cropRatioDialog = true }, onCancel = vm::cancelTool, onApply = vm::applyTool)
+                }
+                state.tool is ToolState.Draw -> PaintTopBar(
+                    state.tool as ToolState.Draw, paintPanel, { paintPanel = it }, vm::setDrawKind, vm::undoStroke, vm::redoStroke,
+                    onCancel = vm::cancelTool, onApply = vm::applyTool,
+                )
                 (state.tool as? ToolState.Adjust)?.takeIf { usesClassicChrome(it) } != null -> {
                     val t = state.tool as ToolState.Adjust
                     ClassicToolTopBar(t, activeParam, { activeParam = it }, vm::resetParams, { on -> if (on) vm.ensureBefore(); comparing = on },
                         onMoreOptions = { allOptions = !allOptions }, onCancel = vm::cancelTool, onApply = vm::applyTool)
                 }
-                bar != null && ((state.tool as? ToolState.EditBalloon)?.isNew == true || (state.tool as? ToolState.EditText)?.isNew == true) && !styleDetails ->
+                bar != null && (state.tool as? ToolState.StyleSticker)?.vector != null ->
                     ClassicTopBar(bar.title, onBack = bar.onCancel, onConfirm = bar.onApply, backIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft, greenConfirm = true)
+                bar != null && (state.tool is ToolState.EditBalloon || state.tool is ToolState.EditText) -> when {
+                    fontPage -> ClassicTopBar(stringResource(R.string.tab_font), onBack = { fontPage = false }, backIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft)
+                    styleDetails -> ClassicTopBar(
+                        stringResource(if (state.tool is ToolState.EditText) R.string.title_style else R.string.balloon_style),
+                        onBack = { styleDetails = false }, onConfirm = { styleDetails = false }, backIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft, greenConfirm = true,
+                    )
+                    else -> ClassicTopBar(bar.title, onBack = bar.onCancel, onConfirm = bar.onApply, backIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft, greenConfirm = true)
+                }
                 bar != null -> ClassicTopBar(bar.title, onBack = bar.onCancel, onConfirm = bar.onApply, actions = { info?.quick?.invoke(this) },
                     backIcon = if (bar.onApply == null && (state.tool as? ToolState.PickSticker)?.category == null) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack)
                 else -> ClassicTopBar(
@@ -309,15 +361,31 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                 }
                 null -> Unit
             }
-            // "New Word Balloon" / "New Title": light full-screen composer until the user taps the
-            // preview for every style option (then the usual panel over the photo)
+            // "New Word Balloon" / "New Title" (also when re-editing): light full-screen composer;
+            // tapping the preview opens the detailed style screen, Font › its own font list
             val newTool = state.tool
-            if (newTool is ToolState.EditBalloon && newTool.isNew && !styleDetails) {
-                NewBalloonScreen(newTool.draft, objRenderer, vm::updateDraft, onStylePreview = { styleDetails = true }, onPhrases = { composerPhrases = true })
+            if (newTool is ToolState.EditBalloon) {
+                when {
+                    fontPage -> FontScreen(fonts, newTool.draft.style.font, typeface, onPick = { ref -> vm.updateDraft(newTool.draft.copy(style = newTool.draft.style.copy(font = ref))) },
+                        onImport = { fontPicker.launch(arrayOf("font/*", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream")) })
+                    styleDetails -> BalloonStyleScreen(newTool.draft, objRenderer, fonts, typeface, vm::updateDraft, onFonts = { fontPage = true })
+                    else -> NewBalloonScreen(newTool.draft, objRenderer, vm::updateDraft, onStylePreview = { styleDetails = true }, onPhrases = { composerPhrases = true })
+                }
                 return@Column
             }
-            if (newTool is ToolState.EditText && newTool.isNew && !styleDetails) {
-                NewTitleScreen(newTool.draft, objRenderer, vm::updateDraft, onStylePreview = { styleDetails = true }, onPhrases = { composerPhrases = true })
+            if (newTool is ToolState.EditText) {
+                when {
+                    fontPage -> FontScreen(fonts, newTool.draft.style.font, typeface, onPick = { ref -> vm.updateDraft(newTool.draft.copy(style = newTool.draft.style.copy(font = ref))) },
+                        onImport = { fontPicker.launch(arrayOf("font/*", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream")) })
+                    styleDetails -> TitleStyleScreen(newTool.draft, objRenderer, fonts, typeface, vm::updateDraft, onFonts = { fontPage = true }, onDateTime = { composerDate = true })
+                    else -> NewTitleScreen(newTool.draft, objRenderer, vm::updateDraft, onStylePreview = { styleDetails = true }, onPhrases = { composerPhrases = true })
+                }
+                return@Column
+            }
+            // Set Shape Style / Set Line Style: full-screen light grids
+            (state.tool as? ToolState.StyleSticker)?.takeIf { it.vector != null }?.let { t ->
+                if (t.vector == VectorStyleKind.SHAPE) SetShapeStyleScreen(t.draft, objRenderer, vm::updateDraft)
+                else SetLineStyleScreen(t.draft, objRenderer, vm::updateDraft)
                 return@Column
             }
             // "New Sticker": the classic list, a category grid or My Stickers (full screen)
@@ -354,7 +422,8 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                         assetsVersion = state.assetsVersion,
                         zoom = zoom,
                         interactive = state.tool == null,
-                        stretchMode = state.stretchMode,
+                        mode = state.transformMode,
+                        onHandleTap = { transformMenu = true },
                         onSelect = vm::selectObject,
                         onLive = vm::liveObject,
                         onCommit = vm::commitLive,
@@ -363,7 +432,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                     when (val t = state.tool) {
                         is ToolState.Draw -> DrawLayer(
                             t.brush.size, androidx.compose.ui.graphics.Color(if (t.kind == DrawKind.ERASER) 0x88FFFFFF.toInt() else (t.brush.color and 0x00FFFFFF) or 0xAA000000.toInt()),
-                            t.eyedropper, null, vm::addStroke, vm::sampleColor,
+                            t.eyedropper, null, { pts -> vm.addStroke(pts, zoom) }, vm::sampleColor,
                         )
                         is ToolState.Mask -> if (!t.choosingEffect) DrawLayer(
                             t.brush.size, androidx.compose.ui.graphics.Color(if (t.protect) 0x88E53935.toInt() else 0x8843A047.toInt()),
@@ -373,13 +442,34 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                         else -> Unit
                     }
                 }
+                // transformation modes of the selected object (blue handle)
+                if (state.tool == null && state.selectedId != null) {
+                    if (transformMenu) TransformModeMenu(
+                        state.transformMode, onPick = { vm.setTransformMode(it); transformMenu = false },
+                        onReset = { vm.resetTransformSelected(); transformMenu = false }, onDismiss = { transformMenu = false },
+                    )
+                    else if (state.transformStart != null) TransformModeBar(state.transformMode, onMenu = { transformMenu = true }, onCancel = vm::cancelTransform, onDone = vm::finishTransform)
+                }
+                (state.tool as? ToolState.Draw)?.let { t ->
+                    val p = paintPanel
+                    if (p != null && !t.eyedropper) PaintDropPanel(
+                        p, t, vm.historyStages(), { id -> context.getString(Labels.op(id)) }, app.settings.paintColors, app.settings::addPaintColor,
+                        onKind = vm::setDrawKind, onBrush = vm::setBrush, onStage = vm::setHistoryStage,
+                        onEyedropper = { vm.setEyedropper(!t.eyedropper) }, onClose = { paintPanel = null },
+                        onCompare = { on -> if (on) vm.ensureBefore(); comparing = on },
+                    )
+                    if (t.eyedropper) Text(
+                        stringResource(R.string.eyedropper_hint), color = androidx.compose.ui.graphics.Color.White,
+                        modifier = Modifier.align(Alignment.TopCenter).padding(8.dp).background(androidx.compose.ui.graphics.Color(0xCC1E1E1E)).padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                }
                 if (state.loading || state.exporting) CircularProgressIndicator(Modifier.align(Alignment.Center))
                 state.fatalError?.let { Text(it.text(context), Modifier.align(Alignment.Center).padding(24.dp), color = MaterialTheme.colorScheme.error) }
             }
             if (!state.loading && state.fatalError == null) Box(Modifier.fillMaxWidth().background(Classic.Menu)) {
                 Column(Modifier.navigationBarsPadding()) {
                     // the classic slider bar is already minimal: no expand/collapse handle for it
-                    val classicBar = (state.tool as? ToolState.Adjust)?.let { usesClassicChrome(it) && !allOptions } == true
+                    val classicBar = (state.tool as? ToolState.Adjust)?.let { usesClassicChrome(it) && !allOptions } == true || state.tool is ToolState.Draw || state.tool is ToolState.Crop
                     val info = if (classicBar) null else panelInfo(state, context, vm)
                     val expanded = info == null || panelPrefs.expanded(info)
                     if (info != null && !expanded) ExpandHandle { panelPrefs.set(info, true) }
@@ -390,7 +480,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                         else AdjustPanel(t, vm::updateParam, vm::resetParams, vm::applyTool, vm::cancelTool) { on ->
                             if (on) vm.ensureBefore(); comparing = on
                         }
-                        is ToolState.Crop -> CropPanel(t, vm::setCropPreset, vm::setStraighten, vm::applyTool, vm::cancelTool)
+                        is ToolState.Crop -> CropSliderBar(t, vm::setStraighten)
                         ToolState.Orient -> OrientPanel(vm::orient, vm::cancelTool)
                         is ToolState.EditText -> TextEditorPanel(
                             t, fonts, typeface, state.photoDate, phrases = { app.phrases.list() }, onPhrasesChanged = {}, phraseOps = phraseOps,
@@ -403,11 +493,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                             onApply = vm::applyTool, onCancel = vm::cancelTool,
                         )
                         is ToolState.PickSticker -> Unit // full-screen sticker menu above
-                        is ToolState.Draw -> DrawPanel(
-                            t, vm.historyStages(), { id -> context.getString(Labels.op(id)) },
-                            onKind = vm::setDrawKind, onBrush = vm::setBrush, onStage = vm::setHistoryStage, onEyedropper = vm::setEyedropper,
-                            onUndo = vm::undoStroke, onRedo = vm::redoStroke, onApply = vm::applyTool, onCancel = vm::cancelTool,
-                        )
+                        is ToolState.Draw -> Unit // classic Paint: bar and drop-down panels at the top
                         is ToolState.Mask -> MaskPanel(
                             t, maskEffects(app.registry.all),
                             { op -> context.getString(Labels.op(op.id)) },
@@ -419,7 +505,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                             ObjectMenu(sel, state.stretchMode, ObjectActions(
                                 edit = vm::editSelected, duplicate = vm::duplicateSelected, delete = vm::deleteSelected,
                                 arrange = vm::arrangeSelected, flip = vm::flipSelected, reset = vm::resetTransformSelected,
-                                toggleStretch = vm::toggleStretchMode, replace = { vm.openStickerPicker(replace = true) },
+                                toggleStretch = vm::toggleStretchMode, replace = { vm.openStickerPicker(replace = true) }, transformMenu = { transformMenu = true }, vectorStyle = vm::openVectorStyle,
                                 opacityLive = vm::setOpacityLive, opacityCommit = { vm.commitLive("opacity") }, done = { vm.selectObject(null) },
                             ))
                         } ?: ClassicBottomBar(listOf(
@@ -438,7 +524,8 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
     }
 
     if (state.tool == ToolState.Resize) {
-        ResizeDialog(state.outputWidth, state.outputHeight, onApply = { w, h, m, bg -> vm.applyResize(w, h, m, bg) }, onDismiss = vm::cancelTool)
+        if (resizeMore) ResizeDialog(state.outputWidth, state.outputHeight, onApply = { w, h, m, bg -> resizeMore = false; vm.applyResize(w, h, m, bg) }, onDismiss = { resizeMore = false; vm.cancelTool() })
+        else SetSizeDialog(state.outputWidth, state.outputHeight, onApply = { w, h, m, bg -> vm.applyResize(w, h, m, bg) }, onMore = { resizeMore = true }, onDismiss = vm::cancelTool)
     }
     if (state.tool == ToolState.Export) {
         ExportSheet(state.outputWidth, state.outputHeight, state.sourceHasAlpha, exportTarget, onDismiss = vm::cancelTool) { options, target ->
@@ -522,7 +609,7 @@ private fun toolBar(state: EditorUiState, context: Context, vm: EditorViewModel)
             MY_STICKERS -> ToolBarInfo(s(R.string.my_stickers), { vm.showStickerCategory(null) }, null)
             else -> ToolBarInfo(app.bocadillo.core.model.StickerCategories.all.firstOrNull { it.id == c }?.name(java.util.Locale.getDefault().language) ?: c, { vm.showStickerCategory(null) }, null)
         }
-        is ToolState.StyleSticker -> ToolBarInfo(s(R.string.sticker_set_style), vm::cancelTool, vm::applyTool)
+        is ToolState.StyleSticker -> ToolBarInfo(s(when (t.vector) { VectorStyleKind.SHAPE -> R.string.set_shape_style; VectorStyleKind.LINE -> R.string.set_line_style; null -> R.string.sticker_set_style }), vm::cancelTool, vm::applyTool)
         is ToolState.Draw -> ToolBarInfo(s(when (t.kind) {
             DrawKind.BRUSH -> R.string.brush; DrawKind.MARKER -> R.string.marker
             DrawKind.ERASER -> R.string.eraser_transparent; DrawKind.HISTORY -> R.string.history_paint

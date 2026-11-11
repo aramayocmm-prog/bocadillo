@@ -55,7 +55,79 @@ object ObjectGeometry {
             Affine2D.scale(
                 (t.scale * t.stretchX * (if (t.flipH) -1 else 1)).toDouble(),
                 (t.scale * t.stretchY * (if (t.flipV) -1 else 1)).toDouble(),
-            )
+            ) *
+            Affine2D(1.0, t.skewY.toDouble(), t.skewX.toDouble(), 1.0, 0.0, 0.0)
+
+    /** Local box corners (TL, TR, BR, BL) with the perspective offsets applied, local px. */
+    fun localCorners(t: ObjectTransform, hw: Float, hh: Float): List<Pair<Float, Float>> {
+        val base = listOf(-hw to -hh, hw to -hh, hw to hh, -hw to hh)
+        if (!t.hasPerspective) return base
+        return base.mapIndexed { i, (x, y) -> (x + t.perspective[2 * i] * hw) to (y + t.perspective[2 * i + 1] * hh) }
+    }
+
+    /** Canvas positions of the four corners (TL, TR, BR, BL), skew and perspective included. */
+    fun corners(t: ObjectTransform, w: Float, h: Float, hw: Float, hh: Float): List<Pair<Float, Float>> {
+        val m = toCanvas(t, w, h)
+        return localCorners(t, hw, hh).map { (x, y) -> m.map(x.toDouble(), y.toDouble()).let { it.first.toFloat() to it.second.toFloat() } }
+    }
+
+    /** True if the four points make a convex, non-degenerate quadrilateral (a valid perspective). */
+    fun isConvexQuad(q: List<Pair<Float, Float>>): Boolean {
+        var sign = 0
+        for (i in 0 until 4) {
+            val (ax, ay) = q[i]; val (bx, by) = q[(i + 1) % 4]; val (cx, cy) = q[(i + 2) % 4]
+            val cross = (bx - ax) * (cy - by) - (by - ay) * (cx - bx)
+            if (kotlin.math.abs(cross) < 1e-3f) return false
+            val s = if (cross > 0) 1 else -1
+            if (sign == 0) sign = s else if (s != sign) return false
+        }
+        return true
+    }
+
+    /** Point inside the (convex) quad, or within [slop] px of it. */
+    fun hitQuad(q: List<Pair<Float, Float>>, x: Float, y: Float, slop: Float): Boolean {
+        var inside = true
+        var sign = 0
+        for (i in 0 until 4) {
+            val (ax, ay) = q[i]; val (bx, by) = q[(i + 1) % 4]
+            val cross = (bx - ax) * (y - ay) - (by - ay) * (x - ax)
+            val s = if (cross >= 0) 1 else -1
+            if (sign == 0) sign = s else if (s != sign) inside = false
+        }
+        if (inside) return true
+        // near an edge
+        for (i in 0 until 4) {
+            val (ax, ay) = q[i]; val (bx, by) = q[(i + 1) % 4]
+            val dx = bx - ax; val dy = by - ay
+            val len2 = dx * dx + dy * dy
+            val k = if (len2 < 1e-6f) 0f else (((x - ax) * dx + (y - ay) * dy) / len2).coerceIn(0f, 1f)
+            if (hypot(x - (ax + k * dx), y - (ay + k * dy)) <= slop) return true
+        }
+        return false
+    }
+
+    /**
+     * Skew handle: the finger at canvas (x,y) becomes the new place of the box's bottom-right
+     * corner, solved for the shear (other parts of the transform unchanged).
+     */
+    fun dragSkew(t: ObjectTransform, w: Float, h: Float, hw: Float, hh: Float, x: Float, y: Float): ObjectTransform {
+        val (lx, ly) = toLocal(t.copy(skewX = 0f, skewY = 0f), w, h, x, y)
+        if (hw < 1f || hh < 1f) return t
+        return t.copy(skewX = ((lx - hw) / hh).coerceIn(-2f, 2f), skewY = ((ly - hh) / hw).coerceIn(-2f, 2f))
+    }
+
+    /** Perspective: moves corner [index] (0 TL, 1 TR, 2 BR, 3 BL) to canvas (x,y); invalid (non-convex) results are refused. */
+    fun dragCorner(t: ObjectTransform, w: Float, h: Float, hw: Float, hh: Float, index: Int, x: Float, y: Float): ObjectTransform {
+        if (hw < 1f || hh < 1f) return t
+        val noPersp = t.copy(perspective = emptyList())
+        val (lx, ly) = toLocal(noPersp, w, h, x, y)
+        val base = listOf(-hw to -hh, hw to -hh, hw to hh, -hw to hh)
+        val p = (if (t.perspective.size == 8) t.perspective else List(8) { 0f }).toMutableList()
+        p[2 * index] = ((lx - base[index].first) / hw).coerceIn(-1.6f, 1.6f)
+        p[2 * index + 1] = ((ly - base[index].second) / hh).coerceIn(-1.6f, 1.6f)
+        val next = t.copy(perspective = p)
+        return if (isConvexQuad(localCorners(next, hw, hh))) next else t
+    }
 
     /** Canvas point → local coordinates. */
     fun toLocal(t: ObjectTransform, w: Float, h: Float, x: Float, y: Float): Pair<Float, Float> {

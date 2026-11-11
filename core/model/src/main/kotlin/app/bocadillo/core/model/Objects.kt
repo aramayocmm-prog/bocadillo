@@ -21,7 +21,17 @@ data class ObjectTransform(
     val rotation: Float = 0f,
     val flipH: Boolean = false,
     val flipV: Boolean = false,
+    /** Affine shear in the object's own frame: x' = x + skewX·y, y' = y + skewY·x. */
+    val skewX: Float = 0f,
+    val skewY: Float = 0f,
+    /**
+     * Four-point perspective: offsets of the box corners (top-left, top-right, bottom-right,
+     * bottom-left; x,y pairs) as fractions of the box half-width / half-height. Empty = none.
+     * Added in MAC Editor 0.9; older projects simply have no value (no perspective).
+     */
+    val perspective: List<Float> = emptyList(),
 ) {
+    val hasPerspective: Boolean get() = perspective.size == 8 && perspective.any { it != 0f }
     fun moved(dx: Float, dy: Float) = copy(cx = cx + dx, cy = cy + dy)
 
     /** Reset Transform keeps position only (as "Reset" in the original Transform menu). */
@@ -59,6 +69,11 @@ data class TextStyle(
     val shadowBlur: Float = 0.06f,
     /** Alpha 0 = no background box. */
     val backgroundColor: Int = 0x00000000,
+    /** Vertical gradient fill: [color] at the top fading to this colour at the bottom. Alpha 0 = solid. */
+    val gradientColor: Int = 0x00000000,
+    /** Second (outer) outline around the first one; width as a fraction of the font size. */
+    val outline2Color: Int = 0x00000000,
+    val outline2Width: Float = 0f,
 )
 
 enum class BalloonShape { SPEECH, THOUGHT, SCREAM, WHISPER, RECTANGLE, ROUNDED, CAPTION, POINTER;
@@ -116,6 +131,10 @@ data class BalloonObject(
     val strokeColor: Int = 0xFF000000.toInt(),
     /** In u. */
     val strokeWidth: Float = 0.008f,
+    /** Vertical gradient: [fillColor] at the top to this colour at the bottom. Alpha 0 = solid fill. */
+    val fillColor2: Int = 0x00000000,
+    /** Drop shadow below-right of the balloon. Alpha 0 = none. */
+    val shadowColor: Int = 0x00000000,
     val text: String = "",
     val style: TextStyle = TextStyle(color = 0xFF000000.toInt(), outlineWidth = 0f, size = 0.06f, font = "system:casual"),
     override val opacity: Float = 1f,
@@ -124,6 +143,18 @@ data class BalloonObject(
     override fun withOpacity(o: Float) = copy(opacity = o.coerceIn(0f, 1f))
     override fun withId(newId: String) = copy(id = newId)
 }
+
+/**
+ * "Set Shape Style" / "Set Line Style" of a vector sticker (SVG or built-in vector). Alpha 0 /
+ * width 0 keep the sticker's own fill, outline and line width. [strokeWidth] is a fraction of the
+ * sticker's longer side.
+ */
+data class VectorStyle(
+    val fill: Int = 0,
+    val stroke: Int = 0,
+    val strokeWidth: Float = 0f,
+    val roundCap: Boolean = true,
+)
 
 /**
  * Sticker. [source] is "builtin:<catalogId>" (vector, recolourable) or "asset:stickers/<file>"
@@ -140,12 +171,17 @@ data class StickerObject(
     /** Multiplies vector stroke widths ("Outline Size"). */
     val outlineScale: Float = 1f,
     override val opacity: Float = 1f,
+    /** Restyling of a vector sticker (null = as designed). Raster PNG/WebP stickers never get one. */
+    val vectorStyle: VectorStyle? = null,
 ) : CanvasObject {
     override fun withTransform(t: ObjectTransform) = copy(transform = t)
     override fun withOpacity(o: Float) = copy(opacity = o.coerceIn(0f, 1f))
     override fun withId(newId: String) = copy(id = newId)
 
     val isVector: Boolean get() = source.startsWith("builtin:")
+
+    /** Vector stickers whose shape and line style can be changed: built-in vectors and imported SVG. */
+    val isRestylable: Boolean get() = isVector || (source.startsWith("asset:") && source.endsWith(".svg", ignoreCase = true))
 }
 
 // ------------------------------------------------------------------ document operations

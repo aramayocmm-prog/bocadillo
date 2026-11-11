@@ -95,4 +95,34 @@ class ObjectsTest {
         h.undo()
         assertTrue(h.current.objects.isEmpty())
     }
+
+    @Test fun skewAndPerspectiveRoundTripAndOldProjectsReadWithout() {
+        val t = ObjectTransform(0.3f, 0.6f, scale = 1.5f, skewX = 0.4f, skewY = -0.2f, perspective = listOf(0.1f, 0f, -0.2f, 0.1f, 0f, 0f, 0.05f, -0.1f))
+        val d = docWithObjects().let { it.copy(objects = it.objects.map { o -> o.withTransform(t) }) }
+        val back = DocumentJson.decode(DocumentJson.encode(d))
+        assertEquals(d.objects, back.objects)
+        // a 0.8 project (no skew / perspective keys) still opens, with neither applied
+        val old = DocumentJson.encode(docWithObjects())
+        assertTrue(!old.contains("skewX") && !old.contains("perspective"))
+        val reread = DocumentJson.decode(old)
+        assertTrue(reread.objects.all { it.transform.skewX == 0f && !it.transform.hasPerspective })
+        // reset clears skew and perspective too
+        assertEquals(ObjectTransform(0.3f, 0.6f), t.reset())
+    }
+
+    @Test fun gradientsAndSecondOutlineRoundTrip() {
+        val st = TextStyle(color = 0xFFFFEB3B.toInt(), gradientColor = 0xFFFF5722.toInt(), outline2Color = 0xFFFFFFFF.toInt(), outline2Width = 0.1f)
+        val b = BalloonObject("b", text = "Hi", fillColor = 0xFFFFFFFF.toInt(), fillColor2 = 0xFF90CAF9.toInt(), shadowColor = 0x66000000)
+        val d = docWithObjects().let { it.copy(objects = listOf(TextObject("t", text = "x", style = st), b)) }
+        assertEquals(d.objects, DocumentJson.decode(DocumentJson.encode(d)).objects)
+    }
+
+    @Test fun vectorStyleOnlyForVectorStickersAndRoundTrips() {
+        val svg = StickerObject("s", source = "asset:stickers/abc.svg", vectorStyle = VectorStyle(0xFFFF0000.toInt(), 0xFF000000.toInt(), 0.03f, false))
+        val png = StickerObject("p", source = "asset:stickers/abc.png")
+        assertTrue(svg.isRestylable); assertTrue(!png.isRestylable)
+        assertTrue(StickerObject("b", source = "builtin:star").isRestylable)
+        val d = docWithObjects().copy(objects = listOf(svg, png))
+        assertEquals(d.objects, DocumentJson.decode(DocumentJson.encode(d)).objects)
+    }
 }

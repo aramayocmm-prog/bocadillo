@@ -268,7 +268,7 @@ private val DATE_SKELETONS = listOf("MMMMd", "EEEE", "yyyy", "EEEEMMMMd", "EEEEM
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DateTimeDialog(photoDate: Long?, onDismiss: () -> Unit, onPick: (String) -> Unit) {
+internal fun DateTimeDialog(photoDate: Long?, onDismiss: () -> Unit, onPick: (String) -> Unit) {
     var source by remember { mutableIntStateOf(if (photoDate != null) 0 else 1) } // 0 photo, 1 today, 2 custom
     var custom by remember { mutableStateOf<Long?>(null) }
     var picker by remember { mutableStateOf(false) }

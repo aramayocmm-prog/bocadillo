@@ -22,6 +22,16 @@ class AppSettings(context: Context) {
     fun updateShareSubject(v: String) { shareSubject = v; prefs.edit().putString("share_subject", v).apply() }
     fun updateShareSignature(v: String) { shareSignature = v; prefs.edit().putString("share_signature", v).apply() }
 
+    /** Colours the user added to the Paint palette (most recent first, at most 14). */
+    var paintColors by mutableStateOf(
+        (prefs.getString("paint_colors", "") ?: "").split(',').mapNotNull { it.toLongOrNull()?.toInt() }
+    ); private set
+
+    fun addPaintColor(c: Int) {
+        paintColors = (listOf(c) + paintColors.filter { it != c }).take(14)
+        prefs.edit().putString("paint_colors", paintColors.joinToString(",") { (it.toLong() and 0xffffffffL).toString() }).apply()
+    }
+
     /** Forgets which tool panels were minimized. */
     fun resetPanels() = panels.edit().clear().apply()
 }

@@ -16,6 +16,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CropFree
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -127,8 +130,8 @@ fun ClassicToolSliderBar(tool: ToolState.Adjust, activeKey: String, onChange: ((
 
 @Composable
 private fun StepButton(label: String, onClick: () -> Unit) {
-    Box(Modifier.size(36.dp).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        Text(label, color = Classic.TextDim, fontSize = 26.sp)
+    Box(Modifier.size(44.dp).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+        Text(label, color = Classic.TextDim, fontSize = 28.sp)
     }
 }
 
@@ -141,3 +144,87 @@ fun valueText(s: ParamSpec.Slider, v: Float): String {
     return sign + num + unit
 }
 
+
+/**
+ * Classic Crop bar (reference WA0117): ↶ (back to the whole picture), "Crop W × H" with the size
+ * of the result in pixels, the frame button (proportions menu) and ✕ — or a green ✓ once the
+ * frame was changed.
+ */
+@Composable
+fun CropTopBar(
+    tool: ToolState.Crop,
+    pixelW: Int,
+    pixelH: Int,
+    wallpaperRatio: Float,
+    onReset: () -> Unit,
+    onPreset: (app.bocadillo.core.imaging.ops.Geometry.CropPreset, Float?) -> Unit,
+    onCustomRatio: () -> Unit,
+    onCancel: () -> Unit,
+    onApply: () -> Unit,
+) {
+    val r = tool.rect
+    val w = ((r[2] - r[0]) * pixelW).roundToInt(); val h = ((r[3] - r[1]) * pixelH).roundToInt()
+    val changed = tool.angle != 0f || r[0] > 0.0005f || r[1] > 0.0005f || r[2] < 0.9995f || r[3] < 0.9995f
+    var menu by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().height(56.dp).background(ToolChrome.Work).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        ChromeSquare(stringResource(R.string.reset), onReset) { Icon(Icons.AutoMirrored.Filled.Undo, null, tint = Classic.Text) }
+        Row(
+            Modifier.weight(1f).padding(horizontal = 4.dp).height(46.dp).background(ToolChrome.Bar, androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).padding(start = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.op_crop) + "  $w × $h", color = Classic.Text, fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Box {
+                IconButton(onClick = { menu = true }) { Icon(Icons.Filled.CropFree, stringResource(R.string.crop_proportions), tint = Classic.Text) }
+                DropdownMenu(menu, { menu = false }) {
+                    val presets = listOf(
+                        app.bocadillo.core.imaging.ops.Geometry.CropPreset.FREEFORM to R.string.crop_free,
+                        app.bocadillo.core.imaging.ops.Geometry.CropPreset.ORIGINAL to R.string.crop_original,
+                        app.bocadillo.core.imaging.ops.Geometry.CropPreset.GOLDEN to R.string.crop_golden,
+                        app.bocadillo.core.imaging.ops.Geometry.CropPreset.SQUARE to R.string.crop_square,
+                        app.bocadillo.core.imaging.ops.Geometry.CropPreset.WALLPAPER to R.string.crop_wallpaper,
+                        app.bocadillo.core.imaging.ops.Geometry.CropPreset.CUSTOM to R.string.crop_custom,
+                    )
+                    for ((p, label) in presets) DropdownMenuItem(
+                        text = { Text((if (tool.preset == p) "● " else "   ") + stringResource(label)) },
+                        onClick = {
+                            menu = false
+                            when (p) {
+                                app.bocadillo.core.imaging.ops.Geometry.CropPreset.CUSTOM -> onCustomRatio()
+                                app.bocadillo.core.imaging.ops.Geometry.CropPreset.WALLPAPER -> onPreset(p, wallpaperRatio)
+                                else -> onPreset(p, p.ratio)
+                            }
+                        },
+                    )
+                }
+            }
+        }
+        if (changed) ChromeSquare(stringResource(R.string.apply), onApply) { Icon(Icons.Filled.Check, null, tint = Classic.Confirm, modifier = Modifier.size(30.dp)) }
+        else ChromeSquare(stringResource(R.string.cancel), onCancel) { Icon(Icons.Filled.Close, null, tint = Classic.Text) }
+    }
+}
+
+@Composable
+private fun ChromeSquare(label: String, onClick: () -> Unit, content: @Composable () -> Unit) {
+    Box(
+        Modifier.size(46.dp).background(ToolChrome.Bar, androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).clickable(onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) { content() }
+}
+
+/** Bottom bar of Crop: − slider + straightening the picture (−45…45°, centre = 0°). */
+@Composable
+fun CropSliderBar(tool: ToolState.Crop, onStraighten: (Float) -> Unit) {
+    val spec = app.bocadillo.core.imaging.ops.TransformOps.Crop.params.first() as ParamSpec.Slider
+    val step = if (spec.step > 0f) spec.step else 0.5f
+    val label = stringResource(R.string.straighten)
+    Row(Modifier.fillMaxWidth().height(56.dp).background(ToolChrome.Bottom).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        StepButton("−") { onStraighten((tool.angle - step).coerceIn(spec.min, spec.max)) }
+        Slider(
+            value = tool.angle, onValueChange = onStraighten, valueRange = spec.min..spec.max,
+            modifier = Modifier.weight(1f).padding(horizontal = 6.dp).semantics { contentDescription = label + " " + valueText(spec, tool.angle) },
+            colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color(0xFF9E9E9E), inactiveTrackColor = Color(0xFF9E9E9E)),
+        )
+        StepButton("+") { onStraighten((tool.angle + step).coerceIn(spec.min, spec.max)) }
+    }
+}

@@ -190,4 +190,25 @@ class BalloonShapesExtraTest {
         org.junit.Assert.assertEquals(160f, ptr.contour[far * 2 + 1], 0.5f)
         org.junit.Assert.assertTrue(ptr.contour.size > rect.contour.size)
     }
+
+    @Test fun skewHandleLandsOnTheFingerAndPerspectiveStaysConvex() {
+        val t = ObjectTransform(0.5f, 0.5f, scale = 1.3f, rotation = 20f)
+        val w = 1000f; val h = 800f; val hw = 100f; val hh = 60f
+        // skew: the bottom-right corner follows the finger
+        val target = 640f to 590f
+        val s = ObjectGeometry.dragSkew(t, w, h, hw, hh, target.first, target.second)
+        val br = ObjectGeometry.corners(s, w, h, hw, hh)[2]
+        assertEquals(target.first, br.first, 0.5f); assertEquals(target.second, br.second, 0.5f)
+        // perspective: corner 1 moves to the finger, others stay
+        val before = ObjectGeometry.corners(t, w, h, hw, hh)
+        val p = ObjectGeometry.dragCorner(t, w, h, hw, hh, 1, before[1].first + 30f, before[1].second - 20f)
+        val after = ObjectGeometry.corners(p, w, h, hw, hh)
+        assertEquals(before[1].first + 30f, after[1].first, 0.5f)
+        assertEquals(before[0].first, after[0].first, 0.01f); assertEquals(before[3].second, after[3].second, 0.01f)
+        assertTrue(ObjectGeometry.hitQuad(after, t.cx * w, t.cy * h, 0f))
+        // dragging a corner across the opposite one would fold the quad: refused
+        val folded = ObjectGeometry.dragCorner(t, w, h, hw, hh, 0, before[2].first + 50f, before[2].second + 50f)
+        assertEquals(t, folded)
+        assertFalse(ObjectGeometry.hitQuad(after, 0f, 0f, 4f))
+    }
 }

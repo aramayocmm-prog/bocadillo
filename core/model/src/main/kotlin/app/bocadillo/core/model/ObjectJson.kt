@@ -31,12 +31,19 @@ internal object ObjectJson {
                 put("width", o.width); put("height", o.height)
                 put("tailX", o.tailX); put("tailY", o.tailY); put("tailWidth", o.tailWidth); put("hasTail", o.hasTail)
                 putColor("fillColor", o.fillColor); putColor("strokeColor", o.strokeColor); put("strokeWidth", o.strokeWidth)
+                if (o.fillColor2 != 0) putColor("fillColor2", o.fillColor2)
+                if (o.shadowColor != 0) putColor("shadowColor", o.shadowColor)
                 put("text", o.text); put("style", style(o.style))
             }
             is StickerObject -> {
                 put("type", "sticker"); put("source", o.source); put("size", o.size); put("aspect", o.aspect)
                 put("outlineScale", o.outlineScale)
                 put("colors", buildJsonArray { o.colors.forEach { add(JsonPrimitive(it.toLong() and 0xffffffffL)) } })
+                o.vectorStyle?.let { v ->
+                    put("vectorStyle", buildJsonObject {
+                        putColor("fill", v.fill); putColor("stroke", v.stroke); put("strokeWidth", v.strokeWidth); put("roundCap", v.roundCap)
+                    })
+                }
             }
         }
     }
@@ -57,6 +64,7 @@ internal object ObjectJson {
                     hasTail = j["hasTail"]?.jsonPrimitive?.booleanOrNull ?: true,
                     fillColor = j.color("fillColor", d.fillColor), strokeColor = j.color("strokeColor", d.strokeColor),
                     strokeWidth = j.f("strokeWidth", d.strokeWidth),
+                    fillColor2 = j.color("fillColor2", 0), shadowColor = j.color("shadowColor", 0),
                     text = j["text"]?.jsonPrimitive?.content ?: "",
                     style = j["style"]?.jsonObject?.let { style(it) } ?: d.style,
                     opacity = opacity,
@@ -67,6 +75,9 @@ internal object ObjectJson {
                 size = j.f("size", 0.35f), aspect = j.f("aspect", 1f),
                 colors = j["colors"]?.jsonArray?.map { it.jsonPrimitive.long.toInt() } ?: emptyList(),
                 outlineScale = j.f("outlineScale", 1f), opacity = opacity,
+                vectorStyle = j["vectorStyle"]?.jsonObject?.let { v ->
+                    VectorStyle(v.color("fill", 0), v.color("stroke", 0), v.f("strokeWidth", 0f), v["roundCap"]?.jsonPrimitive?.booleanOrNull ?: true)
+                },
             )
             else -> throw ProjectFormatException("Unknown object type '$type'")
         }
@@ -76,12 +87,18 @@ internal object ObjectJson {
         put("cx", t.cx); put("cy", t.cy); put("scale", t.scale)
         put("stretchX", t.stretchX); put("stretchY", t.stretchY); put("rotation", t.rotation)
         put("flipH", t.flipH); put("flipV", t.flipV)
+        // written only when used, so projects without them stay byte-identical to 0.8
+        if (t.skewX != 0f) put("skewX", t.skewX)
+        if (t.skewY != 0f) put("skewY", t.skewY)
+        if (t.hasPerspective) put("perspective", buildJsonArray { t.perspective.forEach { add(JsonPrimitive(it)) } })
     }
 
     private fun transform(j: JsonObject) = ObjectTransform(
         cx = j.f("cx", 0.5f), cy = j.f("cy", 0.5f), scale = j.f("scale", 1f),
         stretchX = j.f("stretchX", 1f), stretchY = j.f("stretchY", 1f), rotation = j.f("rotation", 0f),
         flipH = j["flipH"]?.jsonPrimitive?.boolean ?: false, flipV = j["flipV"]?.jsonPrimitive?.boolean ?: false,
+        skewX = j.f("skewX", 0f), skewY = j.f("skewY", 0f),
+        perspective = j["perspective"]?.jsonArray?.mapNotNull { it.jsonPrimitive.floatOrNull }?.takeIf { it.size == 8 } ?: emptyList(),
     )
 
     private fun style(s: TextStyle) = buildJsonObject {
@@ -91,6 +108,8 @@ internal object ObjectJson {
         putColor("outlineColor", s.outlineColor); put("outlineWidth", s.outlineWidth)
         putColor("shadowColor", s.shadowColor); put("shadowDx", s.shadowDx); put("shadowDy", s.shadowDy); put("shadowBlur", s.shadowBlur)
         putColor("backgroundColor", s.backgroundColor)
+        if (s.gradientColor != 0) putColor("gradientColor", s.gradientColor)
+        if (s.outline2Width > 0f) { putColor("outline2Color", s.outline2Color); put("outline2Width", s.outline2Width) }
     }
 
     private fun style(j: JsonObject?): TextStyle {
@@ -106,6 +125,8 @@ internal object ObjectJson {
             shadowColor = j.color("shadowColor", d.shadowColor), shadowDx = j.f("shadowDx", d.shadowDx),
             shadowDy = j.f("shadowDy", d.shadowDy), shadowBlur = j.f("shadowBlur", d.shadowBlur),
             backgroundColor = j.color("backgroundColor", d.backgroundColor),
+            gradientColor = j.color("gradientColor", 0),
+            outline2Color = j.color("outline2Color", 0), outline2Width = j.f("outline2Width", 0f),
         )
     }
 

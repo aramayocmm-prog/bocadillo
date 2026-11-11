@@ -19,7 +19,7 @@ class ExportRepository(private val context: Context) {
 
     fun suggestedName(title: String, ext: String): String {
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val base = title.replace(Regex("[^\\p{L}\\p{N}_ -]"), "").trim().ifEmpty { "Bocadillo" }.take(40)
+        val base = title.replace(Regex("[^\\p{L}\\p{N}_ -]"), "").trim().ifEmpty { "MAC_Editor" }.take(40)
         return "${base}_$stamp.$ext"
     }
 
@@ -29,7 +29,7 @@ class ExportRepository(private val context: Context) {
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
             put(MediaStore.Images.Media.MIME_TYPE, mimeType)
-            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Bocadillo")
+            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/MAC Editor para MEMES")
             put(MediaStore.Images.Media.IS_PENDING, 1)
         }
         val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)

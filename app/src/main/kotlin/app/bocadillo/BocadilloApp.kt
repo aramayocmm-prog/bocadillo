@@ -63,7 +63,7 @@ class BocadilloApp : Application() {
                 val sw = java.io.StringWriter()
                 error.printStackTrace(java.io.PrintWriter(sw))
                 crashFile.writeText(
-                    "Bocadillo ${info.versionName} · Android ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT}) · " +
+                    "MAC Editor para MEMES ${info.versionName} · Android ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT}) · " +
                         "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}\nThread: ${thread.name}\n\n$sw",
                 )
             }

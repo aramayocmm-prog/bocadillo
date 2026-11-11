@@ -97,6 +97,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.filled.Menu
 import kotlinx.coroutines.Dispatchers
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -108,6 +116,8 @@ fun HomeScreen(vm: HomeViewModel, onOpen: (String) -> Unit) {
     val index by vm.index.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val recovery by vm.recovery.collectAsStateWithLifecycle()
+    val largeImport by vm.largeImport.collectAsStateWithLifecycle()
+    largeImport?.let { LargeImportDialog(it, vm::chooseImportSize) }
     val snackbar = remember { SnackbarHostState() }
     var tab by rememberSaveable { mutableStateOf(0) }
     var blankDialog by remember { mutableStateOf(false) }
@@ -163,14 +173,10 @@ fun HomeScreen(vm: HomeViewModel, onOpen: (String) -> Unit) {
                         )
                     }
                     Column(Modifier.align(Alignment.Center).fillMaxWidth().padding(horizontal = 24.dp).offset(y = (-40).dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        AppLogo(Modifier.fillMaxWidth(0.62f))
-                        Spacer(Modifier.height(36.dp))
-                        Box(
-                            Modifier.fillMaxWidth(0.62f).height(52.dp).background(Classic.HomeButton)
-                                .clickable(enabled = !busy) { getPicture = true },
-                            contentAlignment = Alignment.Center,
-                        ) { Text(stringResource(R.string.get_a_picture), color = Classic.HomeButtonText, fontSize = 19.sp) }
-                        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth(0.62f).padding(top = 16.dp))
+                        AppLogo(Modifier.fillMaxWidth(0.66f).widthIn(max = 320.dp))
+                        Spacer(Modifier.height(32.dp))
+                        GlassOpenButton(stringResource(R.string.open_image), enabled = !busy) { getPicture = true }
+                        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth(0.66f).padding(top = 16.dp))
                     }
                 }
                 page == HomePage.MORE -> {
@@ -310,6 +316,36 @@ private fun ProjectCard(e: ProjectEntry, thumb: File, onOpen: () -> Unit, onFavo
 
 private enum class HomePage { MAIN, RECENT, MORE }
 
+/** "Import large picture…" (reference WA0130): Fast / Normal / Maximum with the resulting size. */
+@Composable
+private fun LargeImportDialog(info: HomeViewModel.LargeImport, onChoose: (Pair<Int, Int>?) -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = { onChoose(null) }) {
+        Column(Modifier.fillMaxWidth().background(androidx.compose.ui.graphics.Color(0xFFFAFAFA)).verticalScroll(rememberScrollState())) {
+            Text(stringResource(R.string.import_large_title), color = Classic.Accent, fontSize = 21.sp, modifier = Modifier.padding(20.dp, 18.dp))
+            androidx.compose.material3.HorizontalDivider(color = Classic.Accent, thickness = 2.dp)
+            val dark = androidx.compose.ui.graphics.Color(0xFF212121)
+            val dim = androidx.compose.ui.graphics.Color(0xFF616161)
+            for ((label, size, desc) in listOf(
+                Triple(R.string.import_fast, info.fast, R.string.import_fast_desc),
+                Triple(R.string.import_normal, info.normal, R.string.import_normal_desc),
+                Triple(R.string.import_maximum, info.maximum, R.string.import_maximum_desc),
+            )) {
+                Column(Modifier.fillMaxWidth().clickable { onChoose(size) }.padding(horizontal = 20.dp, vertical = 10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(label), color = dark, fontSize = 20.sp, modifier = Modifier.weight(1f))
+                        Text("${size.first}×${size.second}", color = dark, fontSize = 20.sp)
+                    }
+                    Text(stringResource(desc), color = dim, fontSize = 14.sp)
+                }
+                androidx.compose.material3.HorizontalDivider(color = androidx.compose.ui.graphics.Color(0xFFE0E0E0))
+            }
+            if (info.maximum.first < info.fullW) Text(
+                stringResource(R.string.import_maximum_limited, info.fullW, info.fullH), color = dim, fontSize = 12.sp, modifier = Modifier.padding(20.dp, 8.dp),
+            )
+        }
+    }
+}
+
 /** "Get Picture from" chooser: white dialog with a blue title and four rows. */
 @Composable
 private fun GetPictureDialog(onDismiss: () -> Unit, onGallery: () -> Unit, onCamera: () -> Unit, onImport: () -> Unit, onBlank: () -> Unit) {
@@ -335,30 +371,72 @@ private fun GetPictureDialog(onDismiss: () -> Unit, onGallery: () -> Unit, onCam
     }
 }
 
-/** Own logo (not PicSay's): a speech balloon with the app name. */
+/**
+ * Official MAC PRODUCCIONES logo (supplied by the owner), shown unchanged. The circular variant
+ * has the black outside of the ring made transparent so it reads on dark and light backgrounds;
+ * the app name sits below it.
+ */
 @Composable
 private fun AppLogo(modifier: Modifier) {
-    Box(modifier.aspectRatio(1.6f), contentAlignment = Alignment.Center) {
-        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-            val w = size.width; val h = size.height
-            val body = androidx.compose.ui.geometry.Rect(w * 0.04f, h * 0.06f, w * 0.96f, h * 0.78f)
-            val tail = androidx.compose.ui.graphics.Path().apply {
-                moveTo(w * 0.28f, h * 0.70f); lineTo(w * 0.18f, h * 0.98f); lineTo(w * 0.44f, h * 0.74f); close()
-            }
-            val shape = androidx.compose.ui.graphics.Path().apply { addOval(body); op(this, tail, androidx.compose.ui.graphics.PathOperation.Union) }
-            drawPath(shape, androidx.compose.ui.graphics.Brush.verticalGradient(listOf(androidx.compose.ui.graphics.Color.White, androidx.compose.ui.graphics.Color(0xFFDCE6F0))))
-            drawPath(shape, androidx.compose.ui.graphics.Color(0xFF1565C0), style = androidx.compose.ui.graphics.drawscope.Stroke(w * 0.018f))
-        }
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(bottom = 30.dp)) {
-            Text(
-                androidx.compose.ui.text.buildAnnotatedString {
-                    withStyle(androidx.compose.ui.text.SpanStyle(color = androidx.compose.ui.graphics.Color(0xFF1565C0))) { append("Boca") }
-                    withStyle(androidx.compose.ui.text.SpanStyle(color = androidx.compose.ui.graphics.Color(0xFFF9A825))) { append("dillo") }
-                },
-                fontSize = 40.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Black,
-            )
-            Text(stringResource(R.string.home_tagline), color = androidx.compose.ui.graphics.Color(0xFF37474F), fontSize = 14.sp)
-        }
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Image(
+            painterResource(R.drawable.logo_mac_circle), contentDescription = stringResource(R.string.logo_description),
+            modifier = Modifier.fillMaxWidth().aspectRatio(1f), contentScale = ContentScale.Fit,
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(stringResource(R.string.app_name), color = Classic.Text, fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, maxLines = 1, softWrap = false)
+    }
+}
+
+/**
+ * "ABRIR IMAGEN" (approved option 1, luminous glass): dark glass with a sober blue → violet
+ * gradient and a magenta touch, a thin glowing border, rounded corners, a pictures icon on the
+ * left and a chevron on the right, white single-line text. A short press animation (skipped when
+ * the system has animations turned off).
+ */
+@Composable
+internal fun GlassOpenButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
+    val context = LocalContext.current
+    val reduceMotion = remember {
+        runCatching { android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }.getOrDefault(false)
+    }
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        if (pressed && !reduceMotion) 0.97f else 1f, androidx.compose.animation.core.tween(if (reduceMotion) 0 else 110), label = "press",
+    )
+    val shape = RoundedCornerShape(18.dp)
+    val violet = androidx.compose.ui.graphics.Color(0xFF6A3DE8)
+    // keep the label on one line at large font scales
+    val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+    val size = (19f / maxOf(1f, fontScale / 1.15f)).sp
+    Row(
+        Modifier
+            .fillMaxWidth(0.86f).widthIn(max = 420.dp).heightIn(min = 56.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .shadow(14.dp, shape, ambientColor = violet, spotColor = violet)
+            .clip(shape)
+            .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(
+                androidx.compose.ui.graphics.Color(0xF0142B6B), androidx.compose.ui.graphics.Color(0xF0301A78), androidx.compose.ui.graphics.Color(0xF05A1670),
+            )))
+            // glass reflection on the upper half
+            .background(androidx.compose.ui.graphics.Brush.verticalGradient(
+                0f to androidx.compose.ui.graphics.Color(0x33FFFFFF), 0.48f to androidx.compose.ui.graphics.Color(0x0DFFFFFF), 0.5f to androidx.compose.ui.graphics.Color.Transparent,
+            ))
+            .border(1.2.dp, androidx.compose.ui.graphics.Brush.linearGradient(listOf(
+                androidx.compose.ui.graphics.Color(0xFF5EC8FF), androidx.compose.ui.graphics.Color(0xFF9B7BFF), androidx.compose.ui.graphics.Color(0xFFFF4FD8),
+            )), shape)
+            .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple(color = androidx.compose.ui.graphics.Color.White), enabled = enabled, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.PhotoLibrary, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(26.dp))
+        Text(
+            text, color = androidx.compose.ui.graphics.Color.White, fontSize = size, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            letterSpacing = 1.2.sp, maxLines = 1, softWrap = false, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+        )
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = androidx.compose.ui.graphics.Color(0xFFE6DDFF), modifier = Modifier.size(28.dp))
     }
 }
 

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ system splash: the MAC PRODUCCIONES launcher icon on black -->
+    <style name="Theme.Bocadillo" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowSplashScreenBackground">#FF000000</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">#FF000000</item>
+    </style>
+</resources>

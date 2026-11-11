@@ -1,0 +1,214 @@
+package app.bocadillo.editor
+
+import android.graphics.Typeface
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.bocadillo.R
+import app.bocadillo.core.model.TextAlign
+import app.bocadillo.core.model.TextObject
+import app.bocadillo.core.model.TextStyle
+import app.bocadillo.data.FontOption
+import app.bocadillo.render.ObjectRenderer
+import app.bocadillo.ui.classic.ClassicSection
+import app.bocadillo.ui.theme.Classic
+import kotlin.math.roundToInt
+
+/**
+ * Detailed title style (opened by tapping the preview of New Title): the light preview stays on
+ * top and every option is grouped below in the classic dark list — Font › (own screen), colour
+ * and gradient, outline and second outline, shadow, background, layout, curve and date/time.
+ */
+@Composable
+fun TitleStyleScreen(
+    draft: TextObject,
+    renderer: ObjectRenderer,
+    fonts: List<FontOption>,
+    typeface: (String) -> Typeface,
+    onDraft: (TextObject) -> Unit,
+    onFonts: () -> Unit,
+    onDateTime: () -> Unit,
+) {
+    val st = draft.style
+    fun style(f: (TextStyle) -> TextStyle) = onDraft(draft.copy(style = f(st)))
+    val hint = stringResource(R.string.title_preview_hint)
+    Column(Modifier.fillMaxSize().background(Classic.Menu)) {
+        TitlePreview(draft, hint, renderer, Modifier.fillMaxWidth().height(84.dp))
+        Column(Modifier.fillMaxWidth().weight(1f).imePadding().verticalScroll(rememberScrollState()).navigationBarsPadding()) {
+            // font: its own screen, as in the original
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button, onClick = onFonts).padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.tab_font), color = Classic.Text, fontSize = 19.sp, modifier = Modifier.weight(1f))
+                val name = fonts.firstOrNull { it.ref == st.font }?.displayName ?: st.font.substringAfter(':')
+                Text(name, color = Classic.TextDim, fontSize = 18.sp, fontFamily = FontFamily(typeface(st.font)), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("  ›", color = Classic.TextDim, fontSize = 20.sp)
+            }
+            HorizontalDivider(color = Classic.Divider)
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(st.bold, { style { it.copy(bold = !it.bold) } }, label = { Text(stringResource(R.string.bold)) })
+                FilterChip(st.italic, { style { it.copy(italic = !it.italic) } }, label = { Text(stringResource(R.string.italic)) })
+            }
+
+            ClassicSection(stringResource(R.string.tab_color))
+            Column(Modifier.padding(horizontal = 12.dp)) {
+                ColorPicker(stringResource(R.string.text_color), st.color, { c -> style { it.copy(color = c) } })
+                SwitchRow(stringResource(R.string.gradient), (st.gradientColor ushr 24) != 0) { on -> style { it.copy(gradientColor = if (on) 0xFF1565C0.toInt() else 0) } }
+                if ((st.gradientColor ushr 24) != 0) ColorPicker(stringResource(R.string.gradient_bottom), st.gradientColor, { c -> style { it.copy(gradientColor = c) } })
+            }
+
+            ClassicSection(stringResource(R.string.tab_outline))
+            Column(Modifier.padding(horizontal = 12.dp)) {
+                LabeledSlider(stringResource(R.string.outline_width), st.outlineWidth, 0f..0.4f, { "${(it * 100).roundToInt()}%" }) { v -> style { it.copy(outlineWidth = v) } }
+                ColorPicker(stringResource(R.string.outline_color), st.outlineColor, { c -> style { it.copy(outlineColor = c) } })
+                LabeledSlider(stringResource(R.string.outline2_width), st.outline2Width, 0f..0.3f, { "${(it * 100).roundToInt()}%" }) { v ->
+                    style { it.copy(outline2Width = v, outline2Color = if ((it.outline2Color ushr 24) == 0) 0xFFFFFFFF.toInt() else it.outline2Color) }
+                }
+                if (st.outline2Width > 0f) ColorPicker(stringResource(R.string.outline2_color), st.outline2Color, { c -> style { it.copy(outline2Color = c) } })
+            }
+
+            ClassicSection(stringResource(R.string.tab_shadow))
+            Column(Modifier.padding(horizontal = 12.dp)) {
+                val on = (st.shadowColor ushr 24) != 0
+                SwitchRow(stringResource(R.string.shadow), on) { enable -> style { it.copy(shadowColor = if (enable) 0x99000000.toInt() else 0) } }
+                if (on) {
+                    ColorPicker(stringResource(R.string.shadow_color), st.shadowColor, { c -> style { it.copy(shadowColor = c) } })
+                    LabeledSlider(stringResource(R.string.shadow_x), st.shadowDx, -0.5f..0.5f) { v -> style { it.copy(shadowDx = v) } }
+                    LabeledSlider(stringResource(R.string.shadow_y), st.shadowDy, -0.5f..0.5f) { v -> style { it.copy(shadowDy = v) } }
+                    LabeledSlider(stringResource(R.string.shadow_blur), st.shadowBlur, 0f..0.6f) { v -> style { it.copy(shadowBlur = v) } }
+                }
+                ColorPicker(stringResource(R.string.background_box), st.backgroundColor, { c -> style { it.copy(backgroundColor = c) } })
+            }
+
+            ClassicSection(stringResource(R.string.tab_layout))
+            Column(Modifier.padding(horizontal = 12.dp)) {
+                LabeledSlider(stringResource(R.string.text_size), st.size, 0.02f..0.4f, { "${(it * 100).roundToInt()}" }) { v -> style { it.copy(size = v) } }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for ((a, label) in listOf(TextAlign.LEFT to R.string.align_left, TextAlign.CENTER to R.string.align_center, TextAlign.RIGHT to R.string.align_right))
+                        FilterChip(st.align == a, { style { it.copy(align = a) } }, label = { Text(stringResource(label)) })
+                }
+                LabeledSlider(stringResource(R.string.line_height), st.lineHeight, 0.6f..2.5f) { v -> style { it.copy(lineHeight = v) } }
+                LabeledSlider(stringResource(R.string.letter_spacing), st.letterSpacing, -0.1f..0.5f) { v -> style { it.copy(letterSpacing = v) } }
+                LabeledSlider(stringResource(R.string.circular_wrap), draft.curve, -360f..360f, { "${it.roundToInt()}°" }) { v -> onDraft(draft.copy(curve = v.roundToInt().toFloat())) }
+                LabeledSlider(stringResource(R.string.opacity), draft.opacity, 0f..1f, { "${(it * 100).roundToInt()}%" }) { v -> onDraft(draft.copy(opacity = v)) }
+            }
+
+            ClassicSection(stringResource(R.string.more_options))
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button, onClick = onDateTime).padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) { Text(stringResource(R.string.insert_datetime), color = Classic.Text, fontSize = 19.sp) }
+            HorizontalDivider(color = Classic.Divider)
+        }
+    }
+}
+
+@Composable
+private fun SwitchRow(label: String, on: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = Classic.Text, modifier = Modifier.weight(1f))
+        Switch(on, onChange)
+    }
+}
+
+/** Font screen of the style tools: light list, each font drawn in itself, "More Fonts ›" imports. */
+@Composable
+fun FontScreen(fonts: List<FontOption>, selected: String, typeface: (String) -> Typeface, onPick: (String) -> Unit, onImport: () -> Unit) {
+    Column(Modifier.fillMaxSize().background(Classic.LightRow).verticalScroll(rememberScrollState()).navigationBarsPadding()) {
+        FontList(fonts, selected, typeface, onPick, onImport)
+    }
+}
+
+/**
+ * Detailed Word Balloon style (tap on the balloon preview): preview on top, then shape, balloon
+ * colours (solid or gradient), outline, shadow, pointer, Font › and text options.
+ */
+@Composable
+fun BalloonStyleScreen(
+    draft: app.bocadillo.core.model.BalloonObject,
+    renderer: ObjectRenderer,
+    fonts: List<FontOption>,
+    typeface: (String) -> Typeface,
+    onDraft: (app.bocadillo.core.model.BalloonObject) -> Unit,
+    onFonts: () -> Unit,
+) {
+    val b = draft
+    val st = b.style
+    val hint = stringResource(R.string.balloon_preview_hint)
+    Column(Modifier.fillMaxSize().background(Classic.Menu)) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().height(130.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Classic.LightPreview, Classic.LightHeader)))) {
+            val preview = b.copy(
+                transform = app.bocadillo.core.model.ObjectTransform(0.5f, 0.42f), width = 0.9f, height = 0.62f, tailX = -0.22f, tailY = 0.5f,
+                text = b.text.ifBlank { hint }, style = st.copy(size = 0.11f),
+            )
+            androidx.compose.foundation.Canvas(Modifier.align(Alignment.Center).fillMaxWidth(0.6f).height(120.dp)) {
+                androidx.compose.ui.graphics.drawscope.drawIntoCanvas { renderer.draw(it.nativeCanvas, preview, size.width, size.height) }
+            }
+        }
+        Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding()) {
+            ClassicSection(stringResource(R.string.balloon_shape))
+            BalloonShapeRow(b.shape, renderer) { onDraft(b.copy(shape = it)) }
+            ClassicSection(stringResource(R.string.tab_balloon))
+            Column(Modifier.padding(horizontal = 12.dp)) {
+                ColorPicker(stringResource(R.string.fill_color), b.fillColor, { onDraft(b.copy(fillColor = it)) })
+                SwitchRow(stringResource(R.string.gradient), (b.fillColor2 ushr 24) != 0) { on -> onDraft(b.copy(fillColor2 = if (on) 0xFF90CAF9.toInt() else 0)) }
+                if ((b.fillColor2 ushr 24) != 0) ColorPicker(stringResource(R.string.gradient_bottom), b.fillColor2, { onDraft(b.copy(fillColor2 = it)) })
+                ColorPicker(stringResource(R.string.outline_color), b.strokeColor, { onDraft(b.copy(strokeColor = it)) })
+                LabeledSlider(stringResource(R.string.outline_width), b.strokeWidth, 0f..0.03f, { "${(it * 1000).roundToInt()}" }) { onDraft(b.copy(strokeWidth = it)) }
+                SwitchRow(stringResource(R.string.shadow), (b.shadowColor ushr 24) != 0) { on -> onDraft(b.copy(shadowColor = if (on) 0x77000000 else 0)) }
+                SwitchRow(stringResource(R.string.balloon_pointer), b.hasTail) { onDraft(b.copy(hasTail = it)) }
+                if (b.hasTail) LabeledSlider(stringResource(R.string.pointer_width), b.tailWidth, 0.05f..0.9f, { "${(it * 100).roundToInt()}%" }) { onDraft(b.copy(tailWidth = it)) }
+                LabeledSlider(stringResource(R.string.opacity), b.opacity, 0f..1f, { "${(it * 100).roundToInt()}%" }) { onDraft(b.copy(opacity = it)) }
+                Text(stringResource(R.string.balloon_tail_hint), color = Classic.TextDim, fontSize = 13.sp)
+            }
+            ClassicSection(stringResource(R.string.tab_text))
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button, onClick = onFonts).padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.tab_font), color = Classic.Text, fontSize = 19.sp, modifier = Modifier.weight(1f))
+                Text(fonts.firstOrNull { it.ref == st.font }?.displayName ?: st.font.substringAfter(':'), color = Classic.TextDim, fontSize = 18.sp, fontFamily = FontFamily(typeface(st.font)), maxLines = 1)
+                Text("  ›", color = Classic.TextDim, fontSize = 20.sp)
+            }
+            Column(Modifier.padding(horizontal = 12.dp)) {
+                ColorPicker(stringResource(R.string.text_color), st.color, { onDraft(b.copy(style = st.copy(color = it))) })
+                LabeledSlider(stringResource(R.string.text_size), st.size, 0.02f..0.2f, { "${(it * 100).roundToInt()}" }) { onDraft(b.copy(style = st.copy(size = it))) }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for ((a, l) in listOf(TextAlign.LEFT to R.string.align_left, TextAlign.CENTER to R.string.align_center, TextAlign.RIGHT to R.string.align_right))
+                        FilterChip(st.align == a, { onDraft(b.copy(style = st.copy(align = a))) }, label = { Text(stringResource(l)) })
+                }
+                LabeledSlider(stringResource(R.string.line_height), st.lineHeight, 0.6f..2.5f) { onDraft(b.copy(style = st.copy(lineHeight = it))) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(st.bold, { onDraft(b.copy(style = st.copy(bold = !st.bold))) }, label = { Text(stringResource(R.string.bold)) })
+                    FilterChip(st.italic, { onDraft(b.copy(style = st.copy(italic = !st.italic))) }, label = { Text(stringResource(R.string.italic)) })
+                }
+            }
+        }
+    }
+}

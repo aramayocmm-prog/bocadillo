@@ -65,6 +65,13 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
         val m = Matrix().apply { setValues(ObjectGeometry.toCanvas(o.transform, w, h).toMatrixValues()) }
         val save = canvas.save()
         canvas.concat(m)
+        if (o.transform.hasPerspective) {
+            // four-point perspective inside the object's own frame
+            val (hw, hh) = halfSize(o, w, h)
+            val q = ObjectGeometry.localCorners(o.transform, hw, hh)
+            val pm = Matrix()
+            if (pm.setPolyToPoly(floatArrayOf(-hw, -hh, hw, -hh, hw, hh, -hw, hh), 0, q.flatMap { listOf(it.first, it.second) }.toFloatArray(), 0, 4)) canvas.concat(pm)
+        }
         if (o.opacity < 0.999f) canvas.saveLayerAlpha(null, (o.opacity * 255).toInt().coerceIn(0, 255))
         try {
             when (o) {
@@ -159,6 +166,13 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
             p.maskFilter = null
             c.restore()
         }
+        val outer = style.outline2Width * sizePx
+        if (outer > 0f && alpha(style.outline2Color) > 0) {
+            p.style = Paint.Style.STROKE
+            p.strokeWidth = (outline + outer) * 2; p.strokeJoin = Paint.Join.ROUND
+            p.color = style.outline2Color
+            l.draw(c)
+        }
         if (outline > 0f && alpha(style.outlineColor) > 0) {
             p.style = Paint.Style.STROKE
             p.strokeWidth = outline * 2; p.strokeJoin = Paint.Join.ROUND
@@ -167,7 +181,13 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
         }
         p.style = Paint.Style.FILL
         p.color = style.color
-        l.draw(c)
+        if (alpha(style.gradientColor) > 0) {
+            // top → bottom of each line's glyphs
+            p.shader = android.graphics.LinearGradient(0f, 0f, 0f, l.height.toFloat(), style.color, style.gradientColor, android.graphics.Shader.TileMode.CLAMP)
+            p.color = 0xFF000000.toInt()
+            l.draw(c)
+            p.shader = null
+        } else l.draw(c)
     }
 
     private fun curvedGeometry(o: TextObject, u: Float): Triple<TextPaint, String, Float> {
@@ -213,12 +233,22 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
             c.drawTextOnPath(line, path, 0f, 0f, p)
             p.maskFilter = null; c.restore()
         }
+        val outer = o.style.outline2Width * sizePx
+        if (outer > 0f && alpha(o.style.outline2Color) > 0) {
+            p.style = Paint.Style.STROKE; p.strokeWidth = (outline + outer) * 2; p.strokeJoin = Paint.Join.ROUND; p.color = o.style.outline2Color
+            c.drawTextOnPath(line, path, 0f, 0f, p)
+        }
         if (outline > 0f && alpha(o.style.outlineColor) > 0) {
             p.style = Paint.Style.STROKE; p.strokeWidth = outline * 2; p.strokeJoin = Paint.Join.ROUND; p.color = o.style.outlineColor
             c.drawTextOnPath(line, path, 0f, 0f, p)
         }
         p.style = Paint.Style.FILL; p.color = o.style.color
+        if (alpha(o.style.gradientColor) > 0) {
+            val (_, hh2) = curvedBox(o, u)
+            p.shader = android.graphics.LinearGradient(0f, -hh2, 0f, hh2, o.style.color, o.style.gradientColor, android.graphics.Shader.TileMode.CLAMP)
+        }
         c.drawTextOnPath(line, path, 0f, 0f, p)
+        p.shader = null
     }
 
     // ------------------------------------------------------------------ balloons
@@ -232,8 +262,21 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
         for (i in 1 until pts.size / 2) path.lineTo(pts[2 * i], pts[2 * i + 1])
         path.close()
         for (b in 0 until geo.bubbles.size / 3) path.addCircle(geo.bubbles[3 * b], geo.bubbles[3 * b + 1], geo.bubbles[3 * b + 2], Path.Direction.CW)
+        if (alpha(o.shadowColor) > 0) {
+            c.save(); c.translate(w * 0.035f, h * 0.05f)
+            fill.color = o.shadowColor
+            fill.maskFilter = BlurMaskFilter(max(1f, min(w, h) * 0.03f), BlurMaskFilter.Blur.NORMAL)
+            c.drawPath(path, fill)
+            fill.maskFilter = null
+            c.restore()
+        }
         fill.color = o.fillColor
+        if (alpha(o.fillColor2) > 0) {
+            fill.shader = android.graphics.LinearGradient(0f, -h / 2f, 0f, h / 2f, o.fillColor, o.fillColor2, android.graphics.Shader.TileMode.CLAMP)
+            fill.color = 0xFF000000.toInt()
+        }
         c.drawPath(path, fill)
+        fill.shader = null
         val sw = o.strokeWidth * u
         if (sw > 0f && alpha(o.strokeColor) > 0) {
             stroke.color = o.strokeColor; stroke.strokeWidth = sw
@@ -274,12 +317,16 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
             c.scale(s, s)
             c.translate(-def.width / 2f, -def.height / 2f)
             val paths = stickerPaths.getOrPut(def.id) { def.layers.map { toPath(it.path, it.evenOdd) } }
+            val vs = o.vectorStyle
             def.layers.forEachIndexed { i, layer ->
-                def.resolve(layer.fill, o.colors)?.let { fill.color = it; c.drawPath(paths[i], fill) }
+                def.resolve(layer.fill, o.colors)?.let { fill.color = if (vs != null && alpha(vs.fill) > 0) vs.fill else it; c.drawPath(paths[i], fill) }
                 def.resolve(layer.stroke, o.colors)?.let {
-                    if (layer.strokeWidth > 0f) {
-                        stroke.color = it; stroke.strokeWidth = layer.strokeWidth * o.outlineScale
+                    val width = if (vs != null && vs.strokeWidth > 0f) vs.strokeWidth * max(def.width, def.height) else layer.strokeWidth * o.outlineScale
+                    if (width > 0f) {
+                        stroke.color = if (vs != null && alpha(vs.stroke) > 0) vs.stroke else it; stroke.strokeWidth = width
+                        if (vs != null) stroke.strokeCap = if (vs.roundCap) Paint.Cap.ROUND else Paint.Cap.SQUARE
                         c.drawPath(paths[i], stroke)
+                        stroke.strokeCap = Paint.Cap.ROUND
                     }
                 }
             }
@@ -335,16 +382,21 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
         val dst = RectF(-bw / 2, -bh / 2, bw / 2, bh / 2)
         try {
             val svg = svgAssets.get(path) ?: assets[path]?.let { com.caverock.androidsvg.SVG.getFromString(it.toString(Charsets.UTF_8)) }?.also { svgAssets.put(path, it) } ?: return
-            if (!c.isHardwareAccelerated) { svg.renderToCanvas(c, dst); return }
+            val options = svgOptions(svg, o.vectorStyle)
+            if (!c.isHardwareAccelerated) {
+                if (options == null) svg.renderToCanvas(c, dst) else svg.renderToCanvas(c, options.viewPort(dst.left, dst.top, dst.width(), dst.height()))
+                return
+            }
             val t = o.transform
             val longest = max(bw, bh) * abs(t.scale) * max(abs(t.stretchX), abs(t.stretchY))
             val px = (ceil(longest / 64f) * 64f).toInt().coerceIn(64, 1536)
-            val key = "$path@$px"
+            val key = "$path@$px#${o.vectorStyle?.hashCode() ?: 0}"
             val bmp = notoBitmaps.get(key) ?: run {
                 val w = if (bw >= bh) px else max(1, (px * bw / bh).toInt())
                 val h = if (bh >= bw) px else max(1, (px * bh / bw).toInt())
                 Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { b ->
-                    svg.renderToCanvas(Canvas(b), RectF(0f, 0f, w.toFloat(), h.toFloat()))
+                    if (options == null) svg.renderToCanvas(Canvas(b), RectF(0f, 0f, w.toFloat(), h.toFloat()))
+                    else svg.renderToCanvas(Canvas(b), options.viewPort(0f, 0f, w.toFloat(), h.toFloat()))
                     notoBitmaps.put(key, b)
                 }
             }
@@ -356,6 +408,26 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
     }
 
     private val svgAssets = LruCache<String, com.caverock.androidsvg.SVG>(64)
+
+    /**
+     * Shape / line style of an SVG sticker as a CSS override applied while rendering (the file is
+     * not modified). Width is a fraction of the sticker's longer side, in viewBox units.
+     */
+    private fun svgOptions(svg: com.caverock.androidsvg.SVG, vs: app.bocadillo.core.model.VectorStyle?): com.caverock.androidsvg.RenderOptions? {
+        if (vs == null) return null
+        fun hex(c: Int) = "#%06X".format(c and 0xFFFFFF)
+        val rules = ArrayList<String>()
+        if (alpha(vs.fill) > 0) rules += "fill:${hex(vs.fill)};fill-opacity:${"%.3f".format(java.util.Locale.US, alpha(vs.fill) / 255f)}"
+        if (alpha(vs.stroke) > 0) rules += "stroke:${hex(vs.stroke)};stroke-opacity:${"%.3f".format(java.util.Locale.US, alpha(vs.stroke) / 255f)}"
+        if (vs.strokeWidth > 0f) {
+            val box = svg.documentViewBox
+            val side = if (box != null) max(box.width(), box.height()) else max(svg.documentWidth, svg.documentHeight).coerceAtLeast(1f)
+            rules += "stroke-width:${"%.3f".format(java.util.Locale.US, vs.strokeWidth * side)}"
+            rules += "stroke-linecap:${if (vs.roundCap) "round" else "square"};stroke-linejoin:${if (vs.roundCap) "round" else "miter"}"
+        }
+        if (rules.isEmpty()) return null
+        return com.caverock.androidsvg.RenderOptions().css("path,rect,circle,ellipse,polygon,polyline,line{" + rules.joinToString(";") + "}")
+    }
 
     private val notoBitmaps = object : LruCache<String, Bitmap>(32 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount

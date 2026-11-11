@@ -192,10 +192,12 @@ private fun CropOverlay(crop: ToolState.Crop, pixelSize: Pair<Int, Int>, onRect:
             drawLine(Color(0x88FFFFFF), Offset(l, gy), Offset(r, gy), line)
         }
         drawRect(Color.White, Offset(l, t), Size(r - l, b - t), style = Stroke(2.dp.toPx()))
-        val hs = 18.dp.toPx(); val hw = 4.dp.toPx()
+        // classic corner handles: light-grey L-shaped brackets just outside the frame (WA0117)
+        val hs = 22.dp.toPx(); val hw = 7.dp.toPx()
         for ((cx, cy, sx, sy) in listOf(floatArrayOf(l, t, 1f, 1f), floatArrayOf(r, t, -1f, 1f), floatArrayOf(l, b, 1f, -1f), floatArrayOf(r, b, -1f, -1f)).map { it.toList() }) {
-            drawLine(Color.White, Offset(cx, cy), Offset(cx + hs * sx, cy), hw)
-            drawLine(Color.White, Offset(cx, cy), Offset(cx, cy + hs * sy), hw)
+            val ox = cx - sx * hw / 2; val oy = cy - sy * hw / 2
+            drawLine(Color(0xFFD6D6D6), Offset(ox - sx * hw / 2, oy), Offset(ox + hs * sx, oy), hw)
+            drawLine(Color(0xFFD6D6D6), Offset(ox, oy - sy * hw / 2), Offset(ox, oy + hs * sy), hw)
         }
     }
 }

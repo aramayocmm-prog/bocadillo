@@ -263,6 +263,10 @@ class ObjectActions(
     val flip: (Boolean) -> Unit,
     val reset: () -> Unit,
     val toggleStretch: () -> Unit,
+    /** Opens the transformation-mode menu (same as tapping the blue handle). */
+    val transformMenu: () -> Unit = {},
+    /** Set Shape Style / Set Line Style (vector stickers only). */
+    val vectorStyle: (VectorStyleKind) -> Unit = {},
     val replace: () -> Unit,
     val opacityLive: (Float) -> Unit,
     val opacityCommit: () -> Unit,
@@ -276,6 +280,10 @@ fun ObjectMenu(o: CanvasObject, stretchMode: Boolean, a: ObjectActions) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Chip(Icons.Filled.Edit, R.string.edit, onClick = a.edit)
             if (o is StickerObject) Chip(Icons.Filled.SwapHoriz, R.string.replace, onClick = a.replace)
+            if (o is StickerObject && o.isRestylable) {
+                Chip(Icons.Filled.Edit, R.string.set_shape_style) { a.vectorStyle(VectorStyleKind.SHAPE) }
+                Chip(Icons.Filled.Edit, R.string.set_line_style) { a.vectorStyle(VectorStyleKind.LINE) }
+            }
             Chip(Icons.Filled.ContentCopy, R.string.action_duplicate, onClick = a.duplicate)
             Chip(Icons.Filled.Delete, R.string.action_delete, onClick = a.delete)
             Chip(Icons.Filled.FlipToFront, R.string.bring_to_front) { a.arrange(Arrange.FRONT) }
@@ -284,7 +292,7 @@ fun ObjectMenu(o: CanvasObject, stretchMode: Boolean, a: ObjectActions) {
             Chip(Icons.Filled.FlipToBack, R.string.send_to_back) { a.arrange(Arrange.BACK) }
             Chip(Icons.Filled.Flip, R.string.flip_h) { a.flip(true) }
             Chip(Icons.Filled.Flip, R.string.flip_v, rotate = true) { a.flip(false) }
-            FilterChip(stretchMode, a.toggleStretch, label = { Text(stringResource(R.string.transform_stretch)) }, leadingIcon = { Icon(Icons.Filled.OpenInFull, null) })
+            FilterChip(stretchMode, a.transformMenu, label = { Text(stringResource(R.string.transform_modes)) }, leadingIcon = { Icon(Icons.Filled.OpenInFull, null) })
             Chip(Icons.Filled.Restore, R.string.transform_reset, onClick = a.reset)
             TextButton(onClick = a.done) { Text(stringResource(R.string.done)) }
         }
