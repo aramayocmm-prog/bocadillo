@@ -127,8 +127,11 @@ class MacFlowsTest {
         desc(s(R.string.style_n).format(7)); shot("31_new_title_typed")
         desc(s(R.string.apply)); Thread.sleep(1000)
         // re-edit: tap the title (select), tap again (edit), change the text
-        rule.onRoot().performTouchInput { click(center) }; rule.waitForIdle(); Thread.sleep(400)
-        rule.onRoot().performTouchInput { click(center) }; rule.waitForIdle()
+        // (after inserting, the title is already selected: one tap opens it, otherwise two)
+        rule.onRoot().performTouchInput { click(center) }; rule.waitForIdle(); Thread.sleep(600)
+        if (rule.onAllNodesWithText(s(R.string.title_edit), useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) {
+            rule.onRoot().performTouchInput { click(center) }; rule.waitForIdle()
+        }
         waitFor(s(R.string.title_edit))
         rule.onAllNodes(hasSetTextAction()).onFirst().performTextReplacement("Hola MEMES")
         hideKeyboard(); shot("32_edit_title")
