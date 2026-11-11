@@ -14,8 +14,8 @@ Datos de la versión:
 | Prueba | Dónde | Resultado |
 |---|---|---|
 | Núcleo (modelo, efectos y geometría) | JVM, `tools/build-core-offline.sh` | **92 pruebas OK**, 5 nuevas: sesgado, perspectiva, degradados, segundo contorno, estilo vectorial y lectura de proyectos 0.8 |
-| Compilación de la APK | GitHub Actions, `assembleDebug` | **BUILD SUCCESSFUL** (commit indicado en el apartado 6) |
-| Pruebas instrumentadas | Emulador Android 14 (perfil Pixel 6, 411 dp de ancho), `connectedDebugAndroidTest` | Ver el apartado 6 |
+| Compilación de la APK | GitHub Actions, `assembleDebug` | **BUILD SUCCESSFUL**, commit `bb435ee` |
+| Pruebas instrumentadas | Emulador Android 14 (perfil Pixel 6, 411 dp de ancho) | **6 de 6 OK** (apartado 6) |
 | Comparación visual | `tools/visual/compare_pairs.py`: original y captura del emulador lado a lado, más SSIM orientativo | Hoja `Comparacion_PicSay_vs_MAC_Editor_0.9.0.jpg` |
 
 El SSIM se usa solo como apoyo. Las capturas originales tienen otra foto, otro teléfono y otra
@@ -55,7 +55,7 @@ Modos del menú **Transformar** (cambio 12):
 | 3 Resize | `ClassicDialogs.kt` (`SetSizeDialog`) | «Set Size ancho × alto», «Keep Proportions», texto de ayuda y la lista clara Scale… / Expand Edges… / Quick Fit, como en WA0112:<br>• Scale… redimensiona al tamaño escrito;<br>• Expand Edges… pide el color del borde y amplía el lienzo;<br>• Quick Fit encaja la foto dentro del tamaño sin deformarla;<br>• «Todas las opciones…» abre el diálogo anterior (modos rellenar y recortar) | 16_resize | Recorrido de pantallas | **Hecho**. Las operaciones de redimensionado ya estaban probadas en el núcleo |
 | 4 Paint | ver el cambio 11 | — | 12_* | — | **Hecho** |
 | 5 Import large picture | `HomeViewModel.kt` (`LargeImport`, `chooseImportSize`), `ImageIo.kt` (`fitPixels`), `HomeScreen.kt` (`LargeImportDialog`), `MainActivity.kt` | Si la foto supera 3,1 MP aparece «Import large picture…» con Fast (≈0,8 MP), Normal (≈3,1 MP) y Maximum (la foto completa, solo limitada por la memoria del aparato). Cada opción muestra el tamaño exacto resultante. El archivo original se guarda completo en el proyecto en todos los casos; la opción fija la resolución de trabajo y de exportación. Si la memoria limita Maximum, el diálogo lo dice. Nada se reduce sin que el usuario lo elija | 41_import_large | `largePictureAsksForSize`: con una foto de 4000×3000 aparecen 1024×768 y 2048×1536, se elige Fast y el proyecto queda en 1024×768 | **Hecho** |
-| 6 Set Shape Style / Set Line Style | `Objects.kt` (`VectorStyle`, `isRestylable`), `ObjectJson.kt`, `ObjectRenderer.kt` (CSS sobre SVG y relleno y trazo en vectores integrados), `VectorStyleScreens.kt` (nuevo), `ObjectPanels.kt`, `EditorScreen.kt` | Solo aparecen para stickers **vectoriales**: SVG importados de la biblioteca y stickers vectoriales de proyectos antiguos. Nunca aparecen para PNG o WebP. Las dos pantallas siguen las capturas WA0096/99/106 y WA0100:<br>• **Set Shape Style**: cuadrícula de 4 filas desplazable con relleno y contorno;<br>• **Set Line Style**: 2 columnas, extremos redondeados o cuadrados, 8 grosores y fila de colores.<br>El archivo SVG no se modifica: el estilo se aplica al dibujar | 42_set_shape_style, 43_set_line_style | `svgShapeAndLineStyle` | Ver el apartado 6. Limitación: un SVG con estilos `style="…"` en línea puede conservar sus colores |
+| 6 Set Shape Style / Set Line Style | `Objects.kt` (`VectorStyle`, `isRestylable`), `ObjectJson.kt`, `ObjectRenderer.kt` (CSS sobre SVG y relleno y trazo en vectores integrados), `VectorStyleScreens.kt` (nuevo), `ObjectPanels.kt`, `EditorScreen.kt` | Solo aparecen para stickers **vectoriales**: SVG importados de la biblioteca y stickers vectoriales de proyectos antiguos. Nunca aparecen para PNG o WebP. Las dos pantallas siguen las capturas WA0096/99/106 y WA0100:<br>• **Set Shape Style**: cuadrícula de 4 filas desplazable con relleno y contorno;<br>• **Set Line Style**: 2 columnas, extremos redondeados o cuadrados, 8 grosores y fila de colores.<br>El archivo SVG no se modifica: el estilo se aplica al dibujar | 42_set_shape_style, 43_set_line_style | `svgShapeAndLineStyle` | **Hecho**. Limitación: un SVG con estilos `style="…"` en línea puede conservar sus colores |
 | 7 Degradados en New Word Balloon | `Objects.kt` (`fillColor2`, `shadowColor`), `ObjectRenderer.kt`, `NewStickerScreens.kt`, `TitleStyleScreens.kt` (`BalloonStyleScreen`) | 42 estilos propios: relleno liso o con degradado vertical, contorno de color o grueso, globos oscuros y sombra. La cuadrícula tiene **4 filas y se desplaza hacia los lados**, como WA0011/12/15. «Balloon Style» (al tocar la vista previa) incluye el interruptor de degradado y su color, la sombra y Fuente ›. Reeditar un globo abre la misma composición | 09_new_word_balloon, 09b_balloon_style | Recorrido de pantallas y prueba del núcleo de lectura y escritura | **Hecho** |
 | 8 Menú ≡ / More | `HomeScreen.kt` | Se revisó: los elementos llevan a funciones reales (imagen en blanco, abrir proyecto, guardar proyecto, recientes, ajustes y licencias). Atrás vuelve siempre al inicio. **No hay captura del original** de este menú, así que no se afirma ninguna equivalencia | 18_more | Recorrido de pantallas | **Revisado**, sin referencia original |
 
@@ -97,7 +97,51 @@ Modos del menú **Transformar** (cambio 12):
 
 ## 6. Pruebas instrumentadas ejecutadas
 
-RESULTADOS_INSTRUMENTADAS
+Commit final `bb435ee`: APK compilada (BUILD SUCCESSFUL) y prueba en el emulador Android 14
+(Pixel 6). Cada prueba se ejecuta por separado con su propio límite de tiempo, porque el emulador
+de GitHub se colgó en algunas ejecuciones anteriores. El resultado en bruto se guarda en
+`results.txt`, en la rama `screens-output`.
+
+| Prueba | Qué recorre | Resultado |
+|---|---|---|
+| `ReferenceScreensTest` | Todas las pantallas clásicas: inicio, Get Picture, More, Adjust, Exposure, Effect, Twirl, Color, Sticker, formas de globo, New Word Balloon y su estilo, Paint con sus 3 paneles, Export, Crop, rotación libre, Set Size, New Title, Title Style y Font | **OK** |
+| `StickerLibraryFlowTest` | Importar la biblioteca ZIP (PNG y SVG, un duplicado y un archivo roto), reimportar sin cambios, insertar, mover, escalar, rotar, duplicar, eliminar y comprobar el proyecto | **OK** |
+| `MacFlowsTest#largePictureAsksForSize` | Foto de 2600×2000: aparece el diálogo con los tamaños exactos, se elige Fast y el proyecto se crea con ese tamaño | **OK** |
+| `MacFlowsTest#homeTitleAndPaint` | Nombre y logotipo; ABRIR IMAGEN en una línea abre el selector. New Title: escribir, elegir el estilo 7, insertar, reeditar (Edit) y cambiar el texto. Paint: panel de color, pipeta solo icono, tomar color de la foto y vuelta al panel, un trazo y ✓. Al salir se comprueban el texto, el estilo y la operación de pintura guardados | **OK** |
+| `MacFlowsTest#insertedPictureSkewPerspectiveSaveReopenExport` | Punto azul → menú → Sesgar (arrastre) → ✓ → Perspectiva (arrastre de una esquina) → ✓. Guardar, comprobar en disco, reabrir y exportar a la galería («Guardado en Imágenes/MAC Editor para MEMES») | **OK** |
+| `MacFlowsTest#svgShapeAndLineStyle` | Sticker SVG de la biblioteca → Set Shape Style (estilo 20) → ✓ → Set Line Style (extremo cuadrado) → ✓. Se comprueba el estilo vectorial guardado | **OK** |
+
+Comparación lado a lado (`Comparacion_PicSay_vs_MAC_Editor_0.9.0.jpg`). SSIM orientativo:
+
+| Pantalla | 0.8.0 | 0.9.0 |
+|---|---|---|
+| Inicio | 0,76 | 0,73 (logotipo nuevo) |
+| Get Picture from | — | 0,55 |
+| Import large picture | no existía | 0,65 |
+| Adjust | 0,67 | 0,63 |
+| Effect | 0,66 | 0,67 |
+| Export | 0,58 | 0,63 |
+| Exposure / Contrast | 0,44 | 0,44 |
+| Crop | 0,44 | 0,52 |
+| Resize / Set Size | 0,33 | 0,37 |
+| Paint | 0,36 | **0,71** |
+| Paint · Brush Settings | no existía | 0,59 |
+| Paint · Brush | no existía | 0,57 |
+| Paint · Color | no existía | 0,54 |
+| New Title | 0,49 | 0,49 |
+| Font | 0,42 | **0,64** |
+| Formas de globo | 0,60 | 0,60 |
+| New Word Balloon | 0,55 | 0,57 |
+| Set Shape Style | no existía | 0,63 |
+| Set Line Style | no existía | 0,55 |
+
+El SSIM de New Title no sube aunque ahora la disposición coincide (filas, desplazamiento lateral
+y proporción). La razón son las fuentes: el original usa tipos decorativos que no se pueden
+incluir.
+
+Nota sobre Set Shape Style: en un SVG hecho solo de líneas, como la cruz de la prueba, el relleno
+no se ve y la cuadrícula muestra sobre todo el color y el grosor del trazo. En formas rellenas
+(estrella, flecha) se ve el relleno.
 
 ## 7. Pendiente o no verificado
 
