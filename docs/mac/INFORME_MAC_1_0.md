@@ -95,7 +95,7 @@ la homografía (prueba `canvasToUnitInvertsRotationFlipAndPerspective`).
 - 8 archivos repiten una familia y un estilo que ya están en otro archivo (el importador avisa de
   los duplicados exactos por contenido).
 
-**No verificado:** la carga de las 226 fuentes no incluidas dentro de Android. No se subieron al
+**No verificado:** la carga de las 228 fuentes no incluidas dentro de Android. No se subieron al
 servidor de pruebas para no redistribuirlas. Su lectura sí se verificó fuera de Android con el
 mismo código de la app (247 de 247). Android puede rechazar alguna con tablas raras. En ese caso
 el importador la lista como error con el motivo, sin cerrarse.
@@ -186,7 +186,7 @@ el importador la lista como error con el motivo, sin cerrarse.
 | Zoom con dos dedos en Cut Out | No automatizado en el emulador. La conversión de coordenadas con giro, espejo y perspectiva sí está probada en la JVM; el zoom del lienzo usa la misma conversión, pero **no hay prueba de extremo a extremo con zoom** |
 | Reeditar una imagen ya insertada (volver a Crop, Place y Cut Out desde el objeto) | Implementado (`editPicture`), **sin prueba automática** |
 | Comparar píxel a píxel la imagen exportada a la galería | La prueba verifica que la exportación termina, y que la imagen procesada que ve el usuario es la misma que entra en la exportación; no lee el archivo final de la galería |
-| Carga en Android de las 226 fuentes del usuario no incluidas | No se subieron al servidor de pruebas para no redistribuirlas (apartado 4) |
+| Carga en Android de las 228 fuentes del usuario no incluidas | No se subieron al servidor de pruebas para no redistribuirlas (apartado 4) |
 
 ### 6.3 Incidencias encontradas y corregidas durante las pruebas
 
@@ -216,7 +216,7 @@ el importador la lista como error con el motivo, sin cerrarse.
 ## 8. Limitaciones conocidas
 
 - Pixel 10 Pro real: **NO PROBADO**.
-- La carga en Android de las 226 fuentes no incluidas: **no verificada** (apartado 4).
+- La carga en Android de las 228 fuentes no incluidas: **no verificada** (apartado 4).
 - Los efectos costosos (Twirl, desenfoques) con pincel de máscara: el contorno de la máscara se
   ve en vivo, pero el efecto completo se calcula al soltar, como en la 0.9.0.
 - Perspectiva extrema: el tamaño del pincel de Cut Out es aproximado (apartado 2).
