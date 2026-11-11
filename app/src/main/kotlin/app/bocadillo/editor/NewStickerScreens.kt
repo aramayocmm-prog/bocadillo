@@ -257,7 +257,7 @@ fun NewTitleScreen(
             val cellW = (maxWidth / 4.8f).coerceAtLeast(64.dp)
             LazyHorizontalGrid(GridCells.Fixed(5), Modifier.fillMaxSize()) {
                 itemsIndexed(TITLE_STYLES) { i, p ->
-                    val cell = TextObject("p", ObjectTransform(0.5f, 0.5f), "ABC", p.copy(size = 0.34f))
+                    val cell = TextObject("p", ObjectTransform(0.5f, 0.5f), "ABC", p.copy(size = 0.43f))
                     val selected = draft.style.applyPreset(p) == draft.style
                     Canvas(
                         Modifier.size(cellW, cellH).background(if (selected) Color(0x3329B6F6) else Color.Transparent)
