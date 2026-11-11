@@ -237,4 +237,34 @@ class MacFlowsTest {
         val doc = runBlocking { app.projects.load(created.id) }.document
         assertEquals(1024, doc.source.width); assertEquals(768, doc.source.height)
     }
+
+    @Test fun svgShapeAndLineStyle() {
+        val app = ctx.application as BocadilloApp
+        runBlocking { app.stickerPacks.clear(null) }
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M20 20 L80 80 M80 20 L20 80" stroke="#000" stroke-width="18" fill="none"/></svg>"""
+        val zip = File(ctx.cacheDir, "svg_test.zip")
+        ZipOutputStream(zip.outputStream()).use { z ->
+            z.putNextEntry(ZipEntry("manifest.json")); z.write("""{"stickers":[{"id":"x_svg","category":"basic_shapes","name":"Cross","file":"x.svg"}]}""".toByteArray()); z.closeEntry()
+            z.putNextEntry(ZipEntry("x.svg")); z.write(svg.toByteArray()); z.closeEntry()
+        }
+        runBlocking { app.stickerPacks.importZip(ctx.contentResolver, Uri.fromFile(zip)) }
+        val id = newProject("Shapes")
+        openProject("Shapes")
+        tap(s(R.string.menu_sticker)); tapInListText("Basic Shapes"); desc("Cross"); Thread.sleep(1500)
+        rule.onAllNodesWithContentDescription(s(R.string.show_options), useUnmergedTree = true).let { n ->
+            if (n.fetchSemanticsNodes().isNotEmpty()) { n.onFirst().performClick(); rule.waitForIdle() }
+        }
+        tap(s(R.string.set_shape_style)); waitFor(s(R.string.set_shape_style)); shot("42_set_shape_style")
+        desc(s(R.string.style_n).format(20)); desc(s(R.string.apply)); Thread.sleep(800)
+        rule.onAllNodesWithContentDescription(s(R.string.show_options), useUnmergedTree = true).let { n ->
+            if (n.fetchSemanticsNodes().isNotEmpty()) { n.onFirst().performClick(); rule.waitForIdle() }
+        }
+        tap(s(R.string.set_line_style)); shot("43_set_line_style")
+        desc(s(R.string.style_n).format(12)); desc(s(R.string.apply)); Thread.sleep(800)
+        deselect()
+        rule.onNodeWithContentDescription(s(R.string.back)).performClick(); rule.waitForIdle(); Thread.sleep(2000)
+        val st = runBlocking { app.projects.load(id) }.document.objects.filterIsInstance<StickerObject>().single()
+        val vs = st.vectorStyle
+        assertTrue("styled ${st.vectorStyle}", vs != null && vs.strokeWidth > 0f && !vs.roundCap)
+    }
 }
