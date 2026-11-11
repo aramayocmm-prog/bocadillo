@@ -1397,7 +1397,8 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         if (_state.value.exporting) return
         val d = doc
         _state.update { it.copy(exporting = true, tool = null) }
-        app.appScope.launch {
+        // results and messages go out on the main thread: whoever collects them may touch the UI
+        app.appScope.launch(Dispatchers.Main) {
             try {
                 val (fmt, quality) = resolveFormat(options, d)
                 val bytes = withContext(Dispatchers.Default) {
