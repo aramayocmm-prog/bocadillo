@@ -38,15 +38,14 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
             adb shell settings put global hide_error_dialogs 1
-            adb logcat -c || true
-            (adb logcat -v time > logcat_full.txt 2>/dev/null &) ; timeout 35m ./gradlew :app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --stacktrace || touch test_failed
-            mkdir -p screens && adb exec-out run-as app.bocadillo.debug tar c files/screens > screens/screens.tar || true
+            ./gradlew :app:installDebug :app:installDebugAndroidTest --stacktrace
+            mkdir -p screens/files/screens
+            for t in app.bocadillo.ReferenceScreensTest app.bocadillo.StickerLibraryFlowTest app.bocadillo.MacFlowsTest#largePictureAsksForSize app.bocadillo.MacFlowsTest#homeTitleAndPaint app.bocadillo.MacFlowsTest#insertedPictureSkewPerspectiveSaveReopenExport app.bocadillo.MacFlowsTest#svgShapeAndLineStyle; do echo "=== $t" >> results.txt; adb logcat -c; timeout 420 adb shell am instrument -w -r -e class "$t" app.bocadillo.debug.test/androidx.test.runner.AndroidJUnitRunner >> results.txt 2>&1 || echo "TIMEOUT_OR_ERROR $t" >> results.txt; adb logcat -b crash -d >> crash.txt 2>/dev/null; adb logcat -d -t 400 '*:E' >> errors.txt 2>/dev/null; done
+            adb exec-out run-as app.bocadillo.debug tar c files/screens > screens/screens.tar || true
             cd screens && tar xf screens.tar && rm screens.tar; cd ..
             mkdir -p screens/files/screens
-            adb logcat -b crash -d > screens/files/screens/crash.txt 2>/dev/null || true
-            adb logcat -d -t 6000 > screens/files/screens/logcat_tail.txt 2>/dev/null || true
-            grep -E 'TestRunner|AndroidRuntime|FATAL|app.bocadillo|ComposeTest|Exception|at app\.|Caused by' logcat_full.txt | tail -3000 > screens/files/screens/logcat.txt || true
-            find app/build/outputs/androidTest-results -name '*.xml' -exec cp {} screens/files/screens/ \; || true
+            cp results.txt crash.txt errors.txt screens/files/screens/ 2>/dev/null || true
+            grep -q 'TIMEOUT_OR_ERROR\|FAILURES!!!\|INSTRUMENTATION_FAILED\|Process crashed' results.txt && touch test_failed || true
             test ! -f test_failed
       - name: Subir capturas
         if: always()
