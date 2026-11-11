@@ -34,6 +34,7 @@ jobs:
           cd ../old && chmod +x gradlew && ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest -q
           ls -la app/build/outputs/apk/debug/ app/build/outputs/apk/androidTest/debug/
       - name: Emulador y capturas
+        timeout-minutes: 75
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -42,33 +43,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: |
-            adb shell settings put global hide_error_dialogs 1
-            mkdir -p screens/files/screens
-            echo "=== UPGRADE: install 0.9.0 and create data" >> results.txt
-            adb install -r ../old/app/build/outputs/apk/debug/app-debug.apk >> results.txt 2>&1
-            adb install -r ../old/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >> results.txt 2>&1
-            timeout 300 adb shell am instrument -w -r -e class app.bocadillo.StickerLibraryFlowTest app.bocadillo.debug.test/androidx.test.runner.AndroidJUnitRunner >> results.txt 2>&1 || echo "TIMEOUT_OR_ERROR old-data" >> results.txt
-            adb push app/src/main/assets/fonts/Comfortaa-Bold.ttf /data/local/tmp/upgrade_font.ttf && adb shell "run-as app.bocadillo.debug sh -c 'mkdir -p files/fonts && cp /data/local/tmp/upgrade_font.ttf files/fonts/UpgradeFont.ttf && echo 0.9.0 > files/upgrade_marker.txt'" ; adb shell "run-as app.bocadillo.debug ls -R files" >> results.txt 2>&1 || true
-            adb shell dumpsys package app.bocadillo.debug | grep -E 'versionName|versionCode|signatures' >> results.txt 2>&1 || true
-            echo "=== UPGRADE: install 1.0 over it (adb install -r)" >> results.txt
-            adb install -r app/build/outputs/apk/debug/app-debug.apk >> results.txt 2>&1
-            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >> results.txt 2>&1
-            adb shell dumpsys package app.bocadillo.debug | grep -E 'versionName|versionCode' >> results.txt 2>&1 || true
-            echo "=== app.bocadillo.LayoutAndUpgradeTest#dataSurvivedUpgrade" >> results.txt; timeout 300 adb shell am instrument -w -r -e class app.bocadillo.LayoutAndUpgradeTest#dataSurvivedUpgrade app.bocadillo.debug.test/androidx.test.runner.AndroidJUnitRunner >> results.txt 2>&1 || echo "TIMEOUT_OR_ERROR upgrade" >> results.txt
-            for t in app.bocadillo.ReferenceScreensTest app.bocadillo.StickerLibraryFlowTest app.bocadillo.MacFlowsTest#largePictureAsksForSize app.bocadillo.MacFlowsTest#homeTitleAndPaint app.bocadillo.MacFlowsTest#insertedPictureSkewPerspectiveSaveReopenExport app.bocadillo.MacFlowsTest#svgShapeAndLineStyle app.bocadillo.Mac10FlowsTest#fontsImportPickAndPersist; do echo "=== $t" >> results.txt; timeout 420 adb shell am instrument -w -r -e class "$t" app.bocadillo.debug.test/androidx.test.runner.AndroidJUnitRunner >> results.txt 2>&1 || echo "TIMEOUT_OR_ERROR $t" >> results.txt; adb logcat -b crash -d >> crash.txt 2>/dev/null; done
-            for t in insertPictureCropPlaceCutOut liveStrokeEqualsAppliedStroke; do echo "=== app.bocadillo.Mac10FlowsTest#$t (recorded)" >> results.txt; adb shell rm -f /sdcard/$t.mp4; (adb shell screenrecord --bit-rate 6000000 --time-limit 170 /sdcard/$t.mp4 &) ; sleep 1; timeout 420 adb shell am instrument -w -r -e class "app.bocadillo.Mac10FlowsTest#$t" app.bocadillo.debug.test/androidx.test.runner.AndroidJUnitRunner >> results.txt 2>&1 || echo "TIMEOUT_OR_ERROR $t" >> results.txt; adb shell pkill -INT screenrecord || true; sleep 3; adb pull /sdcard/$t.mp4 screens/files/screens/$t.mp4 || true; adb logcat -b crash -d >> crash.txt 2>/dev/null; done
-            adb logcat -d -s LiveStroke:I Upgrade:I >> results.txt 2>/dev/null || true
-            for v in 1.3 2.0; do adb shell settings put system font_scale $v; sleep 2; echo "=== homeVariants font $v" >> results.txt; timeout 300 adb shell am instrument -w -r -e class app.bocadillo.LayoutAndUpgradeTest#homeVariants -e variant font$v app.bocadillo.debug.test/androidx.test.runner.AndroidJUnitRunner >> results.txt 2>&1 || echo "TIMEOUT_OR_ERROR font$v" >> results.txt; done
-            adb shell settings put system font_scale 1.0; adb shell settings put system accelerometer_rotation 0; adb shell settings put system user_rotation 1; sleep 2
-            echo "=== homeVariants landscape" >> results.txt; timeout 300 adb shell am instrument -w -r -e class app.bocadillo.LayoutAndUpgradeTest#homeVariants -e variant landscape app.bocadillo.debug.test/androidx.test.runner.AndroidJUnitRunner >> results.txt 2>&1 || echo "TIMEOUT_OR_ERROR landscape" >> results.txt
-            adb shell settings put system user_rotation 0
-            adb exec-out run-as app.bocadillo.debug tar c files/screens > screens/screens.tar || true
-            cd screens && tar xf screens.tar && rm screens.tar; cd ..
-            mkdir -p screens/files/screens
-            cp results.txt crash.txt screens/files/screens/ 2>/dev/null || true
-            grep -q 'TIMEOUT_OR_ERROR\|FAILURES!!!\|INSTRUMENTATION_FAILED\|Process crashed' results.txt && touch test_failed || true
-            test ! -f test_failed
+          script: bash tools/ci-emulator.sh
       - name: Subir capturas
         if: always()
         uses: actions/upload-artifact@v4
@@ -76,13 +51,16 @@ jobs:
           name: screens
           path: |
             screens/
+            results.txt
+            crash.txt
             app/build/reports/androidTests/
       - name: Publicar capturas en la rama screens-output
         if: always()
         run: |
           set -e
-          [ -d screens/files/screens ] || exit 0
+          [ -d screens/files/screens ] || [ -f results.txt ] || exit 0
           mkdir -p /tmp/out && cp screens/files/screens/* /tmp/out/ 2>/dev/null || true
+          cp results.txt crash.txt /tmp/out/ 2>/dev/null || true
           cd /tmp/out
           git init -q -b screens-output
           git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"

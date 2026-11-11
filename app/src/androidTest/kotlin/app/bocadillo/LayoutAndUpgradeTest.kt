@@ -35,6 +35,10 @@ class LayoutAndUpgradeTest {
     /** Home, More… and Licencias y créditos in the current variant; the title is never cut. */
     @Test fun homeVariants() {
         rule.waitUntil(20_000) { rule.onAllNodesWithText(s(R.string.open_image), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        // a previous test may have left the editor open: dismiss the recovery offer first
+        if (rule.onAllNodesWithText(s(R.string.home_recover_title), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()) {
+            rule.onAllNodesWithText(s(R.string.cancel), useUnmergedTree = true).onFirst().performClick(); rule.waitForIdle()
+        }
         val screenW = ctx.resources.displayMetrics.widthPixels
         for (t in listOf("MAC", s(R.string.app_title_line2), s(R.string.open_image))) {
             val n = rule.onAllNodesWithText(t, useUnmergedTree = true).fetchSemanticsNodes().first()

@@ -80,7 +80,7 @@ fun ClassicTopBar(
             .background(Brush.verticalGradient(listOf(Classic.BarTop, Classic.Bar))),
     ) {
         Text(
-            title, color = Classic.Text, fontSize = 22.sp, fontWeight = FontWeight.Normal, maxLines = 1,
+            title, color = Classic.Text, fontSize = 22.sp, fontWeight = FontWeight.Normal, maxLines = 2, lineHeight = 24.sp,
             overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
             modifier = Modifier.align(Alignment.Center).padding(horizontal = 104.dp),
         )
