@@ -301,13 +301,15 @@ class Mac10FlowsTest {
         Thread.sleep(800)
         desc(s(R.string.title_preview_hint)); waitFor(s(R.string.alignment)); shot("80_title_style_panel")
         assertTrue(has(s(R.string.line_height)) && has(s(R.string.fill_color)) && has(s(R.string.outline_color)) && has(s(R.string.text_size)))
-        tap(s(R.string.tab_font)); waitFor(s(R.string.fonts_custom_files)); shot("81_more_fonts")
-        // the System Fonts header lies further down the list: scroll to it, then back up
-        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText(s(R.string.fonts_system_header), substring = true))
-        assertTrue("System Fonts header", has(s(R.string.fonts_system_header))); shot("81b_more_fonts_system")
-        // back to the Custom Font Files section: the imported copy comes before the bundled one
-        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText(s(R.string.fonts_import_files)))
-        tap("Creato Display Black"); systemBack()
+        tap(s(R.string.tab_font)); waitFor(s(R.string.fonts_import_button)); shot("81_more_fonts")
+        // 1.2.0: one A–Z list; the system fonts are further down: scroll to one, then back up
+        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText("Typewriter"))
+        assertTrue("system fonts listed", has("Typewriter")); shot("81b_more_fonts_system")
+        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText(s(R.string.fonts_import_button)))
+        // the imported copy comes before the bundled one of the same name; the tap applies it and returns
+        rule.onAllNodesWithContentDescription("fonts_search", useUnmergedTree = true).onFirst().performTextInput("Creato Display Black")
+        rule.waitForIdle()
+        rule.onAllNodesWithContentDescription("all Creato Display Black", useUnmergedTree = true).onFirst().performClick(); rule.waitForIdle()
         Thread.sleep(500); shot("82_title_with_font")
         systemBack() // close the panel
         desc(s(R.string.apply)); Thread.sleep(1000)

@@ -602,8 +602,8 @@ class Mac11Test {
         // search, open the Creato Display family? (bundled fonts are single rows) — pick Creato Display Black
         rule.onAllNodesWithContentDescription("fonts_search", useUnmergedTree = true).onFirst().performTextInput("creato")
         Thread.sleep(600); shot("141_fuentes_busqueda")
-        assertTrue(has("Creato Display Black")); assertTrue("search filters", !has("Comfortaa"))
-        tap("Creato Display Black")
+        assertTrue(hasDesc("all Creato Display Black")); assertTrue("search filters", !has("Comfortaa"))
+        desc("all Creato Display Black")
         // 1.2.0, decision 8: the tap applies the font and returns to the text by itself
         waitFor(s(R.string.alignment), 5_000); Thread.sleep(500); shot("142_titulo_con_fuente")
         assertTrue("back at the text style", !has(s(R.string.fonts_import_button)))

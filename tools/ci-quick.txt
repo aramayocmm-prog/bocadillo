@@ -9,3 +9,4 @@ catalogo_fuentes app.bocadillo.Mac11Test#fontCatalogueSearchPickPersist
 atras app.bocadillo.Mac12Test#backHierarchyAndFilePickerCancel
 navegacion_guardado app.bocadillo.Mac11Test#finishSaveAndBackNavigation
 iconos app.bocadillo.Mac12Test#stickerCategoryIllustrations
+fuentes10 app.bocadillo.Mac10FlowsTest#fontsImportPickAndPersist

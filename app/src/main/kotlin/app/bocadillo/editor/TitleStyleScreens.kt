@@ -359,7 +359,7 @@ fun MoreFontsScreen(
     val keys = androidx.compose.runtime.remember(fonts) { fonts.associate { it.ref to (it.displayName + " " + it.family).lowercase() } }
     val byRef = androidx.compose.runtime.remember(fonts) { fonts.associateBy { it.ref } }
     val alphabetical = androidx.compose.runtime.remember(fonts) {
-        fonts.sortedWith(compareBy<FontOption>({ it.family.lowercase() }, { it.style.lowercase() }, { it.displayName.lowercase() }))
+        fonts.sortedWith(compareBy<FontOption>({ it.family.lowercase() }, { it.style.lowercase() }, { when (it.kind) { FontOption.Kind.IMPORTED -> 0; FontOption.Kind.BUNDLED -> 1; FontOption.Kind.SYSTEM -> 2 } }, { it.displayName.lowercase() }))
     }
     val q = query.trim().lowercase()
     val shown = if (q.isEmpty()) alphabetical else alphabetical.filter { keys[it.ref]?.contains(q) == true }

@@ -52,17 +52,41 @@ class FontRepository(private val context: Context) {
      * Licence texts: assets/licenses (shown in Licencias y créditos).
      */
     val bundledFonts = listOf(
-        FontOption("bundled:Poppins-Bold.ttf", "Poppins Bold", FontOption.Kind.BUNDLED),
-        FontOption("bundled:Poppins-Regular.ttf", "Poppins", FontOption.Kind.BUNDLED),
+        FontOption("bundled:Poppins-Bold.ttf", "Poppins Bold", FontOption.Kind.BUNDLED, "Poppins", "Bold"),
+        FontOption("bundled:Poppins-Regular.ttf", "Poppins", FontOption.Kind.BUNDLED, "Poppins", "Regular"),
         FontOption("bundled:Lora-Variable.ttf", "Lora", FontOption.Kind.BUNDLED),
         FontOption("bundled:BebasNeue-Regular.ttf", "Bebas Neue", FontOption.Kind.BUNDLED),
-        FontOption("bundled:Comfortaa-Light.ttf", "Comfortaa Light", FontOption.Kind.BUNDLED),
-        FontOption("bundled:Comfortaa-Regular.ttf", "Comfortaa", FontOption.Kind.BUNDLED),
-        FontOption("bundled:Comfortaa-Bold.ttf", "Comfortaa Bold", FontOption.Kind.BUNDLED),
+        FontOption("bundled:Comfortaa-Light.ttf", "Comfortaa Light", FontOption.Kind.BUNDLED, "Comfortaa", "Light"),
+        FontOption("bundled:Comfortaa-Regular.ttf", "Comfortaa", FontOption.Kind.BUNDLED, "Comfortaa", "Regular"),
+        FontOption("bundled:Comfortaa-Bold.ttf", "Comfortaa Bold", FontOption.Kind.BUNDLED, "Comfortaa", "Bold"),
         FontOption("bundled:Bradley Gratis.ttf", "Bradley Gratis", FontOption.Kind.BUNDLED),
     ) + listOf("Thin", "ThinItalic", "Light", "LightItalic", "Regular", "RegularItalic", "Medium", "MediumItalic", "Bold", "BoldItalic",
         "ExtraBold", "ExtraBoldItalic", "Black", "BlackItalic").map { st ->
-        FontOption("bundled:CreatoDisplay-$st.otf", "Creato Display " + st.replace("Italic", " Italic").replace("RegularItalic", "Italic").replace("Regular ", "").trim(), FontOption.Kind.BUNDLED)
+        val style = st.replace("Italic", " Italic").replace("RegularItalic", "Italic").replace("Regular ", "").trim()
+        FontOption("bundled:CreatoDisplay-$st.otf", "Creato Display $style", FontOption.Kind.BUNDLED, "Creato Display", style)
+    }
+
+    /**
+     * The real file of a style of [ref]'s family (1.2.0, decision 8): Bold / Italic use the
+     * family's own Bold / Italic font when it exists, instead of a slanted or thickened copy.
+     */
+    private val variants = HashMap<String, String>()
+    @Synchronized
+    fun realVariant(ref: String, bold: Boolean, italic: Boolean): String? {
+        if (!bold && !italic) return null
+        val key = "$ref|$bold|$italic"
+        variants[key]?.let { return it.ifEmpty { null } }
+        return findVariant(ref, bold, italic).also { variants[key] = it ?: "" }
+    }
+
+    private fun findVariant(ref: String, bold: Boolean, italic: Boolean): String? {
+        val all = bundledFonts + importedFonts()
+        val me = all.firstOrNull { it.ref == ref } ?: return null
+        val fam = all.filter { it.family.equals(me.family, true) && it.ref != ref }
+        if (fam.isEmpty()) return null
+        fun norm(st: String) = st.lowercase().replace(" ", "")
+        val want = (if (bold) "bold" else "regular") + if (italic) "italic" else ""
+        return fam.firstOrNull { norm(it.style) == want || (want == "regularitalic" && norm(it.style) == "italic") }?.ref
     }
 
     /** Index of imported fonts: file → family, style, SHA-1 (duplicates), original file name. */
@@ -220,6 +244,7 @@ class FontRepository(private val context: Context) {
             }
         }
         saveIndex(list)
+        variants.clear()
         return ImportReport(added, dups, invalid, errors, first)
     }
 
@@ -235,6 +260,7 @@ class FontRepository(private val context: Context) {
         val name = ref.removePrefix("asset:fonts/")
         File(library, name).delete()
         cache.remove(ref)
+        variants.clear()
         saveIndex(entries().filter { it.file != name })
     }
 
@@ -276,6 +302,7 @@ class FontRepository(private val context: Context) {
 
     @Synchronized
     fun typeface(ref: String, bold: Boolean, italic: Boolean, projectAssets: Map<String, ByteArray>): Typeface {
+        realVariant(ref, bold, italic)?.let { v -> return cache.getOrPut(v) { load(v, projectAssets) } }
         val base = cache.getOrPut(ref) { load(ref, projectAssets) }
         val style = when {
             bold && italic -> Typeface.BOLD_ITALIC
