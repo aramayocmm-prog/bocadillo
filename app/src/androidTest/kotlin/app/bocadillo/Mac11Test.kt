@@ -400,8 +400,8 @@ class Mac11Test {
         assertTrue("unchanged draft deleted", app.projects.index.value.entries.none { it.id == draft })
 
         // a draft with work: the green check opens the finish dialog
-        val id = newProject("Guardar", saved = false)
-        openProject("Guardar")
+        val id = newProject("Proy11", saved = false)
+        openProject("Proy11")
         ui { vm().orient(90, false, false) }; Thread.sleep(1500)
         desc(s(R.string.finish)); waitFor(s(R.string.finish_title)); shot("130_finalizar_dialogo")
         for (o in listOf(R.string.finish_save_image, R.string.finish_save_project, R.string.finish_continue, R.string.finish_exit_without_saving)) assertTrue(s(o), has(s(o)))
@@ -437,7 +437,7 @@ class Mac11Test {
         shot("135_inicio_tras_guardar")
 
         // reopen, change, then Salir sin guardar: the project goes back to the saved state
-        openProject("Guardar")
+        openProject("Proy11")
         ui { vm().orient(90, false, false) }; Thread.sleep(1500)
         backKey(); waitFor(s(R.string.finish_title))
         tap(s(R.string.finish_exit_without_saving)); waitFor(s(R.string.discard_title)); shot("136_descartar_confirmacion")
@@ -447,7 +447,7 @@ class Mac11Test {
         assertEquals("changes discarded, saved state kept", saved.ops, after.ops)
 
         // opening it again and leaving without changes: no dialog
-        openProject("Guardar")
+        openProject("Proy11")
         backKey(); rule.waitUntil(10_000) { atHome() }
         assertTrue(app.projects.index.value.entries.any { it.id == id })
     }
