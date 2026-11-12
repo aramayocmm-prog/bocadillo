@@ -1,5 +1,7 @@
 package app.bocadillo.editor
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.material.icons.filled.Search
 import android.graphics.Typeface
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

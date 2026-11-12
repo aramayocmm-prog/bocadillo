@@ -199,7 +199,7 @@ fun FontList(fonts: List<FontOption>, selected: String, typeface: (String) -> Ty
             if (f.kind != lastKind) {
                 lastKind = f.kind
                 Text(
-                    stringResource(when (f.kind) { FontOption.Kind.SYSTEM -> R.string.fonts_system; FontOption.Kind.BUNDLED -> R.string.fonts_bundled; FontOption.Kind.IMPORTED -> R.string.fonts_imported }),
+                    stringResource(when (f.kind) { FontOption.Kind.SYSTEM -> R.string.fonts_system; FontOption.Kind.BUNDLED -> R.string.fonts_bundled; FontOption.Kind.IMPORTED -> R.string.fonts_imported; FontOption.Kind.LIBRARY -> R.string.fonts_library }),
                     color = light.LightHeaderText, fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                     modifier = Modifier.fillMaxWidth().background(light.LightHeader).padding(horizontal = 8.dp, vertical = 3.dp),
                 )
