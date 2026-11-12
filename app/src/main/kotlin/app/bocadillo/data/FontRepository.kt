@@ -6,8 +6,17 @@ import java.io.File
 import java.security.MessageDigest
 
 /** A font the user can pick. [ref] is stored in [app.bocadillo.core.model.TextStyle.font]. */
-data class FontOption(val ref: String, val displayName: String, val kind: Kind) {
-    enum class Kind { SYSTEM, BUNDLED, IMPORTED }
+data class FontOption(
+    val ref: String, val displayName: String, val kind: Kind,
+    /** Family and style (for grouping the list by family); the family defaults to the name. */
+    val family: String = displayName, val style: String = "",
+) {
+    /**
+     * IMPORTED: installed by the user on this phone. LIBRARY (1.1.0): the owner's own fonts built
+     * into a personal APK (assets/fonts/personal, never in the published APK or the repository).
+     * BUNDLED: free-licence fonts in every APK. SYSTEM: Android's.
+     */
+    enum class Kind { SYSTEM, BUNDLED, IMPORTED, LIBRARY }
 }
 
 /**
@@ -89,7 +98,40 @@ class FontRepository(private val context: Context) {
 
     fun importedFonts(): List<FontOption> =
         entries().sortedWith(compareBy({ it.family.lowercase() }, { it.style.lowercase() }))
-            .map { FontOption("asset:fonts/${it.file}", it.displayName, FontOption.Kind.IMPORTED) }
+            .map { FontOption("asset:fonts/${it.file}", it.displayName, FontOption.Kind.IMPORTED, it.family, it.style) }
+
+    /**
+     * The owner's font library built into a personal APK (1.1.0): assets/fonts/personal/index.json
+     * lists file, family, style and SHA-1 of each font. Empty in the published APK.
+     */
+    val libraryFonts: List<FontOption> by lazy {
+        runCatching {
+            val arr = org.json.JSONArray(context.assets.open("fonts/personal/index.json").bufferedReader().use { it.readText() })
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                val fam = o.getString("family"); val st = o.optString("style", "")
+                FontOption("bundled:personal/" + o.getString("file"), if (st.isEmpty() || st.equals("Regular", true)) fam else "$fam $st", FontOption.Kind.LIBRARY, fam, st)
+            }.sortedWith(compareBy({ it.family.lowercase() }, { styleRank(it.style) }, { it.style.lowercase() }))
+        }.getOrDefault(emptyList())
+    }
+
+    /** SHA-1 (12 hex) of the fonts already inside the APK: importing them again is reported as a duplicate. */
+    private val shippedHashes: Set<String> by lazy {
+        val out = HashSet<String>()
+        runCatching {
+            val arr = org.json.JSONArray(context.assets.open("fonts/personal/index.json").bufferedReader().use { it.readText() })
+            for (i in 0 until arr.length()) arr.getJSONObject(i).optString("sha1").takeIf { it.isNotEmpty() }?.let { out += it.take(12) }
+        }
+        for (f in bundledFonts) runCatching { context.assets.open("fonts/" + f.ref.removePrefix("bundled:")).use { out += sha1(it.readBytes()) } }
+        out
+    }
+
+    private fun styleRank(s: String): Int {
+        val l = s.lowercase()
+        val w = listOf("thin", "hairline", "extralight", "ultralight", "light", "book", "regular", "", "medium", "semibold", "demibold", "bold", "extrabold", "ultrabold", "black", "heavy")
+            .indexOfFirst { it.isNotEmpty() && l.replace(" ", "").startsWith(it) }.let { if (it < 0) 6 else it }
+        return w * 2 + if ("italic" in l || "oblique" in l) 1 else 0
+    }
 
     /** Result of importing font files or a ZIP. */
     data class ImportReport(val added: List<String>, val duplicates: List<String>, val errors: List<Pair<String, String>>, val firstRef: String?)
@@ -113,6 +155,7 @@ class FontRepository(private val context: Context) {
             if (tag != "OTTO" && tag != "true" && !(bytes[0].toInt() == 0 && bytes[1].toInt() == 1 && bytes[2].toInt() == 0 && bytes[3].toInt() == 0)) { errors += base to "not a TrueType/OpenType font"; return }
             val hash = sha1(bytes)
             list.firstOrNull { it.sha1 == hash }?.let { dups += base; if (first == null) first = "asset:fonts/${it.file}"; return }
+            if (hash in shippedHashes) { dups += base; return } // already in the APK (bundled or personal library)
             val meta = FontMeta.read(bytes)
             val ext = if (base.endsWith(".otf", true)) "otf" else "ttf"
             var stem = base.substringBeforeLast('.').replace(Regex("[^A-Za-z0-9 _.()-]"), "_").trim().ifEmpty { "font" }.take(60)
@@ -166,7 +209,7 @@ class FontRepository(private val context: Context) {
 
     private fun isFontName(n: String) = n.endsWith(".ttf", true) || n.endsWith(".otf", true)
 
-    fun all(): List<FontOption> = systemFonts + bundledFonts + importedFonts()
+    fun all(): List<FontOption> = systemFonts + bundledFonts + libraryFonts + importedFonts()
 
     /**
      * Adds a TTF/OTF to the library. Validates it by loading it; returns its reference.
@@ -188,6 +231,10 @@ class FontRepository(private val context: Context) {
      * Typeface for [ref]. [projectAssets] supplies fonts embedded in the open project (used when
      * a project comes from another device and the font is not in this device's library).
      */
+    /** The typeface if it is already loaded (never loads: safe on the main thread while scrolling). */
+    @Synchronized
+    fun cachedTypeface(ref: String): Typeface? = cache[ref]
+
     @Synchronized
     fun typeface(ref: String, bold: Boolean, italic: Boolean, projectAssets: Map<String, ByteArray>): Typeface {
         val base = cache.getOrPut(ref) { load(ref, projectAssets) }

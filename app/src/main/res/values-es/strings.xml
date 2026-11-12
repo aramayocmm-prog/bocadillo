@@ -530,7 +530,8 @@ Longitud: %2$s</string>
     <string name="ins_guide_never">No volver a mostrar</string>
     <string name="more_fonts_title">Más fuentes</string>
     <string name="fonts_custom_files">Archivos de fuentes propios</string>
-    <string name="fonts_custom_help">Toca «Importar fuentes…» para elegir archivos .ttf u .otf, o un .zip con fuentes, desde este dispositivo o una unidad en la nube. Las fuentes importadas se quedan solo en este dispositivo.\nNota: algunas fuentes pueden ser demasiado grandes o complejas para Android; se indican con el motivo.</string>
+    <string name="fonts_custom_help">Toca «Importar fuentes…» para elegir archivos .ttf u .otf, o un .zip con fuentes, desde este dispositivo o una unidad en la nube. Un .zip instala todas sus fuentes de una vez (por ejemplo, el ZIP de tu biblioteca); las que ya trae la aplicación se omiten. Las fuentes instaladas se quedan solo en este dispositivo.
+Nota: algunas fuentes pueden ser demasiado grandes o complejas para Android; se indican con el motivo.</string>
     <string name="fonts_import_files">Importar fuentes…</string>
     <string name="fonts_system_header">Fuentes del sistema</string>
     <string name="fonts_none_imported">Todavía no has importado fuentes.</string>
@@ -584,4 +585,7 @@ Longitud: %2$s</string>
     <string name="save_image_save">Guardar</string>
     <string name="save_image_where_gallery">%1$s se guardó en Imágenes/MAC Editor para MEMES. La encontrarás en la galería del teléfono.</string>
     <string name="save_image_where_file">%1$s se guardó en el lugar que elegiste.</string>
+    <string name="fonts_search">Buscar fuente</string>
+    <string name="fonts_library">Mi biblioteca de fuentes</string>
+    <string name="fonts_styles_count">%1$d estilos</string>
 </resources>

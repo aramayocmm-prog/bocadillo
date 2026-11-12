@@ -530,7 +530,8 @@ Longitude: %2$s</string>
     <string name="ins_guide_never">Don\'t show again</string>
     <string name="more_fonts_title">More Fonts</string>
     <string name="fonts_custom_files">Custom Font Files</string>
-    <string name="fonts_custom_help">Tap “Import fonts…” to pick .ttf or .otf files, or a .zip with fonts, from this device or a cloud drive. Imported fonts stay on this device only.\nNote: some fonts may be too large or too complex for Android; those are listed with the reason.</string>
+    <string name="fonts_custom_help">Tap “Import fonts…” to pick .ttf or .otf files, or a .zip with fonts, from this device or a cloud drive. A .zip installs all its fonts in one go (for example your whole library ZIP); fonts already included in the app are skipped. Installed fonts stay on this device only.
+Note: some fonts may be too large or too complex for Android; those are listed with the reason.</string>
     <string name="fonts_import_files">Import fonts…</string>
     <string name="fonts_system_header">System Fonts</string>
     <string name="fonts_none_imported">No fonts imported yet.</string>
@@ -584,4 +585,7 @@ Longitude: %2$s</string>
     <string name="save_image_save">Save</string>
     <string name="save_image_where_gallery">%1$s was saved in Pictures/MAC Editor para MEMES. You can find it in the phone\'s gallery.</string>
     <string name="save_image_where_file">%1$s was saved in the place you chose.</string>
+    <string name="fonts_search">Search font</string>
+    <string name="fonts_library">My font library</string>
+    <string name="fonts_styles_count">%1$d styles</string>
 </resources>

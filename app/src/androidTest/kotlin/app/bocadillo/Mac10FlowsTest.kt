@@ -89,7 +89,7 @@ class Mac10FlowsTest {
         if (has(s(R.string.home_recover_title))) { tap(s(R.string.cancel)); Thread.sleep(300) }
         val sample = SampleScene.render(1200, 900)
         val png = ByteArrayOutputStream().also { ImageIo.toBitmap(sample).compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
-        val doc = runBlocking { app.projects.create(ImageIo.Imported(png, "image/png", title), 1200, 900, false, title, ImageIo.thumbnail(sample)) }
+        val doc = runBlocking { app.projects.create(ImageIo.Imported(png, "image/png", title), 1200, 900, false, title, ImageIo.thumbnail(sample)) }.also { app.projects.clearDraft(it.id) }
         rule.waitForIdle()
         return doc.id
     }
@@ -98,7 +98,7 @@ class Mac10FlowsTest {
         tap(title); waitFor(s(R.string.menu_adjust)); Thread.sleep(2500)
     }
     private fun leaveEditor() {
-        rule.onNodeWithContentDescription(s(R.string.back)).performClick(); rule.waitForIdle(); Thread.sleep(2000)
+        TestNav.leaveEditor(rule, ::s)
     }
 
     /** A 900×600 picture: a magenta frame around a cyan field with a yellow disc, opaque. */
@@ -269,10 +269,14 @@ class Mac10FlowsTest {
         // remove fonts left by other runs
         app.fonts.importedFonts().forEach { app.fonts.delete(it.ref) }
         val zip = File(ctx.cacheDir, "fonts_test.zip")
+        // 1.1 skips fonts identical to ones the APK already ships: these copies differ by 16
+        // trailing bytes (ignored by font loaders), so they count as new fonts with the same names
+        val comfortaa = assetBytes("fonts/Comfortaa-Bold.ttf") + ByteArray(16)
+        val creato = assetBytes("fonts/CreatoDisplay-Black.otf") + ByteArray(16)
         ZipOutputStream(zip.outputStream()).use { z ->
-            z.putNextEntry(ZipEntry("FUENTES/Comfortaa-Bold.ttf")); z.write(assetBytes("fonts/Comfortaa-Bold.ttf")); z.closeEntry()
-            z.putNextEntry(ZipEntry("FUENTES/copy/Comfortaa-Bold.ttf")); z.write(assetBytes("fonts/Comfortaa-Bold.ttf")); z.closeEntry()
-            z.putNextEntry(ZipEntry("FUENTES/CreatoDisplay-Black.otf")); z.write(assetBytes("fonts/CreatoDisplay-Black.otf")); z.closeEntry()
+            z.putNextEntry(ZipEntry("FUENTES/Comfortaa-Bold.ttf")); z.write(comfortaa); z.closeEntry()
+            z.putNextEntry(ZipEntry("FUENTES/copy/Comfortaa-Bold.ttf")); z.write(comfortaa); z.closeEntry()
+            z.putNextEntry(ZipEntry("FUENTES/CreatoDisplay-Black.otf")); z.write(creato); z.closeEntry()
             z.putNextEntry(ZipEntry("FUENTES/broken.ttf")); z.write(ByteArray(400) { 7 }); z.closeEntry()
             z.putNextEntry(ZipEntry("FUENTES/readme.txt")); z.write("x".toByteArray()); z.closeEntry()
             z.putNextEntry(ZipEntry("__MACOSX/._Comfortaa-Bold.ttf")); z.write(ByteArray(200)); z.closeEntry()
@@ -284,6 +288,9 @@ class Mac10FlowsTest {
         assertTrue(r.errors.single().first == "broken.ttf")
         // importing the same ZIP again adds nothing
         assertEquals(0, app.fonts.importAll(listOf("fonts_test.zip" to zip.readBytes())).added.size)
+        // a font identical to one shipped in the APK is reported as a duplicate, not copied
+        val shipped = app.fonts.importAll(listOf("Comfortaa-Bold.ttf" to assetBytes("fonts/Comfortaa-Bold.ttf")))
+        assertEquals(0, shipped.added.size); assertEquals(1, shipped.duplicates.size)
 
         val id = newProject("Fonts")
         openProject("Fonts")

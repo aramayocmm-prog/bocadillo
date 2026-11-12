@@ -88,7 +88,7 @@ class MacFlowsTest {
         val app = ctx.application as BocadilloApp
         val sample = SampleScene.render(1200, 900)
         val png = ByteArrayOutputStream().also { ImageIo.toBitmap(sample).compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
-        val doc = runBlocking { app.projects.create(ImageIo.Imported(png, "image/png", title), 1200, 900, false, title, ImageIo.thumbnail(sample)) }
+        val doc = runBlocking { app.projects.create(ImageIo.Imported(png, "image/png", title), 1200, 900, false, title, ImageIo.thumbnail(sample)) }.also { app.projects.clearDraft(it.id) }
         rule.waitForIdle()
         return doc.id
     }
@@ -159,7 +159,7 @@ class MacFlowsTest {
         desc(s(R.string.apply)); Thread.sleep(1500)
 
         // leave (saves) and check
-        rule.onNodeWithContentDescription(s(R.string.back)).performClick(); rule.waitForIdle(); Thread.sleep(2000)
+        TestNav.leaveEditor(rule, ::s)
         val saved = runBlocking { app.projects.load(id) }.document
         val title = saved.objects.filterIsInstance<TextObject>().single()
         assertEquals("Hola MEMES", title.text)
@@ -208,7 +208,7 @@ class MacFlowsTest {
         desc(s(R.string.tmode_done))
 
         // leave (saves), reopen from disk, check, then export to the album
-        rule.onNodeWithContentDescription(s(R.string.back)).performClick(); rule.waitForIdle(); Thread.sleep(2000)
+        TestNav.leaveEditor(rule, ::s)
         val saved = runBlocking { app.projects.load(id) }.document
         val t = saved.objects.filterIsInstance<StickerObject>().single().transform
         assertNotEquals("skewed", 0f, t.skewX)
@@ -268,7 +268,7 @@ class MacFlowsTest {
         tap(s(R.string.set_line_style)); shot("43_set_line_style")
         desc(s(R.string.style_n).format(12)); desc(s(R.string.apply)); Thread.sleep(800)
         deselect()
-        rule.onNodeWithContentDescription(s(R.string.back)).performClick(); rule.waitForIdle(); Thread.sleep(2000)
+        TestNav.leaveEditor(rule, ::s)
         val st = runBlocking { app.projects.load(id) }.document.objects.filterIsInstance<StickerObject>().single()
         val vs = st.vectorStyle
         assertTrue("styled ${st.vectorStyle}", vs != null && vs.strokeWidth > 0f && !vs.roundCap)

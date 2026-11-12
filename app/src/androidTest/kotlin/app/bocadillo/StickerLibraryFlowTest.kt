@@ -102,7 +102,7 @@ class StickerLibraryFlowTest {
         // 2. a project to work on
         val sample = SampleScene.render(1200, 900)
         val png = ByteArrayOutputStream().also { ImageIo.toBitmap(sample).compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
-        val doc = runBlocking { app.projects.create(ImageIo.Imported(png, "image/png", "Stickers"), 1200, 900, false, "Stickers", ImageIo.thumbnail(sample)) }
+        val doc = runBlocking { app.projects.create(ImageIo.Imported(png, "image/png", "Stickers"), 1200, 900, false, "Stickers", ImageIo.thumbnail(sample)) }.also { app.projects.clearDraft(it.id) }
         rule.waitForIdle()
         rule.onAllNodesWithContentDescription(s(R.string.home_more), useUnmergedTree = true).onFirst().performClick(); rule.waitForIdle()
         tap(s(R.string.more_recent_projects)); tap("Stickers"); waitFor(s(R.string.menu_adjust)); Thread.sleep(2500)
@@ -146,7 +146,7 @@ class StickerLibraryFlowTest {
         tap(s(R.string.action_delete)); rule.waitForIdle()
 
         // 6. leave the editor (saves) and check the stored project
-        rule.onNodeWithContentDescription(s(R.string.back)).performClick(); rule.waitForIdle(); Thread.sleep(2000)
+        TestNav.leaveEditor(rule, ::s)
         val saved = runBlocking { app.projects.load(doc.id) }.document
         val stickers = saved.objects.filterIsInstance<StickerObject>()
         assertEquals("one sticker left after duplicate + delete", 1, stickers.size)

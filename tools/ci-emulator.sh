@@ -38,38 +38,57 @@ pull_screens() { # keep what exists so far, even if a later step hangs
   cp $R crash.txt screens/files/screens/ 2>/dev/null || true
 }
 
+# recorded run of one test: screen video in files/screens/<name>.mp4
+rec() { # rec <name> <label> <seconds> <am instrument args...>
+  local name=$1 label=$2 secs=$3; shift 3
+  a shell rm -f /sdcard/$name.mp4
+  (timeout 200 adb shell screenrecord --bit-rate 5000000 --time-limit 175 /sdcard/$name.mp4 >/dev/null 2>&1 &)
+  sleep 1
+  inst "$label (recorded)" "$secs" "$@"
+  a shell pkill -INT screenrecord || true
+  sleep 3
+  T=120 a pull /sdcard/$name.mp4 screens/files/screens/$name.mp4 >/dev/null 2>&1 || true
+}
+M11=app.bocadillo.Mac11Test
+
 mkdir -p screens/files/screens
 a shell settings put global hide_error_dialogs 1
 
-log "=== UPGRADE: install 0.9.0 and create data"
+log "=== UPGRADE: install 1.0.0 and create data with it"
 T=180 a install -r ../old/app/build/outputs/apk/debug/app-debug.apk >> $R 2>&1
 T=180 a install -r ../old/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >> $R 2>&1
-inst "0.9.0 StickerLibraryFlowTest (creates data)" 300 -e class app.bocadillo.StickerLibraryFlowTest
+inst "1.0.0 StickerLibraryFlowTest (creates a project and the sticker library)" 300 -e class app.bocadillo.StickerLibraryFlowTest
+inst "1.0.0 Mac10FlowsTest#fontsImportPickAndPersist (imports fonts, project with a title)" 420 -e class app.bocadillo.Mac10FlowsTest#fontsImportPickAndPersist
 a push app/src/main/assets/fonts/Comfortaa-Bold.ttf /data/local/tmp/upgrade_font.ttf >> $R 2>&1
-a shell "run-as app.bocadillo.debug sh -c 'mkdir -p files/fonts && cp /data/local/tmp/upgrade_font.ttf files/fonts/UpgradeFont.ttf && echo 0.9.0 > files/upgrade_marker.txt'" >> $R 2>&1
+a shell "run-as app.bocadillo.debug sh -c 'mkdir -p files/fonts && cp /data/local/tmp/upgrade_font.ttf files/fonts/UpgradeFont.ttf && echo 1.0.0 > files/upgrade_marker.txt'" >> $R 2>&1
+log "--- 1.0.0 data and preferences before the update"
 a shell "run-as app.bocadillo.debug ls -R files" >> $R 2>&1 || true
+a shell "run-as app.bocadillo.debug sh -c 'cat shared_prefs/*.xml'" >> $R 2>&1 || true
 a shell dumpsys package app.bocadillo.debug | grep -E 'versionName|versionCode' >> $R 2>&1 || true
 
-log "=== UPGRADE: install 1.0 over it (adb install -r)"
+log "=== UPGRADE: install 1.1.0 over it (adb install -r, same signature)"
 T=180 a install -r app/build/outputs/apk/debug/app-debug.apk >> $R 2>&1
 T=180 a install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >> $R 2>&1
 a shell dumpsys package app.bocadillo.debug | grep -E 'versionName|versionCode' >> $R 2>&1 || true
+log "--- preferences after the update"
+a shell "run-as app.bocadillo.debug sh -c 'cat shared_prefs/*.xml'" >> $R 2>&1 || true
 inst app.bocadillo.LayoutAndUpgradeTest#dataSurvivedUpgrade 300 -e class app.bocadillo.LayoutAndUpgradeTest#dataSurvivedUpgrade
 
-
-# the 1.0 flows run with the app in Spanish (per-app language, Android 13+)
+# 1.1.0 corrections, app in Spanish (per-app language, Android 13+)
 a shell cmd locale set-app-locales app.bocadillo.debug --locales es-ES >> $R 2>&1 || true
-inst "app.bocadillo.Mac10FlowsTest#fontsImportPickAndPersist (es)" 420 -e class app.bocadillo.Mac10FlowsTest#fontsImportPickAndPersist
-for t in liveStrokeEqualsAppliedStroke; do
-  a shell rm -f /sdcard/$t.mp4
-  (timeout 200 adb shell screenrecord --bit-rate 6000000 --time-limit 170 /sdcard/$t.mp4 >/dev/null 2>&1 &)
-  sleep 1
-  inst "app.bocadillo.Mac10FlowsTest#$t (es, recorded)" 420 -e class "app.bocadillo.Mac10FlowsTest#$t"
-  a shell pkill -INT screenrecord || true
-  sleep 3
-  T=120 a pull /sdcard/$t.mp4 screens/files/screens/$t.mp4 >/dev/null 2>&1 || true
-done
-a logcat -d -s LiveStroke:I Upgrade:I >> $R 2>/dev/null || true
+a shell dumpsys gfxinfo app.bocadillo.debug reset > /dev/null 2>&1 || true
+rec trazo_en_vivo "$M11#liveStrokeLatencyAndFidelity" 600 -e class "$M11#liveStrokeLatencyAndFidelity"
+log "--- frame statistics during the live-stroke test (dumpsys gfxinfo)"
+a shell dumpsys gfxinfo app.bocadillo.debug | grep -E 'Total frames|Janky|percentile|Number Missed|Number High input|Number Slow' >> $R 2>&1 || true
+rec asa_tamano_perspectiva "$M11#handleTapTogglesSizeAndPerspective" 420 -e class "$M11#handleTapTogglesSizeAndPerspective"
+a shell dumpsys gfxinfo app.bocadillo.debug reset > /dev/null 2>&1 || true
+rec silueta_borrador "$M11#cutOutUnderTheFinger" 420 -e class "$M11#cutOutUnderTheFinger"
+log "--- frame statistics during the Cut Out test (dumpsys gfxinfo)"
+a shell dumpsys gfxinfo app.bocadillo.debug | grep -E 'Total frames|Janky|percentile|Number Missed|Number High input|Number Slow' >> $R 2>&1 || true
+rec navegacion_guardado "$M11#finishSaveAndBackNavigation" 420 -e class "$M11#finishSaveAndBackNavigation"
+rec catalogo_fuentes "$M11#fontCatalogueSearchPickPersist" 420 -e class "$M11#fontCatalogueSearchPickPersist"
+inst "$M11#homeThumbnailAboutTwiceAsBig" 300 -e class "$M11#homeThumbnailAboutTwiceAsBig"
+a logcat -d -s Mac11:I Upgrade:I LiveStroke:I >> $R 2>/dev/null || true
 
 for v in 1.0 1.3 2.0; do
   a shell settings put system font_scale $v; sleep 2
@@ -77,10 +96,12 @@ for v in 1.0 1.3 2.0; do
 done
 a shell settings put system font_scale 1.0
 a shell settings put system accelerometer_rotation 0
-a shell settings put system user_rotation 1; sleep 2
 inst "homeVariants landscape (es)" 300 -e class app.bocadillo.LayoutAndUpgradeTest#homeVariants -e variant landscape
-a shell settings put system user_rotation 0
-inst "app.bocadillo.Mac10FlowsTest#insertPictureCropPlaceCutOut (es)" 420 -e class app.bocadillo.Mac10FlowsTest#insertPictureCropPlaceCutOut
+
+# 1.0 flows (regression)
+for t in fontsImportPickAndPersist liveStrokeEqualsAppliedStroke insertPictureCropPlaceCutOut; do
+  inst "app.bocadillo.Mac10FlowsTest#$t (es)" 420 -e class "app.bocadillo.Mac10FlowsTest#$t"
+done
 
 # regression tests of 0.8/0.9 (system language)
 LOC=en-US; a shell cmd locale set-app-locales app.bocadillo.debug --locales en-US >> $R 2>&1 || true
@@ -90,15 +111,14 @@ for t in app.bocadillo.ReferenceScreensTest app.bocadillo.StickerLibraryFlowTest
   inst "$t" 420 -e class "$t"
 done
 
-# video of Cut Out last: screen recording while the emulator renders has been the least stable part
+# personal APK mechanism (tools/personal_fonts/make_personal_apk.py, with 3 public fonts only):
+# installs over the normal APK (same signature, re-signed by the script) and lists the fonts
 LOC=es-ES; a shell cmd locale set-app-locales app.bocadillo.debug --locales es-ES >> $R 2>&1 || true
-t=insertPictureCropPlaceCutOut
-a shell rm -f /sdcard/$t.mp4
-(timeout 200 adb shell screenrecord --bit-rate 4000000 --time-limit 170 /sdcard/$t.mp4 >/dev/null 2>&1 &)
-sleep 1
-inst "app.bocadillo.Mac10FlowsTest#$t (es, recorded)" 420 -e class "app.bocadillo.Mac10FlowsTest#$t"
-a shell pkill -INT screenrecord || true; sleep 3
-T=120 a pull /sdcard/$t.mp4 screens/files/screens/$t.mp4 >/dev/null 2>&1 || true
+log "=== PERSONAL APK: install over the normal one"
+T=180 a install -r personal-test.apk >> $R 2>&1
+a shell dumpsys package app.bocadillo.debug | grep -E 'versionName|versionCode' >> $R 2>&1 || true
+inst "$M11#personalLibraryFonts" 420 -e class "$M11#personalLibraryFonts"
+a logcat -d -s Mac11:I >> $R 2>/dev/null || true
 cp emulator_revive.log screens/files/screens/ 2>/dev/null || true
 pull_screens
 ! grep -q 'TIMEOUT_OR_ERROR\|FAILURES!!!\|INSTRUMENTATION_FAILED\|Process crashed\|DEVICE_LOST' $R

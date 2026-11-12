@@ -77,7 +77,7 @@ class ReferenceScreensTest {
         val app = ctx.application as BocadilloApp
         val sample = SampleScene.render(1200, 900)
         val png = ByteArrayOutputStream().also { ImageIo.toBitmap(sample).compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
-        runBlocking { app.projects.create(ImageIo.Imported(png, "image/png", "Sample"), 1200, 900, false, "Sample", ImageIo.thumbnail(sample)) }
+        runBlocking { app.projects.create(ImageIo.Imported(png, "image/png", "Sample"), 1200, 900, false, "Sample", ImageIo.thumbnail(sample)) }.also { app.projects.clearDraft(it.id) }
         rule.waitForIdle()
 
         shot("01_home")

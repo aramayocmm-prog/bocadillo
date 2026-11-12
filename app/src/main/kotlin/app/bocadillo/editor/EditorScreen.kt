@@ -456,7 +456,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
             if (newTool is ToolState.EditBalloon) {
                 when {
                     fontPage -> MoreFontsScreen(fonts, newTool.draft.style.font, typeface, onPick = { ref -> vm.updateDraft(newTool.draft.copy(style = newTool.draft.style.copy(font = ref))) },
-                        onImport = { fontPicker.launch(FONT_MIME_TYPES) }, onDelete = vm::deleteFont)
+                        onImport = { fontPicker.launch(FONT_MIME_TYPES) }, onDelete = vm::deleteFont, cached = app.fonts::cachedTypeface)
                     styleDetails -> BalloonStyleScreen(newTool.draft, objRenderer, fonts, typeface, vm::updateDraft, onFonts = { fontPage = true })
                     else -> NewBalloonScreen(newTool.draft, objRenderer, vm::updateDraft, onStylePreview = { styleDetails = true }, onPhrases = { composerPhrases = true })
                 }
@@ -465,7 +465,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
             if (newTool is ToolState.EditText) {
                 when {
                     fontPage -> MoreFontsScreen(fonts, newTool.draft.style.font, typeface, onPick = { ref -> vm.updateDraft(newTool.draft.copy(style = newTool.draft.style.copy(font = ref))) },
-                        onImport = { fontPicker.launch(FONT_MIME_TYPES) }, onDelete = vm::deleteFont)
+                        onImport = { fontPicker.launch(FONT_MIME_TYPES) }, onDelete = vm::deleteFont, cached = app.fonts::cachedTypeface)
                     styleDetails -> TitleStyleScreen(newTool.draft, objRenderer, fonts, typeface, vm::updateDraft, onFonts = { fontPage = true }, onDateTime = { composerDate = true })
                     else -> Box(Modifier.fillMaxSize()) {
                         NewTitleScreen(newTool.draft, objRenderer, vm::updateDraft, onStylePreview = { titlePanel = true }, onPhrases = { composerPhrases = true })

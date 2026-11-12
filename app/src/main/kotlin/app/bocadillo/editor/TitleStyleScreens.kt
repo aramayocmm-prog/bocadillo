@@ -317,10 +317,10 @@ private fun Swatch(c: Int) {
 }
 
 /**
- * "More Fonts" (reference FUENTES_ORIGINAL_MORE_FONTS): vertical list with grey headers — Custom
- * Font Files (imported by the user, with how to import), fonts included with the app, System
- * Fonts — each name drawn in its own typeface, separators and scroll. Long-press an imported
- * font to delete it from this device.
+ * «More Fonts» (1.1.0): «Custom Font Files» (fonts installed on this phone, import), the owner's
+ * library (personal APK), the included fonts and «System Fonts». Families with several styles
+ * are one row that opens to show each style; every name is drawn in its own font, loaded in the
+ * background (the list never waits for a font file while scrolling). A search box filters by name.
  */
 @Composable
 fun MoreFontsScreen(
@@ -330,45 +330,98 @@ fun MoreFontsScreen(
     onPick: (String) -> Unit,
     onImport: () -> Unit,
     onDelete: (String) -> Unit,
+    cached: (String) -> Typeface? = { null },
 ) {
     val L = Classic
     val ink = androidx.compose.ui.graphics.Color(0xFF111111)
     var confirm by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<FontOption?>(null) }
+    var query by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+    val open = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
+    val selectedFamily = fonts.firstOrNull { it.ref == selected }?.let { it.kind.name + it.family }
+    val q = query.trim().lowercase()
+    val shown = if (q.isEmpty()) fonts else fonts.filter { q in it.displayName.lowercase() || q in it.family.lowercase() }
+
+    @Composable fun FontName(f: FontOption, text: String, size: Int, modifier: Modifier) {
+        val tf by androidx.compose.runtime.produceState(cached(f.ref), f.ref) {
+            if (value == null) value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { typeface(f.ref) }.getOrNull() }
+        }
+        Text(text, fontFamily = tf?.let { FontFamily(it) }, fontSize = size.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = ink, modifier = modifier)
+    }
+
     androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxSize().background(L.LightRow).navigationBarsPadding()) {
-        @Composable fun header(t: Int) = Text(stringResource(t), color = L.LightHeaderText, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+        @Composable fun header(t: String) = Text(t, color = L.LightHeaderText, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
             modifier = Modifier.fillMaxWidth().background(L.LightHeader).padding(horizontal = 8.dp, vertical = 4.dp))
-        item { header(R.string.fonts_custom_files) }
         item {
-            Text(stringResource(R.string.fonts_custom_help), color = androidx.compose.ui.graphics.Color(0xFF555555), fontSize = 14.sp,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp))
+            androidx.compose.material3.OutlinedTextField(
+                query, { query = it }, singleLine = true, placeholder = { Text(stringResource(R.string.fonts_search)) },
+                leadingIcon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Search, null) },
+                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(focusedTextColor = ink, unfocusedTextColor = ink),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp).semantics { contentDescription = "fonts_search" },
+            )
         }
-        item {
-            Row(
-                Modifier.fillMaxWidth().background(L.LightMore).clickable(role = Role.Button, onClick = onImport).padding(horizontal = 12.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(stringResource(R.string.fonts_import_files), color = ink, fontSize = 18.sp, modifier = Modifier.weight(1f))
-                Text("+", color = ink, fontSize = 22.sp)
+        item { header(stringResource(R.string.fonts_custom_files)) }
+        if (q.isEmpty()) {
+            item {
+                Text(stringResource(R.string.fonts_custom_help), color = androidx.compose.ui.graphics.Color(0xFF555555), fontSize = 14.sp,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp))
             }
-            HorizontalDivider(color = L.LightDivider)
+            item {
+                Row(
+                    Modifier.fillMaxWidth().background(L.LightMore).clickable(role = Role.Button, onClick = onImport).padding(horizontal = 12.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.fonts_import_files), color = ink, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                    Text("+", color = ink, fontSize = 22.sp)
+                }
+                HorizontalDivider(color = L.LightDivider)
+            }
         }
-        val groups = listOf(FontOption.Kind.IMPORTED to null, FontOption.Kind.BUNDLED to R.string.fonts_bundled, FontOption.Kind.SYSTEM to R.string.fonts_system_header)
+        val groups = listOf(
+            FontOption.Kind.IMPORTED to null, FontOption.Kind.LIBRARY to R.string.fonts_library,
+            FontOption.Kind.BUNDLED to R.string.fonts_bundled, FontOption.Kind.SYSTEM to R.string.fonts_system_header,
+        )
         for ((kind, title) in groups) {
-            val list = fonts.filter { it.kind == kind }
-            if (title != null) item { header(title) }
-            if (kind == FontOption.Kind.IMPORTED && list.isEmpty()) item {
+            val list = shown.filter { it.kind == kind }
+            if (title != null && list.isNotEmpty()) item(key = "h" + kind.name) { header(stringResource(title) + "  (" + list.size + ")") }
+            if (kind == FontOption.Kind.IMPORTED && list.isEmpty() && q.isEmpty()) item {
                 Text(stringResource(R.string.fonts_none_imported), color = androidx.compose.ui.graphics.Color(0xFF888888), fontSize = 14.sp, modifier = Modifier.padding(12.dp))
             }
-            for (f in list) item(key = kind.name + f.ref) {
-                val sel = f.ref == selected
-                Text(
-                    f.displayName, fontFamily = FontFamily(typeface(f.ref)), fontSize = 22.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = ink,
-                    modifier = Modifier.fillMaxWidth().background(if (sel) L.LightMore else L.LightRow)
-                        .combinedClickableCompat(onClick = { onPick(f.ref) }, onLongClick = if (kind == FontOption.Kind.IMPORTED) ({ confirm = f }) else null)
-                        .semantics { this.selected = sel }
-                        .padding(horizontal = 10.dp, vertical = 10.dp),
-                )
-                HorizontalDivider(color = L.LightDivider)
+            // families in the order of the list; a family of one font is a plain row
+            val families = LinkedHashMap<String, MutableList<FontOption>>()
+            for (f in list) families.getOrPut(if (kind == FontOption.Kind.SYSTEM || kind == FontOption.Kind.BUNDLED) f.ref else f.family) { ArrayList() } += f
+            for ((fam, members) in families) {
+                val key = kind.name + fam
+                if (members.size == 1) {
+                    val f = members[0]
+                    item(key = "f" + kind.name + f.ref) {
+                        val sel = f.ref == selected
+                        FontName(f, f.displayName, 22, Modifier.fillMaxWidth().background(if (sel) L.LightMore else L.LightRow)
+                            .combinedClickableCompat(onClick = { onPick(f.ref) }, onLongClick = if (kind == FontOption.Kind.IMPORTED) ({ confirm = f }) else null)
+                            .semantics { this.selected = sel }.padding(horizontal = 10.dp, vertical = 10.dp))
+                        HorizontalDivider(color = L.LightDivider)
+                    }
+                } else {
+                    val expanded = open[key] ?: (q.isNotEmpty() || key == selectedFamily)
+                    val lead = members.firstOrNull { it.style.isEmpty() || it.style.equals("Regular", true) } ?: members[0]
+                    item(key = "g$key") {
+                        Row(
+                            Modifier.fillMaxWidth().background(if (key == selectedFamily) L.LightMore else L.LightRow).clickable { open[key] = !expanded }
+                                .padding(horizontal = 10.dp, vertical = 10.dp).semantics { contentDescription = "family $fam" },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            FontName(lead, fam, 22, Modifier.weight(1f))
+                            Text(stringResource(R.string.fonts_styles_count, members.size) + if (expanded) "  ▴" else "  ▾", color = androidx.compose.ui.graphics.Color(0xFF666666), fontSize = 13.sp)
+                        }
+                        HorizontalDivider(color = L.LightDivider)
+                    }
+                    if (expanded) for (f in members) item(key = "s" + kind.name + f.ref) {
+                        val sel = f.ref == selected
+                        FontName(f, f.style.ifEmpty { f.displayName }, 19, Modifier.fillMaxWidth().background(if (sel) L.LightMore else androidx.compose.ui.graphics.Color(0xFFF3F3F3))
+                            .combinedClickableCompat(onClick = { onPick(f.ref) }, onLongClick = if (kind == FontOption.Kind.IMPORTED) ({ confirm = f }) else null)
+                            .semantics { this.selected = sel; contentDescription = f.displayName }.padding(start = 30.dp, end = 10.dp, top = 8.dp, bottom = 8.dp))
+                        HorizontalDivider(color = L.LightDivider)
+                    }
+                }
             }
         }
     }
