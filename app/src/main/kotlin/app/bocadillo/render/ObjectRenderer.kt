@@ -334,10 +334,16 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
         } else if (o.source.endsWith(".svg", ignoreCase = true)) {
             drawSvgAsset(c, o, bw, bh)
         } else {
-            val bmp = liveBitmaps[o.id] ?: pictureBitmap(o) ?: return
-            c.drawBitmap(bmp, null, RectF(-bw / 2, -bh / 2, bw / 2, bh / 2), bmpPaint)
-            // Cut Out in progress: the changed tiles on top (same raster as liveBitmaps)
-            liveTiles[o.id]?.let { tl -> if (liveBitmaps[o.id] != null) { c.save(); c.translate(-bw / 2, -bh / 2); tl.draw(c, bw, bh); c.restore() } }
+            val live = liveBitmaps[o.id]
+            val tl = if (live != null) liveTiles[o.id] else null
+            if (live != null && tl != null && !tl.isEmpty) {
+                // Cut Out in progress: the changed tiles replace the picture there (erased pixels
+                // must show what is underneath at once, not the old opaque ones through them)
+                c.save(); c.translate(-bw / 2, -bh / 2); tl.drawOver(c, live, bw, bh, bmpPaint); c.restore()
+            } else {
+                val bmp = live ?: pictureBitmap(o) ?: return
+                c.drawBitmap(bmp, null, RectF(-bw / 2, -bh / 2, bw / 2, bh / 2), bmpPaint)
+            }
         }
     }
 

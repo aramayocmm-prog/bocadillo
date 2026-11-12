@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.Path
@@ -76,10 +77,11 @@ fun DrawLayer(
     val pick by rememberUpdatedState(eyedropper)
     val areaLabel = stringResource(R.string.draw_area)
     Box(Modifier.fillMaxSize().semantics { contentDescription = areaLabel }) {
-        maskOverlay?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds) }
-        if (maskTiles != null) androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+        if (maskTiles == null) maskOverlay?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds) }
+        else androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
             maskTiles.version
-            drawIntoCanvas { maskTiles.draw(it.nativeCanvas, size.width, size.height) }
+            // 1.2.0: the tiles replace the overlay where they are, so erasing the mask shows at once
+            drawIntoCanvas { c -> maskOverlay?.let { maskTiles.drawOver(c.nativeCanvas, it.asAndroidBitmap(), size.width, size.height, maskBasePaint) } ?: maskTiles.draw(c.nativeCanvas, size.width, size.height) }
         }
         Box(
             Modifier.fillMaxSize().pointerInput(Unit) {
@@ -246,3 +248,5 @@ fun MaskPanel(
         }
     }
 }
+
+private val maskBasePaint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)

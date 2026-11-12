@@ -30,6 +30,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.ImageBitmap
@@ -122,16 +123,16 @@ fun EditorCanvas(
                     }
                     .drawBehind { drawChecker() },
             ) {
-                Image(
+                if (liveTiles == null) Image(
                     bitmap = image,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.FillBounds,
                     filterQuality = FilterQuality.High,
-                )
-                if (liveTiles != null) androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                ) else androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
                     liveTiles.version // read while drawing: a new tile version redraws this layer only
-                    drawIntoCanvas { liveTiles.draw(it.nativeCanvas, size.width, size.height) }
+                    // the tiles replace the picture where they are (1.2.0): transparent results show through
+                    drawIntoCanvas { liveTiles.drawOver(it.nativeCanvas, image.asAndroidBitmap(), size.width, size.height, tileBasePaint) }
                 }
                 if (crop != null) CropOverlay(crop, cropPixelSize, onCropRect) else overlay(scale)
             }
@@ -209,3 +210,5 @@ private fun CropOverlay(crop: ToolState.Crop, pixelSize: Pair<Int, Int>, onRect:
         }
     }
 }
+
+private val tileBasePaint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)

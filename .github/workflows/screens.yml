@@ -27,17 +27,13 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
-      - name: Compilar la version 1.0.0 (prueba de actualizacion)
+      - name: Compilar la version 1.1.0 (prueba de actualizacion)
+        if: hashFiles('tools/ci-quick.txt') == ''
         run: |
-          git fetch --depth 1 origin backup-1.0.0-before-1.1
+          git fetch --depth 1 origin backup-1.1.0-before-1.2
           git worktree add ../old FETCH_HEAD
           cd ../old && chmod +x gradlew && ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest -q
           ls -la app/build/outputs/apk/debug/ app/build/outputs/apk/androidTest/debug/
-      - name: APK personal de prueba (solo con fuentes publicas)
-        run: |
-          python3 -m pip install --quiet cryptography || true
-          mkdir -p /tmp/pfonts && cp app/src/main/assets/fonts/BebasNeue-Regular.ttf app/src/main/assets/fonts/Comfortaa-Light.ttf app/src/main/assets/fonts/CreatoDisplay-Thin.otf /tmp/pfonts/
-          python3 tools/personal_fonts/make_personal_apk.py --apk app/build/outputs/apk/debug/app-debug.apk --fonts /tmp/pfonts --keystore app/debug.keystore --out personal-test.apk
       - name: Emulador y capturas
         timeout-minutes: 75
         uses: reactivecircus/android-emulator-runner@v2

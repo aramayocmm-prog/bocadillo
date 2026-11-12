@@ -54,19 +54,31 @@ M11=app.bocadillo.Mac11Test
 mkdir -p screens/files/screens
 a shell settings put global hide_error_dialogs 1
 
-log "=== UPGRADE: install 1.0.0 and create data with it"
+# quick run while developing: only the tests listed in tools/ci-quick.txt ("<video name> <class#method>"), recorded
+if [ -s tools/ci-quick.txt ]; then
+  T=180 a install -r app/build/outputs/apk/debug/app-debug.apk >> $R 2>&1
+  T=180 a install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >> $R 2>&1
+  a shell cmd locale set-app-locales app.bocadillo.debug --locales es-ES >> $R 2>&1 || true
+  while read -r name test; do [ -n "$name" ] && rec "$name" "$test" 600 -e class "$test"; done < tools/ci-quick.txt
+  a logcat -d -s Mac11:I Mac12:I >> $R 2>/dev/null || true
+  pull_screens
+  ! grep -q 'TIMEOUT_OR_ERROR\|FAILURES!!!\|INSTRUMENTATION_FAILED\|Process crashed\|DEVICE_LOST' $R
+  exit $?
+fi
+
+log "=== UPGRADE: install 1.1.0 and create data with it"
 T=180 a install -r ../old/app/build/outputs/apk/debug/app-debug.apk >> $R 2>&1
 T=180 a install -r ../old/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >> $R 2>&1
-inst "1.0.0 StickerLibraryFlowTest (creates a project and the sticker library)" 300 -e class app.bocadillo.StickerLibraryFlowTest
-inst "1.0.0 Mac10FlowsTest#fontsImportPickAndPersist (imports fonts, project with a title)" 420 -e class app.bocadillo.Mac10FlowsTest#fontsImportPickAndPersist
+inst "1.1.0 StickerLibraryFlowTest (creates a project and the sticker library)" 300 -e class app.bocadillo.StickerLibraryFlowTest
+inst "1.1.0 Mac10FlowsTest#fontsImportPickAndPersist (imports fonts, project with a title)" 420 -e class app.bocadillo.Mac10FlowsTest#fontsImportPickAndPersist
 a push app/src/main/assets/fonts/Comfortaa-Bold.ttf /data/local/tmp/upgrade_font.ttf >> $R 2>&1
-a shell "run-as app.bocadillo.debug sh -c 'mkdir -p files/fonts && cp /data/local/tmp/upgrade_font.ttf files/fonts/UpgradeFont.ttf && echo 1.0.0 > files/upgrade_marker.txt'" >> $R 2>&1
-log "--- 1.0.0 data and preferences before the update"
+a shell "run-as app.bocadillo.debug sh -c 'mkdir -p files/fonts && cp /data/local/tmp/upgrade_font.ttf files/fonts/UpgradeFont.ttf && echo 1.1.0 > files/upgrade_marker.txt'" >> $R 2>&1
+log "--- 1.1.0 data and preferences before the update"
 a shell "run-as app.bocadillo.debug ls -R files" >> $R 2>&1 || true
 a shell "run-as app.bocadillo.debug sh -c 'cat shared_prefs/*.xml'" >> $R 2>&1 || true
 a shell dumpsys package app.bocadillo.debug | grep -E 'versionName|versionCode' >> $R 2>&1 || true
 
-log "=== UPGRADE: install 1.1.0 over it (adb install -r, same signature)"
+log "=== UPGRADE: install 1.2.0 over it (adb install -r, same signature)"
 T=180 a install -r app/build/outputs/apk/debug/app-debug.apk >> $R 2>&1
 T=180 a install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >> $R 2>&1
 a shell dumpsys package app.bocadillo.debug | grep -E 'versionName|versionCode' >> $R 2>&1 || true
@@ -111,14 +123,6 @@ for t in app.bocadillo.ReferenceScreensTest app.bocadillo.StickerLibraryFlowTest
   inst "$t" 420 -e class "$t"
 done
 
-# personal APK mechanism (tools/personal_fonts/make_personal_apk.py, with 3 public fonts only):
-# installs over the normal APK (same signature, re-signed by the script) and lists the fonts
-LOC=es-ES; a shell cmd locale set-app-locales app.bocadillo.debug --locales es-ES >> $R 2>&1 || true
-log "=== PERSONAL APK: install over the normal one"
-T=180 a install -r personal-test.apk >> $R 2>&1
-a shell dumpsys package app.bocadillo.debug | grep -E 'versionName|versionCode' >> $R 2>&1 || true
-inst "$M11#personalLibraryFonts" 420 -e class "$M11#personalLibraryFonts"
-a logcat -d -s Mac11:I >> $R 2>/dev/null || true
 cp emulator_revive.log screens/files/screens/ 2>/dev/null || true
 pull_screens
 ! grep -q 'TIMEOUT_OR_ERROR\|FAILURES!!!\|INSTRUMENTATION_FAILED\|Process crashed\|DEVICE_LOST' $R

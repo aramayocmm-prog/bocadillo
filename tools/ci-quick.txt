@@ -1,0 +1,2 @@
+silueta_en_vivo app.bocadillo.Mac11Test#cutOutVisibleWhileFingerMoves
+silueta_borrador app.bocadillo.Mac11Test#cutOutUnderTheFinger

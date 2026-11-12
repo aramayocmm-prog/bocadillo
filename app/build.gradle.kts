@@ -14,8 +14,8 @@ android {
         applicationId = "app.bocadillo"
         minSdk = 29          // Android 10
         targetSdk = 35       // Android 15
-        versionCode = 14
-        versionName = "1.1.0"
+        versionCode = 15
+        versionName = "1.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

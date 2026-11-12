@@ -362,6 +362,133 @@ class Mac11Test {
         ui { vm().cancelTool() }
     }
 
+    // 1.2.0, decision 1: what the SCREEN shows while the finger is still down (1.1 checked data only)
+    private fun screenLoc(): IntArray = IntArray(2).also { (ctx.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)).getLocationOnScreen(it) }
+    /** Mean colour difference (|dr|+|dg|+|db|) between two screenshots in a 9×9 square at root point [p]. */
+    private fun diffAt(a: Bitmap, b: Bitmap, p: Offset): Int {
+        val loc = screenLoc(); var sum = 0; var n = 0
+        for (dy in -4..4) for (dx in -4..4) {
+            val x = (p.x + loc[0]).toInt() + dx; val y = (p.y + loc[1]).toInt() + dy
+            if (x !in 0 until a.width || y !in 0 until a.height) continue
+            val c1 = a.getPixel(x, y); val c2 = b.getPixel(x, y)
+            sum += abs(Color.red(c1) - Color.red(c2)) + abs(Color.green(c1) - Color.green(c2)) + abs(Color.blue(c1) - Color.blue(c2)); n++
+        }
+        return if (n == 0) 0 else sum / n
+    }
+    private fun settleLive() { rule.waitForIdle(); rule.waitUntil(10_000) { var p = true; ui { p = vm().livePending() }; !p }; Thread.sleep(250) }
+    private fun keep(b: Bitmap, name: String) { File(shots, "$name.png").outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+
+    @Test fun cutOutVisibleWhileFingerMoves() {
+        val projId = newProject("Silueta12"); openProject("Silueta12"); toPlace()
+        desc(s(R.string.ins_next_cutout)); waitFor(s(R.string.ins_cut_out)); Thread.sleep(800)
+        desc(s(R.string.ins_eraser)); waitFor(s(R.string.brush_hardness))
+        desc(s(R.string.ins_tip_round) + " 8% · 100%"); desc(s(R.string.collapse))
+        val area = boundsOf(s(R.string.ins_cut_area))
+        val ctr = area.center
+        // zoom ×2 first: the test runs on a zoomed, panned canvas
+        rule.onRoot().performTouchInput { pinch(ctr - Offset(60f, 0f), ctr - Offset(220f, 0f), ctr + Offset(60f, 0f), ctr + Offset(220f, 0f), 500) }
+        rule.waitForIdle(); Thread.sleep(1200)
+        val strokes = { Cutout.strokes(insertTool().draft.cutout).size }
+        val p = ctr
+        val far = p + Offset(0f, -260f)
+        val s0 = screenshot(); keep(s0, "130_silueta_antes")
+
+        // 1. slow eraser stroke, finger still down
+        rule.onRoot().performTouchInput { down(p); for (i in 1..12) moveTo(p + Offset(i * 5f, 0f)) }
+        settleLive()
+        val s1 = screenshot(); keep(s1, "131_silueta_borrando_dedo_abajo")
+        val d1a = diffAt(s0, s1, p); val d1b = diffAt(s0, s1, p + Offset(55f, 0f)); val d1far = diffAt(s0, s1, far)
+        log("CUT12 slow erase, finger down: diff start=$d1a end=$d1b far=$d1far strokes committed=${strokes()}")
+        assertEquals("finger still down: nothing committed yet", 0, strokes())
+        assertTrue("erased area visible under the finger during the gesture (start $d1a)", d1a > 60)
+        assertTrue("erased area visible at the current finger position (end $d1b)", d1b > 60)
+        assertTrue("far area untouched ($d1far)", d1far < 15)
+
+        // 2. fast move, quick change of direction, still down
+        rule.onRoot().performTouchInput { moveTo(p + Offset(60f, 130f)); moveTo(p + Offset(-80f, 130f)) }
+        settleLive()
+        val s2 = screenshot(); keep(s2, "132_silueta_borrado_rapido_dedo_abajo")
+        val d2 = diffAt(s0, s2, p + Offset(-10f, 130f))
+        log("CUT12 fast erase + direction change, finger down: diff=$d2")
+        assertTrue("fast segment visible during the gesture ($d2)", d2 > 60)
+        rule.onRoot().performTouchInput { up() }
+        settleLive()
+        assertEquals(1, strokes())
+        val s3 = screenshot(); keep(s3, "133_silueta_tras_levantar")
+        log("CUT12 after lifting: still erased at start=${diffAt(s0, s3, p)} (no jump back)")
+        assertTrue("still erased after lifting", diffAt(s0, s3, p) > 60)
+
+        // 3. restore over the erased start, finger down
+        desc(s(R.string.ins_restore_brush)); desc(s(R.string.collapse))
+        val s3b = screenshot()
+        rule.onRoot().performTouchInput { down(p); for (i in 1..6) moveTo(p + Offset(i * 3f, 0f)) }
+        settleLive()
+        val s4 = screenshot(); keep(s4, "134_silueta_restaurando_dedo_abajo")
+        val d4back = diffAt(s0, s4, p + Offset(9f, 0f)); val d4change = diffAt(s3b, s4, p + Offset(9f, 0f))
+        log("CUT12 restore, finger down: vs original=$d4back vs erased=$d4change")
+        assertTrue("restored pixels visible during the gesture (change $d4change)", d4change > 60)
+        assertTrue("restored = original picture ($d4back)", d4back < 25)
+        rule.onRoot().performTouchInput { up() }
+        settleLive()
+
+        // 4. alternate: eraser again, short stroke, finger down
+        desc(s(R.string.ins_eraser)); desc(s(R.string.collapse))
+        val s5a = screenshot()
+        rule.onRoot().performTouchInput { down(p + Offset(9f, 0f)); moveTo(p + Offset(12f, 0f)) }
+        settleLive()
+        val s5 = screenshot(); keep(s5, "135_silueta_alternar_borrar")
+        val d5 = diffAt(s5a, s5, p + Offset(10f, 0f))
+        log("CUT12 alternate erase (short), finger down: diff=$d5")
+        assertTrue("short stroke visible during the gesture ($d5)", d5 > 60)
+        rule.onRoot().performTouchInput { up() }
+        settleLive()
+
+        // 5. picture edge: find the picture's left edge on the screen (cyan background of the picture)
+        val loc = screenLoc()
+        val row = (p.y + loc[1]).toInt()
+        var edgeX = -1
+        for (x in max(0, (area.left + loc[0]).toInt()) until (p.x + loc[0]).toInt()) {
+            val c = s0.getPixel(x, row)
+            if (abs(Color.red(c) - 20) < 30 && abs(Color.green(c) - 190) < 30 && abs(Color.blue(c) - 210) < 30) { edgeX = x - loc[0]; break }
+        }
+        log("CUT12 picture left edge on screen at x=$edgeX (row ${p.y})")
+        if (edgeX > 0) {
+            val e = Offset(edgeX.toFloat(), p.y)
+            val s6a = screenshot()
+            rule.onRoot().performTouchInput { down(e - Offset(40f, 0f)); for (i in 1..10) moveTo(e + Offset(i * 6f - 40f, 0f)) }
+            settleLive()
+            val s6 = screenshot(); keep(s6, "136_silueta_borde_dedo_abajo")
+            val d6 = diffAt(s6a, s6, e + Offset(12f, 0f))
+            log("CUT12 edge stroke from outside, finger down: diff inside edge=$d6")
+            assertTrue("edge erased during the gesture ($d6)", d6 > 40)
+            rule.onRoot().performTouchInput { up() }
+            settleLive()
+        }
+
+        // 6. what is seen is what is exported (same as 1.1 check, after the new drawing path)
+        val d = insertTool().draft
+        val bytes = vm().assetsSnapshot()[d.source.removePrefix("asset:")]!!
+        val out = processPicture(BitmapFactory.decodeByteArray(bytes, 0, bytes.size), d.crop, d.cutout)
+        val (w2, h2, liveRaw) = vm().cutSnapshot()!!
+        val ex = IntArray(w2 * h2).also { out.getPixels(it, 0, w2, 0, 0, w2, h2) }
+        val live = IntArray(w2 * h2).also { Bitmap.createBitmap(liveRaw, w2, h2, Bitmap.Config.ARGB_8888).getPixels(it, 0, w2, 0, 0, w2, h2) }
+        var diff = 0; for (i in ex.indices) if (ex[i] != live[i]) diff++
+        log("CUT12 live vs export differing=$diff/${ex.size} strokes=${strokes()}")
+        assertEquals(0, diff)
+        // 7. accept, save the project, load it again: the cut is kept exactly
+        val cutout = d.cutout
+        ui { vm().applyTool() }
+        rule.waitForIdle(); Thread.sleep(1500)
+        var saved: Boolean? = null
+        ui { vm().saveProject { ok -> saved = ok } }
+        rule.waitUntil(20_000) { saved != null }
+        val id = vm().state.value.let { st -> st.objects.filterIsInstance<StickerObject>().first { it.cutout == cutout }.id }
+        val bundle = runBlocking { app.projects.load(projId) }
+        val back = bundle.document.objects.filterIsInstance<StickerObject>().first { it.id == id }
+        log("CUT12 saved=$saved reloaded cutout strokes=${Cutout.strokes(back.cutout).size} equal=${back.cutout == cutout}")
+        assertEquals(cutout, back.cutout)
+    }
+
     // ------------------------------------------------------------------ 4. finishing and saving
 
     private fun galleryHas(name: String): ByteArray? {
