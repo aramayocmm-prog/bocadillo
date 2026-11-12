@@ -6,3 +6,6 @@ miniatura app.bocadillo.Mac11Test#homeThumbnailFitsHorizontalBox
 pintar app.bocadillo.MacFlowsTest#homeTitleAndPaint
 fuentes app.bocadillo.Mac12Test#fontsCompactHeaderFavouritesRecentsImportDelete
 catalogo_fuentes app.bocadillo.Mac11Test#fontCatalogueSearchPickPersist
+atras app.bocadillo.Mac12Test#backHierarchyAndFilePickerCancel
+navegacion_guardado app.bocadillo.Mac11Test#finishSaveAndBackNavigation
+iconos app.bocadillo.Mac12Test#stickerCategoryIllustrations

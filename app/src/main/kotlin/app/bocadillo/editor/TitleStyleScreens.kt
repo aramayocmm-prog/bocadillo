@@ -2,6 +2,10 @@ package app.bocadillo.editor
 
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import android.graphics.Typeface
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

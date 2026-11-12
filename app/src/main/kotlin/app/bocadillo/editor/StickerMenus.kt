@@ -7,6 +7,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -83,18 +85,19 @@ fun StickerMenu(
     val counts = remember(index) { index.counts() }
     LazyColumn(Modifier.fillMaxSize().background(Classic.Menu)) {
         if (!replacing) {
-            item { ClassicMenuRow(stringResource(R.string.word_balloon), onBalloon) { ClassicIconView(ClassicIcon.BALLOON) } }
-            item { ClassicMenuRow(stringResource(R.string.title_sticker), onTitle) { ClassicIconView(ClassicIcon.TITLE) } }
+            item { ClassicMenuRow(stringResource(R.string.word_balloon), onBalloon) { app.bocadillo.ui.classic.CategoryIcon("word_balloon", ClassicDims.RowIcon) } }
+            item { ClassicMenuRow(stringResource(R.string.title_sticker), onTitle) { app.bocadillo.ui.classic.CategoryIcon("title", ClassicDims.RowIcon) } }
         }
         items(StickerCategories.all, key = { it.id }) { cat ->
             val n = counts[cat.id] ?: 0
+            // 1.2.0, decision 6: every category has its own illustration (transparent, no box);
+            // an empty one says discreetly that its stickers are still to be imported
             ClassicMenuRow(cat.name(lang), { onCategory(cat.id) }, note = if (n == 0) stringResource(R.string.sticker_pending_short) else null) {
-                val first = remember(index, cat.id) { index.inCategory(cat.id).firstOrNull() }
-                if (first != null) PackThumb(packs, first, ClassicDims.RowIcon) else EmptyIcon()
+                app.bocadillo.ui.classic.CategoryIcon(cat.id, ClassicDims.RowIcon, description = "icon_${cat.id}")
             }
         }
-        item { ClassicMenuRow(stringResource(R.string.my_stickers), { onCategory(MY_STICKERS) }) { Icon(Icons.Filled.Collections, null, tint = Classic.Text, modifier = Modifier.size(30.dp)) } }
-        item { ClassicMenuRow(stringResource(R.string.sticker_import_library), onImportZip) { Icon(Icons.Filled.Unarchive, null, tint = Classic.Text, modifier = Modifier.size(30.dp)) } }
+        item { ClassicMenuRow(stringResource(R.string.my_stickers), { onCategory(MY_STICKERS) }) { app.bocadillo.ui.classic.CategoryIcon("my_stickers", ClassicDims.RowIcon) } }
+        item { ClassicMenuRow(stringResource(R.string.sticker_import_library), onImportZip) { app.bocadillo.ui.classic.CategoryIcon("import", ClassicDims.RowIcon) } }
     }
 }
 
@@ -130,6 +133,8 @@ fun StickerCategoryGrid(
             Modifier.fillMaxSize().background(StickerSheet).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
         ) {
+            app.bocadillo.ui.classic.CategoryIcon(categoryId, 120.dp)
+            Spacer(Modifier.height(16.dp))
             Text(stringResource(R.string.sticker_pending_long), color = androidx.compose.ui.graphics.Color(0xFF616161), textAlign = TextAlign.Center, fontSize = 15.sp)
             ClassicButton(stringResource(R.string.sticker_import_library), onImportZip, Modifier.padding(top = 16.dp))
         }

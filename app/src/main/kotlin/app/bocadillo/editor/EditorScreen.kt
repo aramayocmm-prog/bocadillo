@@ -264,7 +264,11 @@ private fun EditorScreenBody(projectId: String, onBack: () -> Unit) {
     savedImage?.let { where ->
         ImageSavedDialog(where, onContinue = { vm.dismissSavedImage() }, onExit = { vm.dismissSavedImage(); vm.keepAndClose(); onBack() })
     }
+    // classic tool chrome: whether all the options of the tool show (Back closes them first)
+    var allOptions by rememberSaveable { mutableStateOf(false) }
     BackHandler {
+        // 1.2.0, decision 2: Back first goes back inside the screen (menus, submenus, panels,
+        // tool steps), then closes the tool, and only in the editor itself asks about saving
         when {
             openMenu == EditorMenu.BALLOON_SHAPES -> openMenu = EditorMenu.STICKER
             openMenu != null -> openMenu = null
@@ -273,6 +277,7 @@ private fun EditorScreenBody(projectId: String, onBack: () -> Unit) {
             insertTool?.stage == InsertStage.CUTOUT -> vm.insertGoTo(InsertStage.PLACE)
             insertTool?.stage == InsertStage.PLACE && insertTool.isNew -> vm.insertGoTo(InsertStage.CROP)
             state.tool is ToolState.Draw && paintPanel != null -> paintPanel = null
+            allOptions && state.tool is ToolState.Adjust -> allOptions = false
             fontPage && (state.tool is ToolState.EditText || state.tool is ToolState.EditBalloon) -> fontPage = false
             titlePanel && state.tool is ToolState.EditText -> titlePanel = false
             styleDetails && (state.tool is ToolState.EditText || state.tool is ToolState.EditBalloon) -> styleDetails = false
@@ -287,7 +292,6 @@ private fun EditorScreenBody(projectId: String, onBack: () -> Unit) {
     var rotateFlipDialog by rememberSaveable { mutableStateOf(false) }
     // classic tool chrome: which slider the bottom bar controls, and whether all options show
     var activeParam by rememberSaveable { mutableStateOf("") }
-    var allOptions by rememberSaveable { mutableStateOf(false) }
     var composerPhrases by remember { mutableStateOf(false) }
     // a new composer always starts in the light screen
     val toolKind = state.tool?.let { it::class.simpleName + ((it as? ToolState.EditBalloon)?.draft?.id ?: (it as? ToolState.EditText)?.draft?.id ?: "") }

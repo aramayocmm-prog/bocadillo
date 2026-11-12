@@ -288,4 +288,83 @@ class Mac12Test {
         ui { vm().cancelTool() }
     }
     private fun projectIdOf(title: String) = app.projects.index.value.entries.first { it.title == title }.id
+
+    private fun backKey() { InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); rule.waitForIdle(); Thread.sleep(500) }
+
+    /** Decision 2: Back goes back step by step; cancelling the system file picker keeps the work. */
+    @Test fun backHierarchyAndFilePickerCancel() {
+        halves("Atras12")
+        dismissRecovery()
+        if (!has("Atras12")) { desc(s(R.string.home_more)); tap(s(R.string.more_recent_projects)) }
+        tap("Atras12"); waitFor(s(R.string.menu_adjust)); Thread.sleep(2500)
+        // 1. a menu: Back closes it, the editor stays
+        tap(s(R.string.menu_adjust)); Thread.sleep(500)
+        assertTrue(has(s(R.string.op_exposure_contrast)))
+        backKey()
+        assertFalse("menu closed", has(s(R.string.op_exposure_contrast))); assertTrue(has(s(R.string.menu_adjust)))
+        // 2. a tool with all its options open: Back closes the options, then the tool
+        ui { vm().openTool(app.registry["solid_border"]!!) }; rule.waitForIdle(); Thread.sleep(600)
+        tap(s(Labels.op("solid_border")), substring = true); tap(s(R.string.more_options)); Thread.sleep(500)
+        assertTrue("all options shown", has(s(R.string.reset)))
+        backKey()
+        assertTrue("tool still open after closing its options", vm().state.value.tool is ToolState.Adjust)
+        backKey()
+        assertTrue("tool closed", vm().state.value.tool == null)
+        log("BACK menu → options → tool: ok")
+        // 3. a change, then Guardar imagen in a chosen place, and the system picker is cancelled
+        ui { vm().orient(90, false, false) }; Thread.sleep(1500)
+        desc(s(R.string.finish)); waitFor(s(R.string.finish_title))
+        tap(s(R.string.finish_save_image)); waitFor(s(R.string.save_image_title))
+        tap(s(R.string.save_image_choose))
+        tap(s(R.string.save_image_save))
+        Thread.sleep(3000); shot("230_selector_archivos_sistema")
+        // the system picker is another app: Back cancels it
+        backKey(); Thread.sleep(1500)
+        rule.waitUntil(15_000) { runCatching { has(s(R.string.menu_adjust)) || has(s(R.string.save_image_title)) }.getOrDefault(false) }
+        shot("231_tras_cancelar_selector")
+        log("BACK picker cancelled: editor=${has(s(R.string.menu_adjust))} saveDialog=${has(s(R.string.save_image_title))} pending=${vm().hasPendingChanges()}")
+        assertTrue("work kept after cancelling", vm().hasPendingChanges())
+        if (has(s(R.string.save_image_title))) tap(s(R.string.cancel))
+        // 4. Back in the editor with changes: the finish dialog; «Guardar proyecto» keeps it, it opens again with the change
+        backKey(); waitFor(s(R.string.finish_title))
+        tap(s(R.string.finish_save_project)); rule.waitUntil(15_000) { !has(s(R.string.menu_adjust)) }
+        Thread.sleep(800)
+        val id = app.projects.index.value.entries.first { it.title == "Atras12" }.id
+        val saved = runBlocking { app.projects.load(id) }.document
+        log("BACK saved project ops=${saved.ops.size}")
+        assertEquals(1, saved.ops.size)
+        if (!has("Atras12")) { desc(s(R.string.home_more)); tap(s(R.string.more_recent_projects)) }
+        tap("Atras12"); waitFor(s(R.string.menu_adjust)); Thread.sleep(2500)
+        assertEquals("recovered with its change", 1, vm().state.value.historyStep.let { _ -> runBlocking { app.projects.load(id) }.document.ops.size })
+        assertEquals(800, vm().state.value.outputWidth) // rotated 90°: 1000×800 → 800×1000
+        // 5. no changes: Back leaves without a dialog
+        backKey(); rule.waitUntil(10_000) { !has(s(R.string.menu_adjust)) }
+        assertFalse(has(s(R.string.finish_title)))
+    }
+
+    /** Decision 6: every category has its illustration; empty ones say «Pendiente de importar». */
+    @Test fun stickerCategoryIllustrations() {
+        halves("Iconos12")
+        dismissRecovery()
+        if (!has("Iconos12")) { desc(s(R.string.home_more)); tap(s(R.string.more_recent_projects)) }
+        tap("Iconos12"); waitFor(s(R.string.menu_adjust)); Thread.sleep(2500)
+        tap(s(R.string.menu_sticker)); Thread.sleep(800)
+        shot("240_categorias_stickers")
+        val missing = ArrayList<String>()
+        for (cat in app.bocadillo.core.model.StickerCategories.all) {
+            rule.onAllNodes(androidx.compose.ui.test.hasScrollToNodeAction()).onFirst()
+                .performScrollToNode(androidx.compose.ui.test.hasContentDescription("icon_${cat.id}"))
+            if (!hasDesc("icon_${cat.id}")) missing += cat.id
+        }
+        shot("241_categorias_stickers_final")
+        log("ICONS ${app.bocadillo.core.model.StickerCategories.all.size} categories, missing=$missing, pending notes=${rule.onAllNodesWithText(s(R.string.sticker_pending_short), useUnmergedTree = true).fetchSemanticsNodes().size}")
+        assertTrue("all categories illustrated: missing $missing", missing.isEmpty())
+        // an empty category: the large illustration and the pending text, no invented stickers
+        val empty = app.bocadillo.core.model.StickerCategories.all.firstOrNull { app.stickerPacks.index.inCategory(it.id).isEmpty() }
+        if (empty != null) {
+            tap(empty.name(java.util.Locale.getDefault().language)); Thread.sleep(800)
+            shot("242_categoria_vacia")
+            assertTrue(has(s(R.string.sticker_pending_long).substringBefore("\n")))
+        }
+    }
 }
