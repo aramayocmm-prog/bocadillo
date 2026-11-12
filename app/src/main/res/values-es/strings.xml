@@ -551,4 +551,37 @@ Longitud: %2$s</string>
     <string name="credits_hide_third_party">Ocultar licencias de terceros</string>
     <string name="credits_libraries">Bibliotecas (Apache License 2.0): AndroidX / Jetpack Compose, biblioteca estándar de Kotlin, kotlinx.coroutines, kotlinx.serialization, AndroidSVG (com.caverock:androidsvg).</string>
     <string name="credits_full_texts">Los textos completos de las licencias se incluyen en la aplicación: assets/fonts/OFL.txt (SIL Open Font License 1.1), assets/noto/LICENSE-APACHE-2.0.txt (Apache License 2.0), assets/noto/LICENSE-region-flags.txt.</string>
+    <!-- 1.1.0: finishing and saving -->
+    <string name="finish">Finalizar</string>
+    <string name="confirm_next">Siguiente</string>
+    <string name="confirm_insert">Insertar</string>
+    <string name="finish_title">Terminar la edición</string>
+    <string name="finish_text_pending">Hay cambios que todavía no están guardados.</string>
+    <string name="finish_text_saved">Todo está guardado. También puedes guardar la imagen.</string>
+    <string name="finish_save_image">Guardar imagen</string>
+    <string name="finish_save_project">Guardar proyecto</string>
+    <string name="finish_continue">Continuar editando</string>
+    <string name="finish_exit_without_saving">Salir sin guardar</string>
+    <string name="discard_title">¿Descartar los cambios?</string>
+    <string name="discard_text">El proyecto vuelve a como estaba la última vez que se guardó.</string>
+    <string name="discard_text_draft">Esta imagen no se ha guardado: el trabajo se borra (la foto original no se toca).</string>
+    <string name="discard_confirm">Descartar cambios</string>
+    <string name="image_saved_title">Imagen guardada</string>
+    <string name="image_saved_exit">Salir (el proyecto se conserva)</string>
+    <string name="save_image_title">Guardar imagen</string>
+    <string name="save_image_name">Nombre del archivo</string>
+    <string name="save_image_format">FORMATO</string>
+    <string name="save_image_png">PNG</string>
+    <string name="save_image_png_note">Conserva la transparencia, sin pérdida por compresión (archivo más grande)</string>
+    <string name="save_image_jpg">JPG</string>
+    <string name="save_image_jpg_note">Archivo más pequeño; sin transparencia (fondo blanco)</string>
+    <string name="save_image_quality">Calidad JPG: %1$d</string>
+    <string name="save_image_location">UBICACIÓN</string>
+    <string name="save_image_gallery">Galería</string>
+    <string name="save_image_gallery_note">Imágenes/MAC Editor para MEMES — visible en la galería del teléfono</string>
+    <string name="save_image_choose">Elegir ubicación…</string>
+    <string name="save_image_choose_note">El selector de archivos del sistema (carpeta, Drive…)</string>
+    <string name="save_image_save">Guardar</string>
+    <string name="save_image_where_gallery">%1$s se guardó en Imágenes/MAC Editor para MEMES. La encontrarás en la galería del teléfono.</string>
+    <string name="save_image_where_file">%1$s se guardó en el lugar que elegiste.</string>
 </resources>

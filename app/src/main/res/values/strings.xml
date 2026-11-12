@@ -551,4 +551,37 @@ Longitude: %2$s</string>
     <string name="credits_hide_third_party">Hide third-party licences</string>
     <string name="credits_libraries">Libraries (Apache License 2.0): AndroidX / Jetpack Compose, Kotlin standard library, kotlinx.coroutines, kotlinx.serialization, AndroidSVG (com.caverock:androidsvg).</string>
     <string name="credits_full_texts">Full licence texts are included in the app: assets/fonts/OFL.txt (SIL Open Font License 1.1), assets/noto/LICENSE-APACHE-2.0.txt (Apache License 2.0), assets/noto/LICENSE-region-flags.txt.</string>
+    <!-- 1.1.0: finishing and saving -->
+    <string name="finish">Finish</string>
+    <string name="confirm_next">Next</string>
+    <string name="confirm_insert">Insert</string>
+    <string name="finish_title">Finish editing</string>
+    <string name="finish_text_pending">There are changes that are not saved yet.</string>
+    <string name="finish_text_saved">Everything is saved. You can also save the picture.</string>
+    <string name="finish_save_image">Save image</string>
+    <string name="finish_save_project">Save project</string>
+    <string name="finish_continue">Continue editing</string>
+    <string name="finish_exit_without_saving">Exit without saving</string>
+    <string name="discard_title">Discard the changes?</string>
+    <string name="discard_text">The project goes back to how it was last saved.</string>
+    <string name="discard_text_draft">This picture has not been saved: the work is deleted (the original photo is not touched).</string>
+    <string name="discard_confirm">Discard changes</string>
+    <string name="image_saved_title">Image saved</string>
+    <string name="image_saved_exit">Exit (the project is kept)</string>
+    <string name="save_image_title">Save image</string>
+    <string name="save_image_name">File name</string>
+    <string name="save_image_format">FORMAT</string>
+    <string name="save_image_png">PNG</string>
+    <string name="save_image_png_note">Keeps transparency, no compression loss (bigger file)</string>
+    <string name="save_image_jpg">JPG</string>
+    <string name="save_image_jpg_note">Smaller file; no transparency (white background)</string>
+    <string name="save_image_quality">JPG quality: %1$d</string>
+    <string name="save_image_location">WHERE</string>
+    <string name="save_image_gallery">Gallery</string>
+    <string name="save_image_gallery_note">Pictures/MAC Editor para MEMES — visible in the phone\'s gallery</string>
+    <string name="save_image_choose">Choose a place…</string>
+    <string name="save_image_choose_note">The system file picker (folder, Drive…)</string>
+    <string name="save_image_save">Save</string>
+    <string name="save_image_where_gallery">%1$s was saved in Pictures/MAC Editor para MEMES. You can find it in the phone\'s gallery.</string>
+    <string name="save_image_where_file">%1$s was saved in the place you chose.</string>
 </resources>

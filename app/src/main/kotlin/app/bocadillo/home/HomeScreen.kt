@@ -168,18 +168,27 @@ fun HomeScreen(vm: HomeViewModel, onOpen: (String) -> Unit) {
                     IconButton(onClick = { page = HomePage.MORE }, modifier = Modifier.align(Alignment.TopStart).padding(4.dp)) {
                         Icon(Icons.Filled.Menu, stringResource(R.string.home_more), tint = Classic.TextDim, modifier = Modifier.size(30.dp))
                     }
-                    index.recent().firstOrNull()?.let { last ->
-                        val thumb = vm.thumbFile(last.id)
-                        val bmp = remember(last.id, last.modifiedAt) { runCatching { android.graphics.BitmapFactory.decodeFile(thumb.path)?.asImageBitmap() }.getOrNull() }
-                        if (bmp != null) androidx.compose.foundation.Image(
-                            bmp, last.title, contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(44.dp, 58.dp)
-                                .border(2.dp, Classic.Text).clickable { onOpen(last.id) },
+                    // last work (1.1.0: about twice as big — long side 116 dp instead of 58 — with the
+                    // photo's own proportions instead of a crop; smaller when the screen is short)
+                    val recent = index.recent().firstOrNull()
+                    val bmp = recent?.let { last -> remember(last.id, last.modifiedAt) { runCatching { android.graphics.BitmapFactory.decodeFile(vm.thumbFile(last.id).path)?.asImageBitmap() }.getOrNull() } }
+                    val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+                    var thumbBottom = 0.dp
+                    if (recent != null && bmp != null) {
+                        val long = minOf(116.dp, cfg.screenWidthDp.dp * 0.28f, cfg.screenHeightDp.dp * 0.22f)
+                        val aspect = bmp.width.toFloat() / bmp.height.coerceAtLeast(1)
+                        val tw = if (aspect >= 1f) long else long * aspect
+                        val th = if (aspect >= 1f) long / aspect else long
+                        thumbBottom = th + 8.dp + 4.dp
+                        androidx.compose.foundation.Image(
+                            bmp, recent.title, contentScale = androidx.compose.ui.layout.ContentScale.FillBounds,
+                            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(tw, th)
+                                .border(2.dp, Classic.Text).clickable { onOpen(recent.id) },
                         )
                     }
                     // logo, two-line title, glass button and, at the bottom, the short description;
                     // scrolls when space is short (landscape, very large text) instead of overlapping
-                    BoxWithConstraints(Modifier.fillMaxSize().padding(top = 56.dp)) {
+                    BoxWithConstraints(Modifier.fillMaxSize().padding(top = maxOf(56.dp, thumbBottom))) {
                         val minH = maxHeight
                         val logo = minOf(maxWidth * 0.62f, maxHeight * 0.36f, 320.dp)
                         Column(

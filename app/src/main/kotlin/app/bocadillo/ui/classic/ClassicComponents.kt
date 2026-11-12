@@ -1,5 +1,7 @@
 package app.bocadillo.ui.classic
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -74,6 +76,8 @@ fun ClassicTopBar(
     actions: @Composable RowScope.() -> Unit = {},
     /** Green check of the sticker tools (New Title, New Word Balloon, Set … Style). */
     greenConfirm: Boolean = false,
+    /** Word under the check (default «Aplicar»). */
+    confirmLabel: String? = null,
 ) {
     Box(
         Modifier.fillMaxWidth().heightIn(min = ClassicDims.TopBar)
@@ -89,12 +93,36 @@ fun ClassicTopBar(
         }
         Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
             actions()
-            if (onConfirm != null) IconButton(onClick = onConfirm) {
-                Icon(Icons.Filled.Check, stringResource(R.string.apply), tint = if (greenConfirm) Classic.Confirm else Classic.Text, modifier = Modifier.size(if (greenConfirm) 30.dp else 24.dp))
-            }
+            if (onConfirm != null) ConfirmButton(confirmLabel ?: stringResource(R.string.apply), onConfirm, green = greenConfirm)
         }
         HorizontalDivider(Modifier.align(Alignment.BottomCenter), color = Classic.Background, thickness = 1.dp)
     }
+}
+
+/**
+ * The green check with a short word under it (1.1.0, correction 5): «Aplicar» inside a tool,
+ * «Siguiente» / «Insertar» in Insert Picture, «Finalizar» in the editor. The word has a fixed
+ * size (it must fit the button even with large system fonts); the full meaning is also the
+ * button's accessibility description.
+ */
+@Composable
+fun CheckWithLabel(text: String, green: Boolean = true) {
+    val d = androidx.compose.ui.platform.LocalDensity.current
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Icon(Icons.Filled.Check, null, tint = if (green) Classic.Confirm else Classic.Text, modifier = Modifier.size(24.dp))
+        Text(text, color = Classic.Text, fontSize = with(d) { 9.5.dp.toSp() }, lineHeight = with(d) { 10.dp.toSp() }, maxLines = 1, softWrap = false)
+    }
+}
+
+/** Top-bar confirm button: [CheckWithLabel] in a 52×48 touch area. */
+@Composable
+fun ConfirmButton(text: String, onClick: () -> Unit, green: Boolean = true, description: String = text) {
+    Box(
+        Modifier.widthIn(min = 52.dp).heightIn(min = 48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = description }.padding(horizontal = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) { CheckWithLabel(text, green) }
 }
 
 /** One item of the editor's bottom bar: icon above a short label. */

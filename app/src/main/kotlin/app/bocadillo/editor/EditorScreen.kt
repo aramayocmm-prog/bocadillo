@@ -193,6 +193,56 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
         dismissButton = { TextButton({ discardPaint = false }) { Text(stringResource(R.string.cancel)) } },
     )
     val leave = { vm.closeEditor(); onBack() }
+    // ---- finishing (1.1.0, correction 5)
+    var finishDialog by rememberSaveable { mutableStateOf(false) }
+    var discardConfirm by rememberSaveable { mutableStateOf(false) }
+    var saveImageDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingSave by remember { mutableStateOf<Triple<String, Boolean, Int>?>(null) }
+    val savedImage by vm.savedImage.collectAsStateWithLifecycle()
+    val pickPng = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { uri ->
+        pendingSave?.let { (n, png, q) -> if (uri != null) vm.saveImage(n, png, q, uri) }; pendingSave = null
+    }
+    val pickJpg = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/jpeg")) { uri ->
+        pendingSave?.let { (n, png, q) -> if (uri != null) vm.saveImage(n, png, q, uri) }; pendingSave = null
+    }
+    /** Leaving the editor (← of the editor, Back with nothing open): protects unsaved work. */
+    val tryLeave = {
+        when {
+            state.loading || state.fatalError != null -> leave()
+            vm.hasPendingChanges() -> finishDialog = true
+            vm.isDraft() -> vm.discardAndClose(onBack) // opened a picture and changed nothing: nothing to keep
+            else -> leave()
+        }
+    }
+    val exitWithoutSaving = {
+        finishDialog = false
+        if (vm.hasPendingChanges()) discardConfirm = true
+        else if (vm.isDraft()) vm.discardAndClose(onBack) else leave()
+    }
+    if (finishDialog) FinishDialog(
+        pending = vm.hasPendingChanges(),
+        onSaveImage = { finishDialog = false; saveImageDialog = true },
+        onSaveProject = {
+            finishDialog = false
+            vm.saveProject { ok -> if (ok) { android.widget.Toast.makeText(context, R.string.project_saved, android.widget.Toast.LENGTH_SHORT).show(); leave() } }
+        },
+        onContinue = { finishDialog = false },
+        onExit = exitWithoutSaving,
+    )
+    if (discardConfirm) DiscardConfirmDialog(vm.isDraft(), onDiscard = { discardConfirm = false; vm.discardAndClose(onBack) }, onCancel = { discardConfirm = false })
+    if (saveImageDialog) SaveImageDialog(
+        suggestedName = remember { vm.suggestedImageName() },
+        hasTransparency = state.sourceHasAlpha || vm.currentHasTransparency(),
+        onSave = { name, png, q, choose ->
+            saveImageDialog = false
+            if (choose) { pendingSave = Triple(name, png, q); (if (png) pickPng else pickJpg).launch(name + if (png) ".png" else ".jpg") }
+            else vm.saveImage(name, png, q, null)
+        },
+        onDismiss = { saveImageDialog = false },
+    )
+    savedImage?.let { where ->
+        ImageSavedDialog(where, onContinue = { vm.dismissSavedImage() }, onExit = { vm.dismissSavedImage(); vm.keepAndClose(); onBack() })
+    }
     BackHandler {
         when {
             openMenu == EditorMenu.BALLOON_SHAPES -> openMenu = EditorMenu.STICKER
@@ -210,7 +260,7 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
             transformMenu -> transformMenu = false
             state.transformStart != null -> vm.finishTransform()
             state.selectedId != null -> vm.selectObject(null)
-            else -> leave()
+            else -> tryLeave()
         }
     }
     var rotateFlipDialog by rememberSaveable { mutableStateOf(false) }
@@ -369,7 +419,8 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                 bar != null -> ClassicTopBar(bar.title, onBack = bar.onCancel, onConfirm = bar.onApply, actions = { info?.quick?.invoke(this) },
                     backIcon = if (bar.onApply == null && (state.tool as? ToolState.PickSticker)?.category == null) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack)
                 else -> ClassicTopBar(
-                    state.title.ifEmpty { stringResource(R.string.untitled) }, onBack = leave, onConfirm = leave,
+                    state.title.ifEmpty { stringResource(R.string.untitled) }, onBack = tryLeave, onConfirm = { finishDialog = true },
+                    confirmLabel = stringResource(R.string.finish), greenConfirm = true,
                     actions = {
                         IconButton(onClick = vm::undo, enabled = state.canUndo && state.tool == null) { Icon(Icons.AutoMirrored.Filled.Undo, stringResource(R.string.undo), tint = if (state.canUndo) Classic.Text else Classic.Cell) }
                         IconButton(onClick = vm::redo, enabled = state.canRedo && state.tool == null) { Icon(Icons.AutoMirrored.Filled.Redo, stringResource(R.string.redo), tint = if (state.canRedo) Classic.Text else Classic.Cell) }

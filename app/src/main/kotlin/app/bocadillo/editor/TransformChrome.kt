@@ -97,6 +97,6 @@ fun TransformModeBar(mode: TransformMode, onMenu: () -> Unit, onCancel: () -> Un
             Text(stringResource(transformModeLabel(mode)) + "  ▾", color = Classic.Text, fontSize = 16.sp, maxLines = 1)
             Text(stringResource(transformModeHint(mode)), color = Classic.TextDim, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-        IconButton(onClick = onDone) { Icon(Icons.Filled.Check, stringResource(R.string.tmode_done), tint = Classic.Confirm, modifier = Modifier.size(28.dp)) }
+        app.bocadillo.ui.classic.ConfirmButton(stringResource(R.string.apply), onDone, description = stringResource(R.string.tmode_done))
     }
 }

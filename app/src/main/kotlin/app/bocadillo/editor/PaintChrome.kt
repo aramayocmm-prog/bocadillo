@@ -139,7 +139,7 @@ fun PaintTopBar(
             }
         }
         Spacer(Modifier.weight(1f))
-        if (painted) SquareButton(stringResource(R.string.apply), onClick = onApply) { Icon(Icons.Filled.Check, null, tint = Classic.Confirm, modifier = Modifier.size(30.dp)) }
+        if (painted) SquareButton(stringResource(R.string.apply), onClick = onApply) { app.bocadillo.ui.classic.CheckWithLabel(stringResource(R.string.apply)) }
         else SquareButton(stringResource(R.string.cancel), onClick = onCancel) { Icon(Icons.Filled.Close, null, tint = Classic.Text) }
     }
 }

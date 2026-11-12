@@ -64,7 +64,7 @@ fun CompactToolBar(info: PanelInfo, onExpand: () -> Unit) {
         )
         info.quick(this)
         IconButton(onClick = onExpand) { Icon(Icons.Filled.KeyboardArrowUp, stringResource(R.string.show_options)) }
-        info.onApply?.let { IconButton(onClick = it) { Icon(Icons.Filled.Check, stringResource(R.string.apply), tint = MaterialTheme.colorScheme.primary) } }
+        info.onApply?.let { app.bocadillo.ui.classic.ConfirmButton(stringResource(R.string.apply), it) }
     }
 }
 

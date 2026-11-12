@@ -86,7 +86,7 @@ fun PanelHeader(title: String, onCancel: () -> Unit, onApply: () -> Unit, onComp
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Filled.Compare, null) }
         }
-        IconButton(onClick = onApply) { Icon(Icons.Filled.Check, stringResource(R.string.apply)) }
+        app.bocadillo.ui.classic.ConfirmButton(stringResource(R.string.apply), onApply)
     }
 }
 

@@ -102,7 +102,7 @@ fun ClassicToolTopBar(
             },
             contentAlignment = Alignment.Center,
         ) { Box(Modifier.size(18.dp).border(2.dp, Classic.TextDim)) }
-        if (changed) IconButton(onClick = onApply) { Icon(Icons.Filled.Check, stringResource(R.string.apply), tint = Classic.Confirm, modifier = Modifier.size(30.dp)) }
+        if (changed) app.bocadillo.ui.classic.ConfirmButton(stringResource(R.string.apply), onApply)
         else IconButton(onClick = onCancel) { Icon(Icons.Filled.Close, stringResource(R.string.cancel), tint = Classic.Text) }
     }
 }
@@ -198,7 +198,7 @@ fun CropTopBar(
                 }
             }
         }
-        if (changed) ChromeSquare(stringResource(R.string.apply), onApply) { Icon(Icons.Filled.Check, null, tint = Classic.Confirm, modifier = Modifier.size(30.dp)) }
+        if (changed) ChromeSquare(stringResource(R.string.apply), onApply) { app.bocadillo.ui.classic.CheckWithLabel(stringResource(R.string.apply)) }
         else ChromeSquare(stringResource(R.string.cancel), onCancel) { Icon(Icons.Filled.Close, null, tint = Classic.Text) }
     }
 }

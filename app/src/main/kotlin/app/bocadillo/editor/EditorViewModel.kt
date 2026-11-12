@@ -295,6 +295,10 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     private suspend fun load() {
         try {
             val bundle = repo.load(projectId)
+            // the save point «Salir sin guardar» returns to (1.1.0)
+            savedBundle = ProjectBundle(bundle.document, bundle.sourceBytes, bundle.masks,
+                bundle.thumbnailJpeg ?: runCatching { repo.thumbFile(projectId).takeIf { it.exists() }?.readBytes() }.getOrNull(), bundle.assets)
+            savedDoc = bundle.document
             sourceBytes = bundle.sourceBytes
             masks = bundle.masks
             assets.putAll(bundle.assets)
@@ -1564,11 +1568,60 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         return bmp
     }
 
+    // ---- finishing (1.1.0, correction 5): save point, «Guardar proyecto», «Salir sin guardar»
+    private var savedBundle: ProjectBundle? = null
+    private var savedDoc: Document? = null
+    @Volatile private var discarded = false
+
+    /** Changes since the project was opened or last saved on purpose. */
+    fun hasPendingChanges(): Boolean = ::history.isInitialized && history.current != savedDoc
+
+    /** Created from a picture and never saved on purpose: leaving without saving deletes it. */
+    fun isDraft(): Boolean = repo.isDraft(projectId)
+
+    /** «Guardar proyecto»: writes the project and makes it the new save point. */
+    fun saveProject(onDone: (Boolean) -> Unit) {
+        app.appScope.launch(Dispatchers.Main) {
+            dirty = true
+            saveNow()
+            val ok = !dirty
+            if (ok) {
+                val d = history.current
+                savedDoc = d
+                savedBundle = runCatching { repo.load(projectId) }.getOrNull() ?: savedBundle
+                repo.clearDraft(projectId)
+            }
+            onDone(ok)
+        }
+    }
+
+    /**
+     * «Salir sin guardar»: drops the changes since the save point (a draft is deleted, an older
+     * project goes back to how it was saved). Nothing is written afterwards.
+     */
+    fun discardAndClose(onDone: () -> Unit) {
+        autosaveJob?.cancel()
+        discarded = true
+        app.appScope.launch(Dispatchers.Main) {
+            saveMutex.withLock {
+                runCatching {
+                    if (repo.isDraft(projectId)) repo.delete(projectId)
+                    else savedBundle?.let { repo.save(it) }
+                }
+            }
+            repo.clearOpen()
+            onDone()
+        }
+    }
+
+    /** Leaving after the picture was saved: the project is kept as it is (no longer a draft). */
+    fun keepAndClose() { repo.clearDraft(projectId); closeEditor() }
+
     /** Persists the project. Safe to call from any lifecycle callback. */
     suspend fun saveNow() {
-        if (!::history.isInitialized || !dirty) return
+        if (!::history.isInitialized || !dirty || discarded) return
         saveMutex.withLock {
-            if (!dirty) return
+            if (!dirty || discarded) return
             val d = history.current
             val thumb = lastPreview?.let { p -> withContext(Dispatchers.Default) { runCatching { ImageIo.thumbnail(composite(p, d.objects)) }.getOrNull() } }
             try {
@@ -1593,7 +1646,21 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
 
     // ------------------------------------------------------------------ export
 
-    fun export(options: ExportOptions, target: ExportTarget, documentUri: Uri? = null, shareTo: android.content.ComponentName? = null) {
+    /** Result of «Guardar imagen» (where it went), shown as a confirmation; null when none. */
+    private val _savedImage = MutableStateFlow<String?>(null)
+    val savedImage: StateFlow<String?> = _savedImage
+    fun dismissSavedImage() { _savedImage.value = null }
+
+    /** «Guardar imagen» (1.1.0): PNG or JPG with its quality, a file name, gallery or a chosen place. */
+    fun saveImage(name: String, png: Boolean, jpegQuality: Int, documentUri: Uri?) {
+        val opts = if (png) ExportOptions(format = ExportFormat.PNG) else ExportOptions(format = ExportFormat.JPEG_HIGH, quality = jpegQuality.coerceIn(10, 100))
+        export(opts, if (documentUri != null) ExportTarget.DOCUMENT else ExportTarget.GALLERY, documentUri, fileName = name, confirm = true)
+    }
+
+    fun export(
+        options: ExportOptions, target: ExportTarget, documentUri: Uri? = null, shareTo: android.content.ComponentName? = null,
+        fileName: String? = null, confirm: Boolean = false,
+    ) {
         if (_state.value.exporting) return
         val d = doc
         _state.update { it.copy(exporting = true, tool = null) }
@@ -1611,10 +1678,18 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
                     val out = PipelineRenderer(registry, cacheSize = 1).render(src, "export", d.ops, masks, RenderContext(scale = s))
                     ImageIo.encodeBitmap(composite(out, d.objects), fmt, quality, options.jpegBackground)
                 }
-                val name = app.exports.suggestedName(d.title, fmt.extension)
+                val name = fileName?.trim()?.replace(Regex("[\\\\/:*?\"<>|]"), "")?.takeIf { it.isNotEmpty() }?.let { n ->
+                    if (n.lowercase().endsWith(".${fmt.extension}")) n else "$n.${fmt.extension}"
+                } ?: app.exports.suggestedName(d.title, fmt.extension)
                 when (target) {
-                    ExportTarget.GALLERY -> { app.exports.saveToGallery(bytes, fmt.mimeType, name); _messages.send(UiMessage.Res(R.string.export_done_gallery)) }
-                    ExportTarget.DOCUMENT -> { app.exports.saveToUri(requireNotNull(documentUri), bytes); _messages.send(UiMessage.Res(R.string.export_done_file)) }
+                    ExportTarget.GALLERY -> {
+                        app.exports.saveToGallery(bytes, fmt.mimeType, name)
+                        if (confirm) _savedImage.value = app.getString(R.string.save_image_where_gallery, name) else _messages.send(UiMessage.Res(R.string.export_done_gallery))
+                    }
+                    ExportTarget.DOCUMENT -> {
+                        app.exports.saveToUri(requireNotNull(documentUri), bytes)
+                        if (confirm) _savedImage.value = app.getString(R.string.save_image_where_file, documentUri.lastPathSegment?.substringAfterLast('/') ?: name) else _messages.send(UiMessage.Res(R.string.export_done_file))
+                    }
                     ExportTarget.SHARE -> _shares.send(ShareRequest(app.exports.prepareShare(bytes, name), fmt.mimeType, component = shareTo))
                     ExportTarget.SET_AS -> _shares.send(ShareRequest(app.exports.prepareShare(bytes, name), fmt.mimeType, attach = true))
                 }
@@ -1629,6 +1704,9 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     }
 
     fun exportFormatFor(options: ExportOptions): ImageIo.Format = resolveFormat(options, doc).first
+
+    /** Suggested file name for «Guardar imagen» (without extension). */
+    fun suggestedImageName(): String = app.exports.suggestedName(doc.title, "x").removeSuffix(".x")
 
     private fun resolveFormat(o: ExportOptions, d: Document): Pair<ImageIo.Format, Int> = when (o.format) {
         ExportFormat.PNG -> ImageIo.Format.PNG to 100

@@ -62,6 +62,7 @@ class ProjectRepository(context: Context) {
                 now = System.currentTimeMillis(),
             )
             save(ProjectBundle(doc, imported.bytes, emptyMap(), thumb))
+            markDraft(doc.id)
             doc
         }
 
@@ -95,6 +96,7 @@ class ProjectRepository(context: Context) {
         mutex.withLock {
             projectFile(id).delete(); thumbFile(id).delete()
             writeIndex(_index.value.remove(id))
+            clearDraft(id)
         }
     }
 
@@ -117,6 +119,16 @@ class ProjectRepository(context: Context) {
     }
 
     // ---- crash recovery: a marker exists while a project is open in the editor ----
+
+    /**
+     * Projects created from a picture and never saved on purpose (1.1.0): «Salir sin guardar»
+     * deletes them. Projects from 1.0 and earlier are not drafts.
+     */
+    private val draftsFile get() = File(root, "drafts.txt")
+    private fun drafts(): Set<String> = runCatching { draftsFile.readLines().filter { it.isNotBlank() }.toSet() }.getOrDefault(emptySet())
+    fun isDraft(id: String): Boolean = id in drafts()
+    fun markDraft(id: String) { runCatching { draftsFile.writeText((drafts() + id).joinToString("\n")) } }
+    fun clearDraft(id: String) { if (isDraft(id)) runCatching { draftsFile.writeText((drafts() - id).joinToString("\n")) } }
 
     fun markOpen(id: String) = runCatching { sessionFile.writeText(id) }
     fun clearOpen() = runCatching { sessionFile.delete() }

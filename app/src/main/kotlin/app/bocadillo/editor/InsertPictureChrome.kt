@@ -192,7 +192,7 @@ fun InsertTopBar(t: ToolState.InsertPicture, panelOpen: Boolean, onPanel: (Boole
             }
         }
         val next = stringResource(when (t.stage) { InsertStage.CROP -> R.string.ins_next_place; InsertStage.PLACE -> R.string.ins_next_cutout; InsertStage.CUTOUT -> R.string.ins_insert })
-        Square(next, onClick = a.next) { Icon(Icons.Filled.Check, null, tint = Classic.Confirm, modifier = Modifier.size(30.dp)) }
+        Square(next, onClick = a.next) { app.bocadillo.ui.classic.CheckWithLabel(stringResource(if (t.stage == InsertStage.CUTOUT) R.string.confirm_insert else R.string.confirm_next)) }
     }
 }
 
