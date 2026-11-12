@@ -1,2 +1,0 @@
-trazo_en_vivo app.bocadillo.Mac11Test#liveStrokeLatencyAndFidelity
-fuentes app.bocadillo.Mac12Test#fontsCompactHeaderFavouritesRecentsImportDelete
