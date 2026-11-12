@@ -235,18 +235,18 @@ class Mac10FlowsTest {
         for (i in 1..90) { val p = a + (b - a) * (i / 90f); rule.onRoot().performTouchInput { moveTo(p) }; Thread.sleep(45) }
         Thread.sleep(700)
         shot("70_live_finger_down", 300)
-        val live = vm().livePaint.value
+        var live: Pair<Int, IntArray>? = null
+        rule.runOnUiThread { live = vm().liveSnapshot(); assertTrue("live tiles on screen while the finger is down", vm().liveTilesShown()) }
         assertNotNull("live preview while the finger is down", live)
-        val livePx = live!!.asAndroidBitmap().copy(Bitmap.Config.ARGB_8888, false)
         rule.onRoot().performTouchInput { up() }
         // wait for the real render to replace the live view
-        rule.waitUntil(15_000) { vm().livePaint.value == null }
+        rule.waitUntil(15_000) { var gone = false; rule.runOnUiThread { gone = !vm().liveTilesShown() }; gone }
         Thread.sleep(500)
         shot("71_after_release", 300)
         val fin = vm().state.value.preview!!.asAndroidBitmap().copy(Bitmap.Config.ARGB_8888, false)
-        assertEquals(livePx.width, fin.width); assertEquals(livePx.height, fin.height)
+        assertEquals(live!!.first, fin.width)
         val n = fin.width * fin.height
-        val p1 = IntArray(n).also { livePx.getPixels(it, 0, fin.width, 0, 0, fin.width, fin.height) }
+        val p1 = live!!.second
         val p2 = IntArray(n).also { fin.getPixels(it, 0, fin.width, 0, 0, fin.width, fin.height) }
         var diff = 0; var maxD = 0; var painted = 0
         val base = vm().previewBitmap()

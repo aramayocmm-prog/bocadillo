@@ -66,11 +66,14 @@ fun ObjectLayer(
     onCommit: (String) -> Unit,
     onTapSelected: () -> Unit,
     /** Tap (no drag) on the blue handle: choose the transformation mode. */
-    onHandleTap: () -> Unit = {},
+    /** A tap (no move beyond the touch slop) on a handle; the corner index (2 = bottom right). */
+    onHandleTap: (corner: Int) -> Unit = {},
     /** Insert Picture's Perspective Tool draws blue diamonds instead of circles. */
     diamonds: Boolean = false,
     /** Changes when a picture's pixels change without the object changing (live Cut Out). */
     redraw: Any? = null,
+    /** Tiles changing while Cut Out paints (read while drawing: redraws without recomposing). */
+    liveTiles: app.bocadillo.render.LiveTiles? = null,
 ) {
     val objs by rememberUpdatedState(objects)
     val sel by rememberUpdatedState(selectedId)
@@ -210,12 +213,14 @@ fun ObjectLayer(
                     guides = emptyList()
                     if (moved) {
                         onCommit(when (target) { Target.BODY -> "move"; Target.HANDLE, Target.CORNER -> "transform"; Target.TAIL -> "tail"; null -> "move" })
-                    } else if (target == Target.HANDLE || target == Target.CORNER) onHandleTap()
+                    } else if (target == Target.HANDLE) onHandleTap(2)
+                    else if (target == Target.CORNER) onHandleTap(corner)
                     else if (wasSelected) onTapSelected()
                 }
             },
     ) {
         @Suppress("UNUSED_EXPRESSION") redraw // read so that a new value redraws the layer
+        liveTiles?.version
         drawIntoCanvas { c -> renderer.drawAll(c.nativeCanvas, objects, size.width, size.height) }
         // guide lines
         for (g in guides) {

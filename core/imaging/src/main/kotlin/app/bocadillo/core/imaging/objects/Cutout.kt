@@ -15,7 +15,12 @@ import kotlin.math.roundToInt
  * zoom, rotation, perspective or the screen.
  */
 object Cutout {
-    const val MAX_SIDE = 1024
+    /**
+     * Longest side of the mask raster. 1.1.0 raised it from 1024 to 2048: fine detail (hair,
+     * thin edges) of a large picture was coarse, and the exported picture was limited to it.
+     * Strokes are normalized, so masks saved by 1.0 give the same shape, only sharper.
+     */
+    const val MAX_SIDE = 2048
 
     /** Pixel rectangle (x, y, w, h) of [crop] (fractions) on a srcW×srcH image. */
     fun cropRect(crop: List<Float>, srcW: Int, srcH: Int): IntArray {
@@ -45,12 +50,20 @@ object Cutout {
     fun apply(src: PixelBuffer, mask: FloatArray): PixelBuffer {
         require(mask.size == src.size)
         val out = IntArray(src.size)
-        for (i in out.indices) {
-            val p = src.pixels[i]
-            val a = (((p ushr 24) and 0xFF) * mask[i].coerceIn(0f, 1f) + 0.5f).toInt()
-            out[i] = (a shl 24) or (p and 0xFFFFFF)
-        }
+        for (i in out.indices) out[i] = pixel(src.pixels[i], mask[i])
         return PixelBuffer(src.width, src.height, out)
+    }
+
+    /** One pixel of [apply]: alpha × mask, colour kept. */
+    fun pixel(p: Int, m: Float): Int {
+        val a = (((p ushr 24) and 0xFF) * m.coerceIn(0f, 1f) + 0.5f).toInt()
+        return (a shl 24) or (p and 0xFFFFFF)
+    }
+
+    /** Mask value with the stroke in progress on top of the settled mask (same step as [mask]). */
+    fun liveMask(m: Float, coverage: Float, s: Stroke): Float {
+        val v = coverage * s.opacity
+        return if (v <= 0f) m else StrokeRasterizer.maskCombine(m, v, s.mode != StrokeMode.ERASE)
     }
 
     fun eraser(points: FloatArray, size: Float, hardness: Float, square: Boolean = false) = Stroke(points, size, hardness, 1f, 0xFF000000.toInt(), StrokeMode.ERASE, pressureSize = true, square = square)

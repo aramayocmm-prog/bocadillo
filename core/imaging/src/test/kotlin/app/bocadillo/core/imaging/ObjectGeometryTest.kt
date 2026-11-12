@@ -251,7 +251,7 @@ class BalloonShapesExtraTest {
         assertTrue(soft.any { it > 0.05f && it < 0.95f })
         // crop rect and raster size
         assertTrue(Cutout.cropRect(listOf(0.25f, 0f, 0.75f, 0.5f), 400, 200).contentEquals(intArrayOf(100, 0, 200, 100)))
-        assertEquals(1024 to 512, Cutout.rasterSize(3000, 1500))
+        assertEquals(2048 to 1024, Cutout.rasterSize(3000, 1500)); assertEquals(2048 to 1365, Cutout.rasterSize(4500, 3000))
         // encode / decode round trip
         val enc = Cutout.encode(listOf(Cutout.eraser(line, 0.3f, 0.5f)))
         assertEquals(1, Cutout.strokes(enc).size)

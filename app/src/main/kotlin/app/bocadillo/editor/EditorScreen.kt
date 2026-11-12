@@ -157,7 +157,10 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
     var guideStage by remember { mutableStateOf<InsertStage?>(null) }
     val insertTool = state.tool as? ToolState.InsertPicture
     val insertLive by vm.insertLive.collectAsStateWithLifecycle()
-    val livePaint by vm.livePaint.collectAsStateWithLifecycle()
+    val liveTiles by vm.liveTiles.collectAsStateWithLifecycle()
+    val maskTiles by vm.maskTiles.collectAsStateWithLifecycle()
+    // once a render with every finished stroke is on screen, the live tiles can go
+    LaunchedEffect(state.preview) { vm.previewShown(state.preview) }
     LaunchedEffect(insertTool?.stage) {
         val st = insertTool?.stage
         if (st == null) cutPanel = false
@@ -263,9 +266,10 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
     // Objects renderer shared by the canvas and the pickers (UI thread only).
     val objRenderer = remember { ObjectRenderer(app.fonts, app.stickers, app.noto) }
     // Cut Out: the processed picture (incl. the stroke in progress) replaces the draft's pixels
-    LaunchedEffect(insertLive) {
-        objRenderer.liveBitmaps.clear()
-        insertLive?.let { (id, bmp) -> objRenderer.liveBitmaps[id] = bmp }
+    val cutTiles by vm.cutTiles.collectAsStateWithLifecycle()
+    LaunchedEffect(insertLive, cutTiles) {
+        objRenderer.liveBitmaps.clear(); objRenderer.liveTiles.clear()
+        insertLive?.let { (id, bmp) -> objRenderer.liveBitmaps[id] = bmp; cutTiles?.let { objRenderer.liveTiles[id] = it } }
     }
     remember(state.assetsVersion) { objRenderer.assets = vm.assetsSnapshot(); 0 }
     val fonts = remember(state.assetsVersion) { app.fonts.all() }
@@ -453,7 +457,8 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
             }
             Box(Modifier.weight(1f).fillMaxWidth().background(if (state.tool != null) ToolChrome.Work else Classic.Background)) {
                 EditorCanvas(
-                    image = if (comparing) state.before ?: state.preview else livePaint ?: state.preview,
+                    image = if (comparing) state.before ?: state.preview else state.preview,
+                    liveTiles = if (comparing) null else liveTiles,
                     crop = state.tool as? ToolState.Crop,
                     cropPixelSize = state.outputWidth to state.outputHeight,
                     onCropRect = vm::setCropRect,
@@ -475,8 +480,11 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                             onLive = vm::insertLive,
                             onCommit = { vm.insertDragEnd() },
                             onTapSelected = { },
+                            // 1.1.0: a tap on the bottom-right handle (circle or diamond) switches size ↔ perspective
+                            onHandleTap = { c -> if (c == 2) vm.toggleInsertPerspective() },
                             diamonds = insertTool.perspective,
                             redraw = insertLive,
+                            liveTiles = cutTiles,
                         )
                         if (insertTool.stage == InsertStage.CUTOUT) CutoutLayer(
                             insertTool.draft, objRenderer, zoom, insertTool.brushSize, insertTool.brushSquare,
@@ -498,10 +506,10 @@ fun EditorScreen(projectId: String, onBack: () -> Unit) {
                     )
                     when (val t = state.tool) {
                         is ToolState.Draw -> DrawLayer(
-                            t.eyedropper, null, onLive = { pts -> vm.strokeLive(pts, zoom) }, onStroke = { pts -> vm.addStroke(pts, zoom) }, onSample = vm::sampleColor,
+                            t.eyedropper, null, null, onLive = { pts -> vm.strokeLive(pts, zoom) }, onStroke = { pts -> vm.addStroke(pts, zoom) }, onSample = vm::sampleColor,
                         )
                         is ToolState.Mask -> if (!t.choosingEffect) DrawLayer(
-                            false, state.maskOverlay, onLive = { pts -> vm.strokeLive(pts) }, onStroke = { pts -> vm.addStroke(pts) }, onSample = { _, _ -> },
+                            false, state.maskOverlay, maskTiles, onLive = { pts -> vm.strokeLive(pts) }, onStroke = { pts -> vm.addStroke(pts) }, onSample = { _, _ -> },
                         )
                         is ToolState.Adjust -> if (t.op.id == "warp_brush") WarpOverlay(t.params, vm::updateParam) else PointHandles(t.op.params, t.params, zoom, vm::updateParam)
                         else -> Unit

@@ -98,16 +98,18 @@ object StrokeCodec {
 /** Rasterizes strokes into coverage (0..1 per pixel). */
 object StrokeRasterizer {
 
+    /** Brush radius in px on a w×h raster, and the spacing between dabs (~12% of the radius, ≥ 1 px). */
+    internal fun maxRadius(s: Stroke, w: Int, h: Int): Float = s.size * min(w, h).toFloat() / 2f
+    internal fun spacing(maxR: Float): Float = max(1f, maxR * 0.12f)
+
     /**
      * Coverage of one stroke on a w×h grid. Dabs are combined with max (not added), so a stroke
      * crossing itself does not get darker — like a real marker pass.
      * Returns null if the stroke is entirely outside.
      */
     fun coverage(s: Stroke, w: Int, h: Int): Coverage? {
-        val u = min(w, h).toFloat()
-        val maxR = s.size * u / 2f
-        // dab spacing: ~12% of the radius (≥ 1 px) keeps edges smooth without wasting work
-        val pts = smooth(s.points, w, h, spacing = max(1f, maxR * 0.12f))
+        val maxR = maxRadius(s, w, h)
+        val pts = smooth(s.points, w, h, spacing = spacing(maxR))
         if (pts.isEmpty()) return null
         // bounding box
         var x0 = Float.MAX_VALUE; var y0 = Float.MAX_VALUE; var x1 = -Float.MAX_VALUE; var y1 = -Float.MAX_VALUE
@@ -120,25 +122,37 @@ object StrokeRasterizer {
         val bw = bx1 - bx0; val bh = by1 - by0
         val cov = FloatArray(bw * bh)
         val hard = s.hardness.coerceIn(0f, 1f)
-        for (k in 0 until pts.size / 3) {
-            val p = pts[3 * k + 2].coerceIn(0.05f, 1f)
-            val r = max(0.5f, maxR * (if (s.pressureSize) p else 1f))
-            val a = if (s.pressureOpacity) p else 1f
-            dab(cov, bw, bh, pts[3 * k] - bx0, pts[3 * k + 1] - by0, r, hard, a, s.square)
-        }
+        for (k in 0 until pts.size / 3) sampleDab(cov, bx0, by0, bw, bh, pts[3 * k], pts[3 * k + 1], pts[3 * k + 2], s, maxR, hard)
         return Coverage(bx0, by0, bw, bh, cov)
     }
 
     class Coverage(val x: Int, val y: Int, val w: Int, val h: Int, val values: FloatArray)
 
-    /** Round dab: full inside r*hardness, smooth falloff to 0 at r. */
-    private fun dab(cov: FloatArray, w: Int, h: Int, cx: Float, cy: Float, r: Float, hardness: Float, alpha: Float, square: Boolean = false) {
+    /**
+     * One resampled point of a stroke: radius and alpha from its pressure, then the dab. Shared by
+     * [coverage] and [IncrementalStroke], so the stroke in progress and the finished one are the
+     * same numbers.
+     */
+    internal fun sampleDab(cov: FloatArray, ox: Int, oy: Int, bw: Int, bh: Int, x: Float, y: Float, pressure: Float, s: Stroke, maxR: Float, hard: Float) {
+        val p = pressure.coerceIn(0.05f, 1f)
+        val r = max(0.5f, maxR * (if (s.pressureSize) p else 1f))
+        val a = if (s.pressureOpacity) p else 1f
+        dab(cov, ox, oy, bw, bh, x, y, r, hard, a, s.square)
+    }
+
+    /**
+     * Round (or square) dab: full inside r*hardness, smooth falloff to 0 at r. [cov] is a bw×bh
+     * window whose top-left pixel is (ox, oy); (cx, cy) and the loop run in global pixel
+     * coordinates, so the result does not depend on the window.
+     */
+    private fun dab(cov: FloatArray, ox: Int, oy: Int, bw: Int, bh: Int, cx: Float, cy: Float, r: Float, hardness: Float, alpha: Float, square: Boolean) {
         val inner = r * hardness
-        val xa = max(0, floor(cx - r).toInt()); val xb = min(w - 1, ceil(cx + r).toInt())
-        val ya = max(0, floor(cy - r).toInt()); val yb = min(h - 1, ceil(cy + r).toInt())
+        val xa = max(ox, floor(cx - r).toInt()); val xb = min(ox + bw - 1, ceil(cx + r).toInt())
+        val ya = max(oy, floor(cy - r).toInt()); val yb = min(oy + bh - 1, ceil(cy + r).toInt())
         val r2 = (r + 0.5f) * (r + 0.5f)
         for (y in ya..yb) {
             val dy = y + 0.5f - cy
+            val row = (y - oy) * bw - ox
             for (x in xa..xb) {
                 val dx = x + 0.5f - cx
                 val d: Float
@@ -156,10 +170,46 @@ object StrokeRasterizer {
                     else -> { val t = ((d - inner) / (r - inner)).coerceIn(0f, 1f); 1f - t * t * (3f - 2f * t) }
                 }
                 v *= alpha
-                val i = y * w + x
+                val i = row + x
                 if (v > cov[i]) cov[i] = v
             }
         }
+    }
+
+    /** Growable float list (no boxing). */
+    internal class FloatList(cap: Int = 64) {
+        var data = FloatArray(cap); var size = 0
+        fun add(v: Float) { if (size == data.size) data = data.copyOf(size * 2); data[size++] = v }
+        fun clear() { size = 0 }
+        fun toArray(): FloatArray = data.copyOf(size)
+    }
+
+    /**
+     * Resampled points (x, y, pressure in px) of segment [i] (from point i to i+1) of the
+     * Catmull-Rom spline through [points] (normalized, n points). The segment only depends on
+     * points i-1..i+2, so once point i+2 exists it never changes.
+     */
+    internal fun emitSegment(points: FloatArray, n: Int, w: Int, h: Int, i: Int, step: Float, out: FloatList) {
+        fun p(k: Int, c: Int): Float {
+            val v = points[3 * k.coerceIn(0, n - 1) + c]
+            return when (c) { 0 -> v * w; 1 -> v * h; else -> v }
+        }
+        val seg = hypot(p(i + 1, 0) - p(i, 0), p(i + 1, 1) - p(i, 1))
+        val steps = max(1, ceil(seg / step).toInt())
+        for (sIdx in 0 until steps) {
+            val t = sIdx.toFloat() / steps
+            val t2 = t * t; val t3 = t2 * t
+            for (c in 0..1) {
+                val p0 = p(i - 1, c); val p1 = p(i, c); val p2 = p(i + 1, c); val p3 = p(i + 2, c)
+                out.add(0.5f * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3))
+            }
+            out.add(p(i, 2) + (p(i + 1, 2) - p(i, 2)) * t)
+        }
+    }
+
+    /** Last point of the stroke in px (always dabbed). */
+    internal fun emitLast(points: FloatArray, n: Int, w: Int, h: Int, out: FloatList) {
+        out.add(points[3 * (n - 1)] * w); out.add(points[3 * (n - 1) + 1] * h); out.add(points[3 * (n - 1) + 2])
     }
 
     /**
@@ -169,27 +219,14 @@ object StrokeRasterizer {
     fun smooth(points: FloatArray, w: Int, h: Int, spacing: Float = 1.2f): FloatArray {
         val n = points.size / 3
         if (n == 0) return FloatArray(0)
-        val px = FloatArray(n * 3) { i -> when (i % 3) { 0 -> points[i] * w; 1 -> points[i] * h; else -> points[i] } }
-        if (n == 1) return px
-        val out = ArrayList<Float>(n * 6)
-        val step = spacing
-        fun p(i: Int, c: Int) = px[3 * i.coerceIn(0, n - 1) + c]
-        for (i in 0 until n - 1) {
-            val seg = hypot(p(i + 1, 0) - p(i, 0), p(i + 1, 1) - p(i, 1))
-            val steps = max(1, ceil(seg / step).toInt())
-            for (sIdx in 0 until steps) {
-                val t = sIdx.toFloat() / steps
-                val t2 = t * t; val t3 = t2 * t
-                for (c in 0..1) {
-                    val p0 = p(i - 1, c); val p1 = p(i, c); val p2 = p(i + 1, c); val p3 = p(i + 2, c)
-                    out += 0.5f * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3)
-                }
-                out += p(i, 2) + (p(i + 1, 2) - p(i, 2)) * t
-            }
-        }
-        out += p(n - 1, 0); out += p(n - 1, 1); out += p(n - 1, 2)
-        return out.toFloatArray()
+        val out = FloatList(n * 6)
+        for (i in 0 until n - 1) emitSegment(points, n, w, h, i, spacing, out)
+        emitLast(points, n, w, h, out)
+        return out.toArray()
     }
+
+    /** One mask step: PAINT/MARKER add coverage [v], ERASE removes it. */
+    fun maskCombine(m: Float, v: Float, add: Boolean): Float = if (add) m + (1f - m) * v else m * (1f - v)
 
     /**
      * Builds a mask (0..1) from mask strokes: PAINT/MARKER strokes add coverage, ERASE strokes
@@ -199,19 +236,25 @@ object StrokeRasterizer {
         val m = FloatArray(w * h) { base }
         for (s in strokes) {
             ctx?.checkCancelled()
-            val c = coverage(s, w, h) ?: continue
-            val add = s.mode != StrokeMode.ERASE
-            for (yy in 0 until c.h) {
-                val row = (c.y + yy) * w + c.x
-                for (xx in 0 until c.w) {
-                    val v = c.values[yy * c.w + xx] * s.opacity
-                    if (v <= 0f) continue
-                    val i = row + xx
-                    m[i] = if (add) m[i] + (1f - m[i]) * v else m[i] * (1f - v)
-                }
-            }
+            applyToMask(m, w, h, s)
         }
         return m
+    }
+
+    /** Adds one stroke to a mask built by [maskCoverage] (same arithmetic). */
+    fun applyToMask(m: FloatArray, w: Int, h: Int, s: Stroke): IntArray? {
+        val c = coverage(s, w, h) ?: return null
+        val add = s.mode != StrokeMode.ERASE
+        for (yy in 0 until c.h) {
+            val row = (c.y + yy) * w + c.x
+            for (xx in 0 until c.w) {
+                val v = c.values[yy * c.w + xx] * s.opacity
+                if (v <= 0f) continue
+                val i = row + xx
+                m[i] = maskCombine(m[i], v, add)
+            }
+        }
+        return intArrayOf(c.x, c.y, c.x + c.w, c.y + c.h)
     }
 
     /** Separable box blur ×3 (≈ gaussian) used to feather masks. radius in pixels. */
@@ -249,27 +292,36 @@ object StrokePainter {
 
     /**
      * Paints one stroke directly into [px] (w×h) and returns the touched area (x, y, w, h) or
-     * null. Used by the final render above and by the editor's live preview, so the stroke in
-     * progress and the applied stroke are computed by the very same code.
+     * null. The final render uses it; the live preview ([IncrementalStroke]) uses the same
+     * coverage and the same [Blender], so the stroke in progress and the applied stroke match.
      */
     fun paintInPlace(px: IntArray, w: Int, h: Int, s: Stroke): IntArray? {
         val c = StrokeRasterizer.coverage(s, w, h) ?: return null
-        val ca = ((s.color ushr 24) and 0xFF) / 255f
-        val cr = (s.color shr 16) and 0xFF; val cg = (s.color shr 8) and 0xFF; val cb = s.color and 0xFF
+        val b = Blender(s)
         for (yy in 0 until c.h) {
             val row = (c.y + yy) * w + c.x
             for (xx in 0 until c.w) {
                 val cov = c.values[yy * c.w + xx]
                 if (cov <= 0f) continue
                 val i = row + xx
-                px[i] = when (s.mode) {
-                    StrokeMode.ERASE -> eraseOver(px[i], cov * s.opacity)
-                    StrokeMode.PAINT -> over(px[i], cr, cg, cb, cov * s.opacity * ca)
-                    StrokeMode.MARKER -> multiply(px[i], cr, cg, cb, cov * s.opacity * ca)
-                }
+                px[i] = b.blend(px[i], cov)
             }
         }
         return intArrayOf(c.x, c.y, c.w, c.h)
+    }
+
+    /** How one stroke changes a pixel for a given coverage (colour, opacity and mode). */
+    class Blender(private val s: Stroke) {
+        private val ca = ((s.color ushr 24) and 0xFF) / 255f
+        private val cr = (s.color shr 16) and 0xFF
+        private val cg = (s.color shr 8) and 0xFF
+        private val cb = s.color and 0xFF
+        fun blend(d: Int, cov: Float): Int = when {
+            cov <= 0f -> d
+            s.mode == StrokeMode.ERASE -> eraseOver(d, cov * s.opacity)
+            s.mode == StrokeMode.PAINT -> over(d, cr, cg, cb, cov * s.opacity * ca)
+            else -> multiply(d, cr, cg, cb, cov * s.opacity * ca)
+        }
     }
 
     private fun over(d: Int, r: Int, g: Int, b: Int, a: Float): Int {

@@ -336,6 +336,8 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
         } else {
             val bmp = liveBitmaps[o.id] ?: pictureBitmap(o) ?: return
             c.drawBitmap(bmp, null, RectF(-bw / 2, -bh / 2, bw / 2, bh / 2), bmpPaint)
+            // Cut Out in progress: the changed tiles on top (same raster as liveBitmaps)
+            liveTiles[o.id]?.let { tl -> if (liveBitmaps[o.id] != null) { c.save(); c.translate(-bw / 2, -bh / 2); tl.draw(c, bw, bh); c.restore() } }
         }
     }
 
@@ -345,6 +347,7 @@ class ObjectRenderer(private val fonts: FontRepository, private val catalog: Sti
      * the export uses — so the live view and the result are the same pixels.
      */
     val liveBitmaps = java.util.concurrent.ConcurrentHashMap<String, Bitmap>()
+    val liveTiles = java.util.concurrent.ConcurrentHashMap<String, LiveTiles>()
     private val processed = LruCache<String, Bitmap>(12)
 
     /** Raster picture with its crop and Cut Out mask applied (cached). */

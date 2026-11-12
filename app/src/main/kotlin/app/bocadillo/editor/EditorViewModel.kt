@@ -25,6 +25,8 @@ import app.bocadillo.data.FontRepository
 import app.bocadillo.core.imaging.paint.StrokeCodec
 import app.bocadillo.core.imaging.ops.PaintOps
 import app.bocadillo.core.imaging.paint.StrokePainter
+import app.bocadillo.core.imaging.paint.IncrementalStroke
+import app.bocadillo.render.LiveTiles
 import app.bocadillo.render.processPicture
 import app.bocadillo.core.imaging.objects.Cutout
 import app.bocadillo.core.imaging.paint.StrokeMode
@@ -351,15 +353,13 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         val job = coroutineContext[Job]
         val ctx = RenderContext(scale = proxyScale, isCancelled = { job?.isActive == false })
         try {
-            val count = (_state.value.tool as? ToolState.Draw)?.strokes?.size ?: -1
+            // read before the ops: a render started at the current value contains every finished stroke
+            val seq = commitSeq
             val result = renderer.render(proxy, PROXY_TOKEN, previewOps(), masks, ctx)
             val bmp = ImageIo.toBitmap(result).asImageBitmap()
             lastPreview = result
-            previewStrokeCount = count
+            if (seq == commitSeq) completeImage = bmp
             _state.update { it.copy(preview = bmp) }
-            // the rendered picture now contains every finished stroke: the live view can go
-            val now = (_state.value.tool as? ToolState.Draw)?.strokes?.size ?: -1
-            if (count == now) _livePaint.value = null
         } catch (_: CancellationException) {
             // superseded by a newer render request
         }
@@ -460,7 +460,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     fun cancelTool() { if (_state.value.tool is ToolState.InsertPicture) clearInsertLive(); closeTool() }
 
     private fun closeTool(render: Boolean = true) {
-        _livePaint.value = null; paintBaseCount = -1; historySource = null
+        endLive(closing = true); historySource = null
         _state.update { it.copy(tool = null, before = null, maskOverlay = null) }
         if (render) requestRender()
     }
@@ -926,6 +926,9 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     /** ▶|◀ and "Perspective Tool": blue circles (move/scale/rotate) ↔ blue diamonds (four corners). */
     fun setInsertPerspective(on: Boolean) = updateInsert { it.copy(perspective = on) }
 
+    /** Tap on the bottom-right handle of Place Picture: size mode ↔ perspective mode. The picture is not changed. */
+    fun toggleInsertPerspective() = updateInsert { if (it.stage == InsertStage.PLACE) it.copy(perspective = !it.perspective) else it }
+
     fun toggleInsertStickers() = updateInsert { it.copy(showStickers = !it.showStickers) }
 
     /** Bottom slider of Place Picture: the picture's opacity ("Place Picture 100%"). */
@@ -940,13 +943,28 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
 
     fun setCutErase(erase: Boolean) = updateInsert { it.copy(erase = erase) }
 
-    // ---- Cut Out: live mask (same code as the export: processPicture / core Cutout)
+    // ---- Cut Out: live mask (1.1.0, correction 3)
+    // 1.0 re-cropped, re-scaled and re-masked the whole picture with every stroke on each finger
+    // move. Now a session keeps the cropped pixels, the settled mask and the result; a stroke in
+    // progress only recomputes its own area (IncrementalStroke, same numbers as the export) on the
+    // main thread, and only the touched tiles are uploaded.
     private var insertRaw: android.graphics.Bitmap? = null
     private val _insertLive = MutableStateFlow<Pair<String, android.graphics.Bitmap>?>(null)
-    /** Processed picture of the draft (crop + mask incl. the stroke in progress) for the screen. */
+    /** Processed picture of the draft (crop + settled mask) for the screen. */
     val insertLive: StateFlow<Pair<String, android.graphics.Bitmap>?> = _insertLive
     private var liveJob: Job? = null
-    private val liveStrokes = kotlinx.coroutines.channels.Channel<Stroke?>(kotlinx.coroutines.channels.Channel.CONFLATED)
+    private val liveRequests = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
+
+    private class CutSession(val id: String, val crop: List<Float>, var cutout: List<Float>, val w: Int, val h: Int, val src: IntArray, val m: FloatArray, val out: IntArray) {
+        val inc = IncrementalStroke(w, h)
+        val tiles = LiveTiles(w, h)
+        var stroke: Stroke? = null
+    }
+    private var cut: CutSession? = null
+    private var cutRefreshPending = false
+    private val _cutTiles = MutableStateFlow<LiveTiles?>(null)
+    /** Tiles of the stroke in progress (and the strokes since the last full refresh) over [insertLive]. */
+    val cutTiles: StateFlow<LiveTiles?> = _cutTiles
 
     private fun rawPicture(d: StickerObject): android.graphics.Bitmap? {
         insertRaw?.let { return it }
@@ -956,30 +974,82 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
 
     private fun ensureLiveWorker() {
         if (liveJob?.isActive == true) return
-        liveJob = viewModelScope.launch(Dispatchers.Default) {
-            for (extra in liveStrokes) {
+        liveJob = viewModelScope.launch {
+            for (r in liveRequests) {
                 val t = insertTool() ?: continue
-                val raw = rawPicture(t.draft) ?: continue
-                val bmp = runCatching { processPicture(raw, t.draft.crop, t.draft.cutout, extra) }.getOrNull() ?: continue
-                _insertLive.value = t.draft.id to bmp
+                val d = t.draft
+                val built = withContext(Dispatchers.Default) {
+                    runCatching {
+                        val raw = rawPicture(d) ?: return@runCatching null
+                        val rc = Cutout.cropRect(d.crop, raw.width, raw.height)
+                        val cropped = if (rc[0] == 0 && rc[1] == 0 && rc[2] == raw.width && rc[3] == raw.height) raw else android.graphics.Bitmap.createBitmap(raw, rc[0], rc[1], rc[2], rc[3])
+                        val (w, h) = Cutout.rasterSize(cropped.width, cropped.height)
+                        val scaled = if (w == cropped.width && h == cropped.height) cropped else android.graphics.Bitmap.createScaledBitmap(cropped, w, h, true)
+                        val src = IntArray(w * h).also { scaled.getPixels(it, 0, w, 0, 0, w, h) }
+                        val m = Cutout.mask(Cutout.strokes(d.cutout), w, h)
+                        val out = IntArray(w * h) { i -> Cutout.pixel(src[i], m[i]) }
+                        CutSession(d.id, d.crop, d.cutout, w, h, src, m, out) to android.graphics.Bitmap.createBitmap(out, w, h, android.graphics.Bitmap.Config.ARGB_8888)
+                    }.getOrNull()
+                } ?: continue
+                if (cut?.stroke != null) { cutRefreshPending = true; continue } // never under a finger
+                val now = insertTool()?.draft ?: continue
+                if (now.id != d.id || now.crop != d.crop || now.cutout != d.cutout) { liveRequests.trySend(Unit); continue }
+                cut = built.first
+                _insertLive.value = d.id to built.second
+                _cutTiles.value = built.first.tiles
             }
         }
     }
 
     private fun refreshInsertLive() {
         val t = insertTool() ?: return
-        if (t.draft.cutout.isEmpty() && t.stage != InsertStage.CUTOUT) { _insertLive.value = null; return }
-        ensureLiveWorker(); liveStrokes.trySend(null)
+        if (t.draft.cutout.isEmpty() && t.stage != InsertStage.CUTOUT) { _insertLive.value = null; _cutTiles.value = null; cut = null; return }
+        ensureLiveWorker(); liveRequests.trySend(Unit)
     }
 
-    private fun clearInsertLive() { _insertLive.value = null; insertRaw = null }
+    private fun clearInsertLive() { _insertLive.value = null; _cutTiles.value = null; cut = null; insertRaw = null }
 
-    /** Stroke in progress (image coordinates): the screen shows its real effect at once. */
+    private fun cutSession(t: ToolState.InsertPicture): CutSession? =
+        cut?.takeIf { it.id == t.draft.id && it.crop == t.draft.crop && it.cutout == t.draft.cutout }
+
+    /** Stroke in progress (image coordinates): the screen shows its real effect at once. Main thread. */
     fun cutStrokeLive(points: FloatArray, imageSize: Float) {
         val t = insertTool() ?: return
-        ensureLiveWorker()
-        liveStrokes.trySend(if (points.isEmpty()) null else cutStroke(t, points, imageSize))
+        val c = cutSession(t) ?: run { refreshInsertLive(); return }
+        if (points.isEmpty()) { // two fingers: the stroke is dropped
+            c.inc.touchedArea()?.let { a ->
+                for (y in a[1] until a[3]) for (x in a[0] until a[2]) { val i = y * c.w + x; c.out[i] = Cutout.pixel(c.src[i], c.m[i]) }
+                c.tiles.update(c.out, a)
+            }
+            c.inc.reset(); c.stroke = null
+            return
+        }
+        cutStep(c, cutStroke(t, points, imageSize), final = false)
     }
+
+    private fun cutStep(c: CutSession, s: Stroke, final: Boolean) {
+        val t0 = System.nanoTime()
+        c.stroke = s
+        val d = c.inc.update(s, final)
+        if (d != null) {
+            for (y in d[1] until d[3]) {
+                val row = y * c.w
+                for (x in d[0] until d[2]) { val i = row + x; c.out[i] = Cutout.pixel(c.src[i], Cutout.liveMask(c.m[i], c.inc.coverageAt(x, y), s)) }
+            }
+            c.tiles.update(c.out, d)
+        }
+        if (final) {
+            c.inc.touchedArea()?.let { a ->
+                for (y in a[1] until a[3]) for (x in a[0] until a[2]) { val i = y * c.w + x; c.m[i] = Cutout.liveMask(c.m[i], c.inc.coverageAt(x, y), s) }
+            }
+            c.inc.reset(); c.stroke = null
+        }
+        liveTimings.add((System.nanoTime() - t0) / 1e6f)
+        while (liveTimings.size > 4000) liveTimings.poll()
+    }
+
+    /** Test hook: the processed picture as shown (raster size). */
+    fun cutSnapshot(): Triple<Int, Int, IntArray>? = cut?.let { Triple(it.w, it.h, it.out.copyOf()) }
 
     /** The picked picture, whole (for the Crop step). */
     suspend fun insertSourceBitmap(): androidx.compose.ui.graphics.ImageBitmap? = withContext(Dispatchers.Default) {
@@ -991,9 +1061,14 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     /** End of a stroke: one undo step; the mask stays editable in the project. */
     fun cutStrokeCommit(points: FloatArray, imageSize: Float) {
         val t = insertTool() ?: return
-        val strokes = Cutout.strokes(t.draft.cutout) + cutStroke(t, points, imageSize)
-        pushInsert(t.draft.copy(cutout = Cutout.encode(strokes)))
-        refreshInsertLive()
+        val s = cutStroke(t, points, imageSize)
+        val c = cutSession(t)
+        c?.let { cutStep(it, s, final = true) }
+        val cutout = Cutout.encode(Cutout.strokes(t.draft.cutout) + s)
+        pushInsert(t.draft.copy(cutout = cutout))
+        // the session already contains the stroke: no full recomputation
+        if (c != null) c.cutout = cutout
+        if (c == null || cutRefreshPending) { cutRefreshPending = false; refreshInsertLive() }
     }
 
     /** Removes the whole cut-out (one undo step). */
@@ -1107,6 +1182,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     fun openDraw(kind: DrawKind) {
         val previous = (_state.value.tool as? ToolState.Draw)?.brush ?: lastBrush
         _state.update { it.copy(tool = ToolState.Draw(kind, brush = previous, stage = historyStages().lastOrNull()?.first ?: 0), selectedId = null) }
+        (_state.value.tool as? ToolState.Draw)?.let { if (it.kind == DrawKind.HISTORY) ensureHistorySource(it.stage) }
         requestRender()
     }
 
@@ -1119,6 +1195,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
             applyTool(); openDraw(kind); return
         }
         _state.update { it.copy(tool = t.copy(kind = kind, eyedropper = false)) }
+        if (kind == DrawKind.HISTORY) ensureHistorySource(t.stage)
     }
 
     fun setBrush(b: BrushSettings) {
@@ -1151,95 +1228,154 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         when (val t = _state.value.tool) {
             is ToolState.Draw -> {
                 val s = drawStroke(t, points, zoom)
+                // the live view settles this stroke with the same numbers, then the render confirms it
+                if (!t.eyedropper) liveSession()?.let { liveStep(it, s, final = true, t) }
                 _state.update { it.copy(tool = t.copy(strokes = t.strokes + s, redo = emptyList())) }
-                // the live view finishes this stroke with the same painter, then the render confirms it
-                livePaintMsgs.trySend(LivePaint(s, t.strokes.size, final = true))
+                commitSeq++ // after the state: a render that sees the new value has the stroke
                 requestRender()
             }
             is ToolState.Mask -> {
                 val s = maskStroke(t, points)
+                maskLive(s, final = true)
+                val settled = maskSession?.takeIf { it.key == maskKey(t) }
                 _state.update { it.copy(tool = t.copy(strokes = t.strokes + s, redo = emptyList())) }
-                updateMaskOverlay()
+                // the session already contains the stroke: only its key moves on
+                val nt = _state.value.tool as ToolState.Mask
+                if (settled != null) settled.key = maskKey(nt) else updateMaskOverlay()
             }
             else -> Unit
         }
     }
 
-    // ---- live strokes (change 17): what is seen while the finger moves is the real result
-    private class LivePaint(val stroke: Stroke?, val baseCount: Int, val final: Boolean)
-    private val livePaintMsgs = Channel<LivePaint>(Channel.UNLIMITED)
-    private var livePaintJob: Job? = null
-    private val _livePaint = MutableStateFlow<ImageBitmap?>(null)
-    /** Preview with the stroke in progress painted by the same code as the final render (null = none). */
-    val livePaint: StateFlow<ImageBitmap?> = _livePaint
-    /** Buffer that already contains the committed strokes, and how many. */
-    @Volatile private var paintBase: PixelBuffer? = null
-    @Volatile private var paintBaseCount = -1
-    @Volatile private var previewStrokeCount = -1
+    // ---- live strokes (1.1.0, correction 1)
+    // 1.0 repainted the whole stroke on a full copy of the picture and uploaded the whole picture
+    // on every finger move, on a worker thread: the cost grew with the stroke and the result
+    // arrived frames late. Now the stroke grows incrementally (IncrementalStroke: only the new
+    // segment, same numbers as the final render), on the main thread inside the touch event, and
+    // only the 256-px tiles it touches are uploaded (LiveTiles), so it shows in the same frame.
+    private class LiveSession(val w: Int, val h: Int, val work: IntArray, val out: IntArray) {
+        val inc = IncrementalStroke(w, h)
+        val tiles = LiveTiles(w, h)
+        var stroke: Stroke? = null
+        var blender: StrokePainter.Blender? = null
+        var closing = false
+    }
+    private var live: LiveSession? = null
+    private val _liveTiles = MutableStateFlow<LiveTiles?>(null)
+    /** Tiles drawn over the picture while strokes are not yet in the rendered preview. */
+    val liveTiles: StateFlow<LiveTiles?> = _liveTiles
+    /** Increments when the strokes change; a render that started at the current value contains them all. */
+    @Volatile private var commitSeq = 0
+    @Volatile private var completeImage: ImageBitmap? = null
     private var historySource: Pair<Int, PixelBuffer>? = null
-    private val liveBitmaps = arrayOfNulls<Bitmap>(2)
-    private var liveFlip = 0
+    private var historyJob: Job? = null
+    /** Timing of the live stroke work per finger move (ms), for the performance test and report. */
+    val liveTimings = java.util.concurrent.ConcurrentLinkedQueue<Float>()
 
-    /** Stroke in progress (one finger moving). */
+    private fun liveSession(): LiveSession? {
+        val p = lastPreview ?: return null
+        live?.let { if (it.w == p.width && it.h == p.height && !it.closing) return it }
+        val work = p.pixels.copyOf()
+        val l = LiveSession(p.width, p.height, work, work.copyOf())
+        live?.tiles?.clear()
+        live = l
+        _liveTiles.value = l.tiles
+        return l
+    }
+
+    /** Stroke in progress (one finger moving). Main thread. */
     fun strokeLive(points: FloatArray, zoom: Float = 1f) {
         when (val t = _state.value.tool) {
             is ToolState.Draw -> {
                 if (t.eyedropper) return
-                ensureLivePaint()
-                livePaintMsgs.trySend(LivePaint(if (points.isEmpty()) null else drawStroke(t, points, zoom), t.strokes.size, final = false))
+                val l = liveSession() ?: return
+                if (points.isEmpty()) { cancelLiveStroke(l); return }
+                liveStep(l, drawStroke(t, points, zoom), final = false, t)
             }
-            is ToolState.Mask -> updateMaskOverlay(if (points.isEmpty()) null else maskStroke(t, points))
+            is ToolState.Mask -> maskLive(if (points.isEmpty()) null else maskStroke(t, points), final = false)
             else -> Unit
         }
     }
 
-    private fun ensureLivePaint() {
-        if (livePaintJob?.isActive == true) return
-        livePaintJob = viewModelScope.launch(Dispatchers.Default) {
-            var work: IntArray? = null
-            var workFor = -1
-            while (true) {
-                var m = livePaintMsgs.receive()
-                // drop stale intermediate frames, never a final one
-                while (!m.final) { m = livePaintMsgs.tryReceive().getOrNull() ?: break }
-                val t = _state.value.tool as? ToolState.Draw ?: continue
-                val base = when {
-                    previewStrokeCount == m.baseCount -> lastPreview
-                    paintBaseCount == m.baseCount -> paintBase
-                    else -> lastPreview
-                } ?: continue
-                val w = base.width; val h = base.height
-                if (work == null || work.size != base.pixels.size || workFor != m.baseCount || m.final) { work = base.pixels.copyOf(); workFor = m.baseCount }
-                else System.arraycopy(base.pixels, 0, work, 0, work.size)
-                val st = m.stroke
-                if (st != null) {
-                    if (t.kind == DrawKind.HISTORY) historyLive(work, w, h, base, st, t.stage)
-                    else StrokePainter.paintInPlace(work, w, h, st)
+    private fun liveStep(l: LiveSession, s: Stroke, final: Boolean, t: ToolState.Draw) {
+        val t0 = System.nanoTime()
+        val history = if (t.kind == DrawKind.HISTORY) historySource?.takeIf { it.first == t.stage && it.second.width == l.w && it.second.height == l.h }?.second else null
+        if (t.kind == DrawKind.HISTORY && history == null) {
+            // stage picture not ready yet (rendered in the background): the render will show the stroke
+            ensureHistorySource(t.stage)
+            if (final) { l.inc.reset(); l.stroke = null; l.blender = null }
+            return
+        }
+        if (l.stroke == null) { l.stroke = s; l.blender = StrokePainter.Blender(s) }
+        val d = l.inc.update(s, final)
+        if (d != null) {
+            val b = l.blender!!
+            val work = l.work; val out = l.out; val w = l.w
+            for (y in d[1] until d[3]) {
+                val row = y * w
+                for (x in d[0] until d[2]) {
+                    val i = row + x
+                    val c = l.inc.coverageAt(x, y)
+                    out[i] = if (history != null) {
+                        val k = (c * s.opacity * 255f + 0.5f).toInt().coerceIn(0, 255)
+                        if (k == 0) work[i] else if (k == 255) history.pixels[i] else PaintOps.lerp(work[i], history.pixels[i], k)
+                    } else b.blend(work[i], c)
                 }
-                if (m.final) {
-                    paintBase = PixelBuffer(w, h, work.copyOf()); paintBaseCount = m.baseCount + 1
-                    workFor = -1
-                }
-                val bmp = liveBitmaps[liveFlip]?.takeIf { it.width == w && it.height == h } ?: Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { liveBitmaps[liveFlip] = it }
-                liveFlip = 1 - liveFlip
-                bmp.setPixels(work, 0, w, 0, 0, w, h)
-                _livePaint.value = if (st == null && !m.final) null else bmp.asImageBitmap()
             }
+            l.tiles.update(out, d)
+        }
+        if (final) {
+            // the finished stroke becomes the base of the next one
+            l.inc.touchedArea()?.let { a -> for (y in a[1] until a[3]) System.arraycopy(l.out, y * l.w + a[0], l.work, y * l.w + a[0], a[2] - a[0]) }
+            l.inc.reset(); l.stroke = null; l.blender = null
+        }
+        liveTimings.add((System.nanoTime() - t0) / 1e6f)
+        while (liveTimings.size > 4000) liveTimings.poll()
+    }
+
+    /** Test hooks: the picture shown under the finger (preview size) and whether tiles are on screen. */
+    fun liveSnapshot(): Pair<Int, IntArray>? = live?.let { it.w to it.out.copyOf() }
+    fun liveTilesShown(): Boolean = live?.tiles?.isEmpty == false
+
+    /** Two fingers went down: the stroke in progress is dropped. */
+    private fun cancelLiveStroke(l: LiveSession) {
+        val a = l.inc.touchedArea()
+        if (a != null) {
+            for (y in a[1] until a[3]) System.arraycopy(l.work, y * l.w + a[0], l.out, y * l.w + a[0], a[2] - a[0])
+            l.tiles.update(l.out, a)
+        }
+        l.inc.reset(); l.stroke = null; l.blender = null
+    }
+
+    /** The picture of History Paint's stage, rendered once in the background. */
+    private fun ensureHistorySource(stage: Int) {
+        if (historySource?.first == stage || historyJob?.isActive == true) return
+        historyJob = viewModelScope.launch {
+            val r = withContext(Dispatchers.Default) { renderer.render(proxy, PROXY_TOKEN, doc.ops.take(stage), masks, RenderContext(scale = proxyScale)) }
+            historySource = stage to r
         }
     }
 
-    /** History Paint, live: the same lerp towards the chosen stage as PaintOps.HistoryPaint. */
-    private fun historyLive(px: IntArray, w: Int, h: Int, base: PixelBuffer, st: Stroke, stage: Int) {
-        val src = historySource?.takeIf { it.first == stage && it.second.width == w && it.second.height == h }?.second ?: run {
-            val ops = doc.ops.take(stage)
-            val r = kotlinx.coroutines.runBlocking { renderer.render(proxy, PROXY_TOKEN, ops, masks, RenderContext(scale = proxyScale)) }
-            historySource = stage to r; r
-        }
-        if (src.width != w || src.height != h) return
-        val out = PaintOps.HistoryPaint.apply(
-            base, Params.of("stage" to stage).with("strokes", StrokeCodec.encode(listOf(st))), RenderContext(scale = 1f),
-        ) { if (it == stage) src else null }
-        System.arraycopy(out.pixels, 0, px, 0, px.size)
+    /**
+     * The editor shows [img] as the picture. Once it is a render containing every finished stroke,
+     * the live tiles are no longer needed: removed now, after that picture is on screen, so
+     * nothing flickers.
+     */
+    fun previewShown(img: ImageBitmap?) {
+        val l = live ?: return
+        if (img == null || img !== completeImage || l.stroke != null) return
+        l.tiles.clear()
+        val p = lastPreview
+        if (l.closing || p == null || p.width != l.w || p.height != l.h) { live = null; _liveTiles.value = null; return }
+        System.arraycopy(p.pixels, 0, l.work, 0, l.work.size)
+        System.arraycopy(p.pixels, 0, l.out, 0, l.out.size)
+    }
+
+    /** Tool closed, or strokes removed: the tiles go when the next complete render is shown. */
+    private fun endLive(closing: Boolean) {
+        commitSeq++
+        live?.let { if (closing) it.closing = true }
+        maskLiveReset()
     }
 
     fun undoStroke() {
@@ -1250,7 +1386,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
                 else -> s
             }
         }
-        _livePaint.value = null; paintBaseCount = -1
+        endLive(closing = false)
         if (_state.value.tool is ToolState.Mask) updateMaskOverlay() else requestRender()
     }
 
@@ -1262,6 +1398,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
                 else -> s
             }
         }
+        endLive(closing = false)
         if (_state.value.tool is ToolState.Mask) updateMaskOverlay() else requestRender()
     }
 
@@ -1296,6 +1433,7 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         val t = _state.value.tool as? ToolState.Draw ?: return
         _state.update { it.copy(tool = t.copy(stage = stage)) }
         requestRender()
+        ensureHistorySource(stage)
     }
 
     // ------------------------------------------------------------------ masks
@@ -1313,23 +1451,85 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
 
     private var overlayJob: Job? = null
 
+    /** Overlay colour of a mask value (protected: red, selected: green; 55 % at full mask). */
+    private fun overlayPixel(v0: Float, t: ToolState.Mask): Int {
+        val v = if (t.invert) 1f - v0 else v0
+        return (((v * 0.55f) * 255).toInt().coerceIn(0, 255) shl 24) or (if (t.protect) 0xE53935 else 0x43A047)
+    }
+
+    /** Settled mask (unfeathered) and its overlay, so a new stroke only recomputes its own area. */
+    private class MaskSession(val w: Int, val h: Int, val m: FloatArray, val overlay: IntArray, var key: List<Any>) {
+        val inc = IncrementalStroke(w, h)
+        val tiles = LiveTiles(w, h)
+    }
+    private var maskSession: MaskSession? = null
+    private val _maskTiles = MutableStateFlow<LiveTiles?>(null)
+    val maskTiles: StateFlow<LiveTiles?> = _maskTiles
+    private fun maskKey(t: ToolState.Mask) = listOf(t.strokes.size, t.strokes.lastOrNull() ?: 0, t.feather, t.invert, t.protect)
+
     /** Renders the mask as a translucent red (protected) / green (selected) overlay. */
-    private fun updateMaskOverlay(live: Stroke? = null) {
+    private fun updateMaskOverlay() {
         val t = _state.value.tool as? ToolState.Mask ?: return
         val p = lastPreview ?: return
         overlayJob?.cancel()
-        overlayJob = viewModelScope.launch(Dispatchers.Default) {
-            val w = p.width; val h = p.height
-            var m = StrokeRasterizer.maskCoverage(t.strokes + listOfNotNull(live), w, h, if (t.protect) 1f else 0f)
-            m = StrokeRasterizer.feather(m, w, h, (t.feather * minOf(w, h)).roundToInt())
-            val tint = if (t.protect) 0xE53935 else 0x43A047
-            val px = IntArray(w * h) { i ->
-                val v = if (t.invert) 1f - m[i] else m[i]
-                (((v * 0.55f) * 255).toInt().coerceIn(0, 255) shl 24) or tint
+        overlayJob = viewModelScope.launch {
+            val session = withContext(Dispatchers.Default) {
+                val w = p.width; val h = p.height
+                val m = StrokeRasterizer.maskCoverage(t.strokes, w, h, if (t.protect) 1f else 0f)
+                val f = StrokeRasterizer.feather(m.copyOf(), w, h, (t.feather * minOf(w, h)).roundToInt())
+                MaskSession(w, h, m, IntArray(w * h) { i -> overlayPixel(f[i], t) }, maskKey(t))
             }
-            val bmp = Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888).asImageBitmap()
+            val bmp = Bitmap.createBitmap(session.overlay, session.w, session.h, Bitmap.Config.ARGB_8888).asImageBitmap()
+            if (maskSession?.inc?.touchedArea() != null) return@launch // a stroke started meanwhile: keep its session
+            maskSession?.tiles?.clear()
+            maskSession = session; _maskTiles.value = session.tiles
             _state.update { it.copy(maskOverlay = bmp) }
         }
+    }
+
+    /**
+     * Mask stroke in progress: the settled mask plus the stroke, feathered in a window around
+     * the changed area only (the box blur reaches 3 × radius), shown through tiles. Main thread.
+     */
+    private fun maskLive(s: Stroke?, final: Boolean) {
+        val t = _state.value.tool as? ToolState.Mask ?: return
+        val ms = maskSession?.takeIf { it.key == maskKey(t) } ?: return
+        val w = ms.w; val h = ms.h
+        if (s == null) { // stroke cancelled: back to the settled overlay
+            ms.inc.touchedArea()?.let { ms.inc.reset(); maskRegion(ms, t, it, null) }
+            ms.inc.reset(); return
+        }
+        val t0 = System.nanoTime()
+        val d = ms.inc.update(s, final) ?: return
+        maskRegion(ms, t, d, s)
+        if (final) {
+            ms.inc.touchedArea()?.let { a ->
+                for (y in a[1] until a[3]) for (x in a[0] until a[2]) { val i = y * w + x; ms.m[i] = Cutout.liveMask(ms.m[i], ms.inc.coverageAt(x, y), s) }
+            }
+            ms.inc.reset()
+        }
+        liveTimings.add((System.nanoTime() - t0) / 1e6f)
+    }
+
+    private fun maskRegion(ms: MaskSession, t: ToolState.Mask, d: IntArray, s: Stroke?) {
+        val w = ms.w; val h = ms.h
+        val rad = (t.feather * minOf(w, h)).roundToInt().coerceAtLeast(0)
+        val e = 3 * rad
+        val ox0 = maxOf(0, d[0] - e); val oy0 = maxOf(0, d[1] - e); val ox1 = minOf(w, d[2] + e); val oy1 = minOf(h, d[3] + e)
+        val wx0 = maxOf(0, ox0 - e); val wy0 = maxOf(0, oy0 - e); val wx1 = minOf(w, ox1 + e); val wy1 = minOf(h, oy1 + e)
+        val ww = wx1 - wx0; val wh = wy1 - wy0
+        val buf = FloatArray(ww * wh)
+        for (y in wy0 until wy1) for (x in wx0 until wx1) {
+            val i = y * w + x
+            buf[(y - wy0) * ww + (x - wx0)] = if (s == null) ms.m[i] else Cutout.liveMask(ms.m[i], ms.inc.coverageAt(x, y), s)
+        }
+        val f = StrokeRasterizer.feather(buf, ww, wh, rad)
+        for (y in oy0 until oy1) for (x in ox0 until ox1) ms.overlay[y * w + x] = overlayPixel(f[(y - wy0) * ww + (x - wx0)], t)
+        ms.tiles.update(ms.overlay, intArrayOf(ox0, oy0, ox1, oy1))
+    }
+
+    private fun maskLiveReset() {
+        maskSession?.tiles?.clear(); maskSession = null; _maskTiles.value = null
     }
 
     /** Params carrying the painted mask, attached to the effect picked next. */

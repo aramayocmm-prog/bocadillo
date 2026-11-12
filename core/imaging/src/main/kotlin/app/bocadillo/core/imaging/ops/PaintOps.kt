@@ -63,7 +63,7 @@ object PaintOps {
         }
     }
 
-    internal fun lerp(c0: Int, c1: Int, k: Int): Int {
+    fun lerp(c0: Int, c1: Int, k: Int): Int {
         fun ch(s: Int) = (((c0 ushr s) and 0xFF) * (255 - k) + ((c1 ushr s) and 0xFF) * k + 127) / 255
         return (ch(24) shl 24) or (ch(16) shl 16) or (ch(8) shl 8) or ch(0)
     }

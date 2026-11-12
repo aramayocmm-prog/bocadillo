@@ -30,6 +30,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -52,6 +54,8 @@ fun EditorCanvas(
     cropPixelSize: Pair<Int, Int>,
     onCropRect: (FloatArray) -> Unit,
     modifier: Modifier = Modifier,
+    /** Strokes in progress / not yet rendered, drawn over [image] (1.1.0). */
+    liveTiles: app.bocadillo.render.LiveTiles? = null,
     /** Drawing tools active: one finger draws (handled by the overlay), two fingers zoom/pan. */
     twoFingerNavigation: Boolean = false,
     /** Drawn above the picture inside the zoomed box (objects layer); receives the zoom factor. */
@@ -125,6 +129,10 @@ fun EditorCanvas(
                     contentScale = ContentScale.FillBounds,
                     filterQuality = FilterQuality.High,
                 )
+                if (liveTiles != null) androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                    liveTiles.version // read while drawing: a new tile version redraws this layer only
+                    drawIntoCanvas { liveTiles.draw(it.nativeCanvas, size.width, size.height) }
+                }
                 if (crop != null) CropOverlay(crop, cropPixelSize, onCropRect) else overlay(scale)
             }
         }

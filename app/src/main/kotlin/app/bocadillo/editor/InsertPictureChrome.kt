@@ -290,6 +290,7 @@ fun InsertCropView(t: ToolState.InsertPicture, image: ImageBitmap?, onRect: (Flo
  * picture's own coordinates through the inverse of its full transform (rotation, flip, skew and
  * perspective), so the mask lands under the finger at any zoom or angle.
  */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun CutoutLayer(
     draft: StickerObject,
@@ -334,10 +335,11 @@ fun CutoutLayer(
                     if (pressed.size > 1) { if (!cancelled) { cancelled = true; cursor = null; onLive(FloatArray(0), 0f) }; continue }
                     if (cancelled) continue
                     val c = pressed.first()
-                    if ((c.position - last).getDistance() >= 1.5f) {
-                        add(c.position, c.pressure, c.type == PointerType.Stylus); last = c.position; cursor = c.position
-                        onLive(data.toFloatArray(), imgSize)
-                    }
+                    // every intermediate sample of the event (fast moves, sharp turns keep their shape)
+                    var moved = false
+                    for (hp in c.historical) if ((hp.position - last).getDistance() >= 1f) { add(hp.position, c.pressure, c.type == PointerType.Stylus); last = hp.position; moved = true }
+                    if ((c.position - last).getDistance() >= 1f) { add(c.position, c.pressure, c.type == PointerType.Stylus); last = c.position; moved = true }
+                    if (moved) { cursor = c.position; onLive(data.toFloatArray(), imgSize) }
                     c.consume()
                 }
                 cursor = null

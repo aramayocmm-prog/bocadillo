@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -64,6 +66,7 @@ import kotlin.math.roundToInt
 fun DrawLayer(
     eyedropper: Boolean,
     maskOverlay: ImageBitmap?,
+    maskTiles: app.bocadillo.render.LiveTiles?,
     onLive: (FloatArray) -> Unit,
     onStroke: (FloatArray) -> Unit,
     onSample: (Float, Float) -> Unit,
@@ -71,6 +74,10 @@ fun DrawLayer(
     val pick by rememberUpdatedState(eyedropper)
     Box(Modifier.fillMaxSize()) {
         maskOverlay?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds) }
+        if (maskTiles != null) androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+            maskTiles.version
+            drawIntoCanvas { maskTiles.draw(it.nativeCanvas, size.width, size.height) }
+        }
         Box(
             Modifier.fillMaxSize().pointerInput(Unit) {
                 awaitEachGesture {
