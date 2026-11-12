@@ -153,6 +153,7 @@ class Mac11Test {
         var maxDiff = 0; var diffPx = 0L; var total = 0L
         val rt = Runtime.getRuntime()
         val memBefore = (rt.totalMemory() - rt.freeMemory()) / 1_048_576
+        vm().traceRenders = true
         cases.forEachIndexed { k, (c, delay) ->
             val (name, b, path) = c
             ui {
@@ -170,6 +171,16 @@ class Mac11Test {
             log("PERF stroke=$name points=${path.size} ${stats(times)} background=${vm().liveBackgroundCount}")
             // the rendered picture replaces the live tiles; compare pixel by pixel
             rule.waitUntil(30_000) { var gone = false; ui { gone = !vm().liveTilesShown() }; gone }
+            synchronized(vm().renderTrace) { log("FIDELITY stroke=$name render requests: ${vm().renderTrace}"); vm().renderTrace.clear() }
+            run {
+                val f0 = vm().state.value.preview!!.asAndroidBitmap().copy(Bitmap.Config.ARGB_8888, false)
+                val p0 = IntArray(f0.width * f0.height).also { f0.getPixels(it, 0, f0.width, 0, 0, f0.width, f0.height) }
+                log("FIDELITY stroke=$name right after the tiles were removed: differing=${p0.indices.count { p0[it] != live!!.second[it] }}")
+            }
+            // 1.2.0: wait until no further render replaces the picture (logged if one does)
+            var last = vm().state.value.preview; var stable = 0; var renders = 0
+            while (stable < 6) { Thread.sleep(250); val now = vm().state.value.preview; if (now === last) stable++ else { stable = 0; renders++; last = now } }
+            if (renders > 0) synchronized(vm().renderTrace) { log("FIDELITY stroke=$name: $renders later render(s) after the tiles were removed, requested by ${vm().renderTrace}"); vm().renderTrace.clear() }
             val fin = vm().state.value.preview!!.asAndroidBitmap().copy(Bitmap.Config.ARGB_8888, false)
             val l = live!!
             assertEquals(l.first, fin.width)
@@ -180,14 +191,6 @@ class Mac11Test {
                 for (sh in intArrayOf(0, 8, 16, 24)) m = max(m, abs(((px[i] ushr sh) and 0xFF) - ((l.second[i] ushr sh) and 0xFF)))
             }
             log("FIDELITY stroke=$name differing=$d/${px.size} max=$m")
-            if (d > 0) {
-                val i0 = px.indices.first { px[it] != l.second[it] }
-                log("FIDELITY first diff at ${i0 % fin.width},${i0 / fin.width}: final=#%08X live=#%08X tool=%s strokes=%d".format(px[i0], l.second[i0], vm().state.value.tool?.javaClass?.simpleName, (vm().state.value.tool as? ToolState.Draw)?.strokes?.size ?: -1))
-                Thread.sleep(3000)
-                val fin2 = vm().state.value.preview!!.asAndroidBitmap().copy(Bitmap.Config.ARGB_8888, false)
-                val px2 = IntArray(fin2.width * fin2.height).also { fin2.getPixels(it, 0, fin2.width, 0, 0, fin2.width, fin2.height) }
-                log("FIDELITY after 3 s more: differing=${px2.indices.count { px2[it] != l.second[it] }} final=#%08X".format(px2[i0]))
-            }
             diffPx += d; total += px.size; maxDiff = max(maxDiff, m)
         }
         shot("101_trazo_final")

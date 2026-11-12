@@ -273,6 +273,7 @@ class Mac12Test {
         var saved: Boolean? = null
         ui { vm().saveProject { saved = it } }; rule.waitUntil(20_000) { saved != null }
         // delete it: the warning names the project; bundled fonts cannot be deleted (no long press)
+        ui { vm().selectObject(null) }; rule.waitForIdle(); Thread.sleep(500)
         tap(s(R.string.menu_sticker)); tap(s(R.string.title_sticker)); waitFor(s(R.string.enter_text_here))
         rule.onAllNodes(hasSetTextAction()).onFirst().performTextInput("x")
         ui { ctx.getSystemService(android.view.inputmethod.InputMethodManager::class.java).hideSoftInputFromWindow(ctx.window.decorView.windowToken, 0) }

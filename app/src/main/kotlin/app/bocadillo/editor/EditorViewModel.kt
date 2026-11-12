@@ -341,7 +341,13 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
 
     // ------------------------------------------------------------------ rendering
 
-    private fun requestRender() { renderTrigger.value = renderTrigger.value + 1 }
+    private fun requestRender() {
+        renderTrigger.value = renderTrigger.value + 1
+        if (traceRenders) synchronized(renderTrace) { renderTrace += Throwable().stackTrace.drop(1).take(3).joinToString(" < ") { it.methodName } }
+    }
+    /** Test hook: who asked for renders (only while [traceRenders]). */
+    @Volatile var traceRenders = false
+    val renderTrace = ArrayList<String>()
 
     private fun previewOps(): List<OpInstance> {
         val base = doc.ops
