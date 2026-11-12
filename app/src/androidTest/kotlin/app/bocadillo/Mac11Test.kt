@@ -29,6 +29,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.bocadillo.core.imaging.objects.Cutout
 import app.bocadillo.core.imaging.preview.SampleScene
+import app.bocadillo.core.model.ProjectBundle
 import app.bocadillo.core.model.StickerObject
 import app.bocadillo.core.model.TextObject
 import app.bocadillo.data.FontOption
@@ -511,7 +512,7 @@ class Mac11Test {
         val id = newProject("Miniatura", 1200, 900)
         dismissRecovery()
         // the most recent project is shown: make this one the most recent
-        runBlocking { val b = app.projects.load(id); app.projects.save(app.bocadillo.core.model.ProjectBundle(b.document.copy(modifiedAt = System.currentTimeMillis()), b.sourceBytes, b.masks, b.thumbnailJpeg, b.assets)) }
+        runBlocking { val b = app.projects.load(id); app.projects.save(ProjectBundle(b.document.copy(modifiedAt = System.currentTimeMillis()), b.sourceBytes, b.masks, b.thumbnailJpeg, b.assets)) }
         ui { ctx.recreate() }; Thread.sleep(2500)
         dismissRecovery()
         rule.waitUntil(10_000) { hasDesc("Miniatura") }
