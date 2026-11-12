@@ -13,7 +13,7 @@
 - **El documento recibido está incompleto.** El archivo del prompt termina a mitad de la sección 13.4 («La importación no debe convertir automáticament…»). **Las decisiones 11 y 12 y el resto de la sección 13 no llegaron**, así que no están implementadas. Se implementaron las decisiones 1 a 10 y lo recibido de la sección 13.
 - **Pixel 10 Pro / Android 17: NO PROBADO.** No hay un dispositivo físico en este entorno. Todo lo que dice «probado» se refiere a un **emulador** Android 14 (API 34, perfil Pixel 6, 1080 × 2400) en GitHub Actions, con la APK de depuración. La aprobación final corresponde al propietario en su teléfono.
 - **Pruebas en la JVM** (núcleo de imagen y color): **104 de 104** en este entorno (99 anteriores + 5 nuevas de color).
-- **Ejecución completa en el emulador:** ver la sección 14 (resultado del commit final).
+- **Ejecución completa en el emulador:** commit `e53fc24` (el mismo código de la APK entregada): **28 de 28 ejecuciones aprobadas**, 0 bloqueos (`crash.txt` vacío). Detalle en la sección 14.
 
 ## 1. Decisión 1 — Silueta: el borrado y la restauración se ven bajo el dedo
 
@@ -130,7 +130,19 @@ Nota de medida: «búsqueda mostrada en 1,6–1,7 s» en el registro es el tiemp
 - **Pixel 10 Pro / Android 17:** no probado.
 - Tiempos y fluidez en el teléfono: no medidos (el emulador no es representativo).
 - La lupa del cuentagotas y el gesto de dos dedos se probaron con gestos sintéticos del emulador, no con un dedo real.
+- La observación abierta del trazo en vivo (sección 14).
 
-## 14. Ejecución completa en el emulador
+## 14. Ejecución completa en el emulador (commit `e53fc24`)
 
-(ver abajo)
+28 ejecuciones, **28 aprobadas**, 0 bloqueos de la app:
+
+- **Actualización 1.1.0 → 1.2.0:** se instaló la 1.1.0 (versionCode 14), se crearon datos con ella (proyecto, biblioteca de stickers, fuentes importadas, preferencias), se instaló la 1.2.0 (versionCode 15) encima con la misma firma y `dataSurvivedUpgrade` comprobó que todo sigue.
+- **1.2.0:** `cutOutVisibleWhileFingerMoves`, `newBlankImageFormatsAndLimits`, `colorPickerHexFavouritesRecentsEyedropper`, `fontsCompactHeaderFavouritesRecentsImportDelete`, `backHierarchyAndFilePickerCancel`, `stickerCategoryIllustrations`, `homeThumbnailFitsHorizontalBox`.
+- **Regresión 1.1:** trazo en vivo y fidelidad, toque en el asa (tamaño ↔ perspectiva), Silueta bajo el dedo, finalizar/guardar/Back, catálogo de fuentes.
+- **Regresión 1.0 y anteriores:** pantalla de inicio con letra 1,0 / 1,3 / 2,0 y en horizontal, importación de fuentes, trazo en vivo = trazo aplicado, Insertar imagen (recortar, colocar, silueta), pantallas de referencia, biblioteca de stickers, imagen grande, título y Pintar, perspectiva/guardar/reabrir/exportar, formas SVG.
+
+**Trazo en vivo (regresión de la corrección 1 de la 1.1), APK de depuración en el emulador:** fidelidad final **0 píxeles distintos de 15 728 640** en 5 trazos; tiempo de cálculo por actualización: mediana 14,8 ms, p95 72,2 ms (todas), similar a la 1.1. **Silueta:** mediana 7,1 ms, p95 67,4 ms.
+
+**Observación abierta (trazo en vivo).** En el primer trazo de la prueba, la comparación hecha *inmediatamente* después de retirar los mosaicos dio en algunas ejecuciones 22 463 píxeles distintos; 0,25–1,5 s después, sin ningún render nuevo, la imagen era idéntica a la del dedo apoyado (0 distintos). En la ejecución anterior (`43196106325`) fue 0 desde el principio. Es una comparación de búferes de datos, no de la pantalla; no se identificó la causa ni se vio un efecto en pantalla. La prueba ahora espera a que la imagen quede estable y registra ambas cifras.
+
+**Archivos de la ejecución:** capturas PNG y vídeos MP4 en la rama `screens-output`; registros `mac11_log.txt`, `mac12_log.txt`, `results.txt`.
