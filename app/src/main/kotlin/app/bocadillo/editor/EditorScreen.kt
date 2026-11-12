@@ -71,6 +71,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -370,6 +372,7 @@ private fun EditorScreenBody(projectId: String, onBack: () -> Unit) {
         )
     }
     val fontReport by vm.fontReport.collectAsStateWithLifecycle()
+    val fontImport by vm.fontImport.collectAsStateWithLifecycle()
     fontReport?.let { r -> FontImportReportDialog(r, vm::dismissFontReport) }
     if (composerDate) DateTimeDialog(state.photoDate, onDismiss = { composerDate = false }) { s ->
         composerDate = false
@@ -474,8 +477,12 @@ private fun EditorScreenBody(projectId: String, onBack: () -> Unit) {
             val newTool = state.tool
             if (newTool is ToolState.EditBalloon) {
                 when {
-                    fontPage -> MoreFontsScreen(fonts, newTool.draft.style.font, typeface, onPick = { ref -> vm.updateDraft(newTool.draft.copy(style = newTool.draft.style.copy(font = ref))) },
-                        onImport = { fontPicker.launch(FONT_MIME_TYPES) }, onDelete = vm::deleteFont, cached = app.fonts::cachedTypeface)
+                    fontPage -> MoreFontsScreen(fonts, newTool.draft.style.font, typeface,
+                        // 1.2.0, decision 8: a tap applies the font and goes back to the text at once
+                        onPick = { ref -> vm.updateDraft(newTool.draft.copy(style = newTool.draft.style.copy(font = ref))); app.settings.addFontRecent(ref); fontPage = false },
+                        onImport = { fontPicker.launch(FONT_MIME_TYPES) }, onDelete = vm::deleteFont, cached = app.fonts::cachedTypeface,
+                        favorites = app.settings.fontFavorites, recents = app.settings.fontRecents, onToggleFavorite = app.settings::toggleFontFavorite,
+                        importing = fontImport, usage = vm::projectsUsingFont)
                     styleDetails -> BalloonStyleScreen(newTool.draft, objRenderer, fonts, typeface, vm::updateDraft, onFonts = { fontPage = true })
                     else -> NewBalloonScreen(newTool.draft, objRenderer, vm::updateDraft, onStylePreview = { styleDetails = true }, onPhrases = { composerPhrases = true })
                 }
@@ -483,8 +490,12 @@ private fun EditorScreenBody(projectId: String, onBack: () -> Unit) {
             }
             if (newTool is ToolState.EditText) {
                 when {
-                    fontPage -> MoreFontsScreen(fonts, newTool.draft.style.font, typeface, onPick = { ref -> vm.updateDraft(newTool.draft.copy(style = newTool.draft.style.copy(font = ref))) },
-                        onImport = { fontPicker.launch(FONT_MIME_TYPES) }, onDelete = vm::deleteFont, cached = app.fonts::cachedTypeface)
+                    fontPage -> MoreFontsScreen(fonts, newTool.draft.style.font, typeface,
+                        // 1.2.0, decision 8: a tap applies the font and goes back to the text at once
+                        onPick = { ref -> vm.updateDraft(newTool.draft.copy(style = newTool.draft.style.copy(font = ref))); app.settings.addFontRecent(ref); fontPage = false },
+                        onImport = { fontPicker.launch(FONT_MIME_TYPES) }, onDelete = vm::deleteFont, cached = app.fonts::cachedTypeface,
+                        favorites = app.settings.fontFavorites, recents = app.settings.fontRecents, onToggleFavorite = app.settings::toggleFontFavorite,
+                        importing = fontImport, usage = vm::projectsUsingFont)
                     styleDetails -> TitleStyleScreen(newTool.draft, objRenderer, fonts, typeface, vm::updateDraft, onFonts = { fontPage = true }, onDateTime = { composerDate = true })
                     else -> Box(Modifier.fillMaxSize()) {
                         NewTitleScreen(newTool.draft, objRenderer, vm::updateDraft, onStylePreview = { titlePanel = true }, onPhrases = { composerPhrases = true })
@@ -776,7 +787,12 @@ private fun FontImportReportDialog(r: app.bocadillo.data.FontRepository.ImportRe
         title = { Text(stringResource(R.string.fonts_report_title)) },
         text = {
             androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                item { Text(stringResource(R.string.fonts_report_summary, r.added.size, r.duplicates.size, r.errors.size)) }
+                item { Text(stringResource(R.string.fonts_report_summary4, r.added.size, r.duplicates.size, r.invalid.size, r.errors.size), modifier = Modifier.semantics { contentDescription = "fonts_report_summary" }) }
+                if (r.added.isNotEmpty()) items(r.added.size) { i -> Text("✓ ${r.added[i]}", fontSize = 13.sp) }
+                if (r.invalid.isNotEmpty()) {
+                    item { Text(stringResource(R.string.fonts_report_invalid), modifier = Modifier.padding(top = 10.dp), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) }
+                    items(r.invalid.size) { i -> Text("• ${r.invalid[i].first}: ${r.invalid[i].second}", fontSize = 13.sp) }
+                }
                 if (r.errors.isNotEmpty()) {
                     item { Text(stringResource(R.string.fonts_report_errors), modifier = Modifier.padding(top = 10.dp), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) }
                     items(r.errors.size) { i -> Text("• ${r.errors[i].first}: ${r.errors[i].second}", fontSize = 13.sp) }

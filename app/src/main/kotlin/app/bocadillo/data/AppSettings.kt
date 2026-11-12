@@ -53,6 +53,25 @@ class AppSettings(context: Context) {
         putInts("favorite_colors", favoriteColors)
     }
 
+    // ---- fonts (1.2.0, decision 9): favourites and recently used, kept across sessions
+    private fun strs(key: String) = (prefs.getString(key, "") ?: "").split('\n').filter { it.isNotBlank() }
+    var fontFavorites by mutableStateOf(strs("font_favorites")); private set
+    var fontRecents by mutableStateOf(strs("font_recents")); private set
+    fun toggleFontFavorite(ref: String) {
+        fontFavorites = if (ref in fontFavorites) fontFavorites - ref else fontFavorites + ref
+        prefs.edit().putString("font_favorites", fontFavorites.joinToString("\n")).apply()
+    }
+    fun addFontRecent(ref: String) {
+        if (fontRecents.firstOrNull() == ref) return
+        fontRecents = (listOf(ref) + fontRecents.filter { it != ref }).take(10)
+        prefs.edit().putString("font_recents", fontRecents.joinToString("\n")).apply()
+    }
+    /** A deleted imported font leaves the favourites and recents. */
+    fun forgetFont(ref: String) {
+        if (ref in fontFavorites) toggleFontFavorite(ref)
+        if (ref in fontRecents) { fontRecents = fontRecents - ref; prefs.edit().putString("font_recents", fontRecents.joinToString("\n")).apply() }
+    }
+
     init { current = this }
 
     companion object {

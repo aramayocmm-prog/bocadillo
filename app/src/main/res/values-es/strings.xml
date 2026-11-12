@@ -538,7 +538,7 @@ Nota: algunas fuentes pueden ser demasiado grandes o complejas para Android; se 
     <string name="fonts_delete_q">¿Quitar «%1$s» de este dispositivo? Los proyectos que la usan conservan su propia copia.</string>
     <string name="fonts_report_title">Fuentes importadas</string>
     <string name="fonts_report_summary">Añadidas: %1$d · Ya estaban: %2$d · No utilizables: %3$d</string>
-    <string name="fonts_report_errors">No utilizables</string>
+    <string name="fonts_report_errors">Errores</string>
     <string name="fonts_report_dups">Ya estaban en la biblioteca (no se copian otra vez)</string>
     <string name="alignment">Alineación</string>
     <string name="fonts_missing">Este proyecto usa fuentes que no están disponibles: %1$s. Se muestran con la fuente predeterminada hasta que las importes.</string>
@@ -607,4 +607,19 @@ Nota: algunas fuentes pueden ser demasiado grandes o complejas para Android; se 
     <string name="blank_error_small">Cada lado debe tener al menos %1$d px.</string>
     <string name="blank_error_large">Cada lado puede tener como máximo %1$d px.</string>
     <string name="blank_error_memory">Demasiado grande para la memoria de este dispositivo (máximo %1$s millones de píxeles).</string>
+    <!-- 1.2.0 fuentes -->
+    <string name="fonts_import_button">Importar fuentes</string>
+    <string name="fonts_import_short">Importa fuentes TTF, OTF o ZIP desde tu dispositivo</string>
+    <string name="fonts_help_title">Ayuda: importar fuentes</string>
+    <string name="fonts_help_text">Archivos: elige uno o varios archivos .ttf u .otf de este dispositivo, de una memoria USB o de una unidad en la nube (Drive, OneDrive…).\n\nZIP: un .zip instala de una vez todas las fuentes válidas que contiene; puede tener carpetas dentro. Los archivos que no son fuentes se ignoran.\n\nComprobaciones: cada fuente se valida. Las que ya tienes (o que trae la aplicación) se omiten como duplicadas; los archivos dañados o no compatibles no se instalan. Al terminar verás un resumen de instaladas, omitidas, no válidas y errores.\n\nLímites: hasta 25 MB por fuente y 400 MB por ZIP descomprimido; la importación se detiene si queda poco almacenamiento.\n\nGestión: toca una fuente para usarla; toca la estrella para guardarla en Favoritos; mantén pulsada una fuente que importaste para borrarla de este dispositivo (los proyectos que la usan conservan su propia copia). Las fuentes que trae la aplicación no se pueden borrar.\n\nLicencias: importa solo fuentes que tengas permiso para usar.</string>
+    <string name="fonts_importing">Importando fuentes… %1$d de %2$d</string>
+    <string name="fonts_favorites">Favoritas</string>
+    <string name="fonts_recent">Usadas recientemente</string>
+    <string name="fonts_all">Todas las fuentes (A–Z)</string>
+    <string name="fonts_imported_tag">importada</string>
+    <string name="fonts_favorite_toggle">Favorita: %1$s</string>
+    <string name="fonts_none_found">Ninguna fuente con ese nombre.</string>
+    <string name="fonts_delete_used">Se usa en %1$d proyecto(s): %2$s. Conservan su propia copia y la siguen mostrando.</string>
+    <string name="fonts_report_summary4">Instaladas: %1$d · Duplicadas omitidas: %2$d · No válidas: %3$d · Errores: %4$d</string>
+    <string name="fonts_report_invalid">No válidas (no son fuentes o están dañadas)</string>
 </resources>

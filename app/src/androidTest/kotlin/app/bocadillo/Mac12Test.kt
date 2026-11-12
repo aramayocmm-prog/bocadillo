@@ -9,6 +9,8 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -105,12 +107,12 @@ class Mac12Test {
     }
 
     /** Left half red, right half blue: the eyedropper must take the side under the loupe at any zoom. */
-    private fun halves(): String {
+    private fun halves(title: String = "Mitades"): String {
         dismissRecovery()
         val b = Bitmap.createBitmap(1000, 800, Bitmap.Config.ARGB_8888)
         Canvas(b).apply { drawColor(Color.RED); drawRect(500f, 0f, 1000f, 800f, Paint().apply { color = Color.BLUE }) }
         val png = ByteArrayOutputStream().also { b.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
-        val doc = runBlocking { app.projects.create(ImageIo.Imported(png, "image/png", "Mitades"), 1000, 800, false, "Mitades", ImageIo.thumbnail(b.copy(Bitmap.Config.ARGB_8888, false))) }
+        val doc = runBlocking { app.projects.create(ImageIo.Imported(png, "image/png", title), 1000, 800, false, title, ImageIo.thumbnail(b.copy(Bitmap.Config.ARGB_8888, false))) }
         app.projects.clearDraft(doc.id)
         return doc.id
     }
@@ -174,4 +176,116 @@ class Mac12Test {
         assertEquals(0xFF0000FF.toInt(), param())
         ui { vm().cancelTool() }
     }
+
+    private fun assetBytes(path: String) = ctx.assets.open(path).use { it.readBytes() }
+    private fun fontsZip(): File {
+        val f = File(ctx.cacheDir, "fuentes12.zip")
+        java.util.zip.ZipOutputStream(f.outputStream()).use { z ->
+            fun put(n: String, b: ByteArray) { z.putNextEntry(java.util.zip.ZipEntry(n)); z.write(b); z.closeEntry() }
+            // two valid fonts (unique bytes: 16 bytes appended), in a folder
+            put("Fuentes/Lora12.ttf", assetBytes("fonts/Lora-Variable.ttf") + ByteArray(16) { 7 })
+            put("Fuentes/Bebas12.ttf", assetBytes("fonts/BebasNeue-Regular.ttf") + ByteArray(16) { 9 })
+            put("Fuentes/Comfortaa-Bold.ttf", assetBytes("fonts/Comfortaa-Bold.ttf"))      // duplicate of a font inside the app
+            put("Fuentes/broken.ttf", ByteArray(500) { 1 })                                // not a font
+            put("../evil.ttf", assetBytes("fonts/Poppins-Bold.ttf") + ByteArray(16) { 3 })  // unsafe path
+            put("huge.ttf", ByteArray(26 * 1024 * 1024))                                   // larger than 25 MB unpacked
+            put("leeme.txt", "hola".toByteArray())                                         // ignored
+        }
+        return f
+    }
+
+    private fun openTitleFonts(project: String) {
+        dismissRecovery()
+        if (!has(project)) { desc(s(R.string.home_more)); tap(s(R.string.more_recent_projects)) }
+        tap(project); waitFor(s(R.string.menu_adjust)); Thread.sleep(2500)
+        tap(s(R.string.menu_sticker)); tap(s(R.string.title_sticker)); waitFor(s(R.string.enter_text_here))
+        rule.onAllNodes(hasSetTextAction()).onFirst().performTextInput("Fuentes 1.2")
+        ui { ctx.getSystemService(android.view.inputmethod.InputMethodManager::class.java).hideSoftInputFromWindow(ctx.window.decorView.windowToken, 0) }
+        Thread.sleep(800)
+        desc(s(R.string.title_preview_hint)); waitFor(s(R.string.alignment))
+        tap(s(R.string.tab_font)); waitFor(s(R.string.fonts_import_button))
+    }
+    private fun draftFont() = (vm().state.value.tool as ToolState.EditText).draft.style.font
+    private fun top(text: String) = rule.onAllNodesWithText(text, useUnmergedTree = true).fetchSemanticsNodes().first().boundsInRoot.top
+
+    @Test fun fontsCompactHeaderFavouritesRecentsImportDelete() {
+        halves("Fuentes12")
+        openTitleFonts("Fuentes12")
+        shot("220_mas_fuentes")
+        // decision 7: import button, then the short line, then the search, then the list
+        val tb = top(s(R.string.fonts_import_button)); val tl = top(s(R.string.fonts_import_short))
+        val ts = rule.onAllNodesWithContentDescription("fonts_search", useUnmergedTree = true).fetchSemanticsNodes().first().boundsInRoot.top
+        log("FONTS12 header: button=$tb line=$tl search=$ts")
+        assertTrue("button above the line above the search", tb < tl && tl < ts)
+        desc(s(R.string.fonts_help_title)); waitFor(s(R.string.fonts_help_title)); shot("221_ayuda_fuentes")
+        assertTrue(has("ZIP")); tap(s(R.string.ok))
+        // decision 9: favourite with the star; the Favourites section appears and is kept
+        desc(s(R.string.fonts_favorite_toggle).format("Bebas Neue"))
+        assertTrue("bundled:BebasNeue-Regular.ttf" in app.settings.fontFavorites)
+        assertTrue(has(s(R.string.fonts_favorites)))
+        val stored = ctx.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE).getString("font_favorites", "") ?: ""
+        assertTrue("favourite stored", "bundled:BebasNeue-Regular.ttf" in stored)
+        // search: timing of a keystroke filter, then pick → applied and back to the text (decision 8)
+        val t0 = System.nanoTime()
+        rule.onAllNodesWithContentDescription("fonts_search", useUnmergedTree = true).onFirst().performTextReplacement("comf")
+        rule.waitForIdle()
+        log("FONTS12 search 'comf' shown in ${(System.nanoTime() - t0) / 1_000_000} ms (fonts=${app.fonts.all().size})")
+        shot("222_busqueda")
+        assertTrue(has("Comfortaa Bold")); assertFalse(has("Poppins"))
+        tap("Comfortaa Bold")
+        waitFor(s(R.string.alignment), 5_000)
+        assertEquals("bundled:Comfortaa-Bold.ttf", draftFont())
+        assertEquals("bundled:Comfortaa-Bold.ttf", app.settings.fontRecents.first())
+        // recents: listed, no duplicates after picking again
+        tap(s(R.string.tab_font)); waitFor(s(R.string.fonts_recent))
+        assertTrue(hasDesc("rec Comfortaa Bold"))
+        desc("rec Comfortaa Bold"); waitFor(s(R.string.alignment), 5_000)
+        assertEquals(1, app.settings.fontRecents.count { it == "bundled:Comfortaa-Bold.ttf" })
+        // decision 10: ZIP import with progress and summary
+        tap(s(R.string.tab_font)); waitFor(s(R.string.fonts_import_button))
+        val before = app.fonts.importedFonts().size
+        var sawProgress = false
+        ui { vm().importFonts(listOf(android.net.Uri.fromFile(fontsZip()))) { } }
+        val tImp = System.nanoTime()
+        rule.waitUntil(60_000) { if (vm().fontImport.value != null) sawProgress = true; hasDesc("fonts_report_summary") }
+        log("FONTS12 ZIP import ${(System.nanoTime() - tImp) / 1_000_000} ms, progress seen=$sawProgress")
+        shot("223_resumen_importacion")
+        val r = vm().fontReport.value!!
+        log("FONTS12 report added=${r.added} dups=${r.duplicates} invalid=${r.invalid} errors=${r.errors}")
+        assertEquals(2, r.added.size); assertEquals(1, r.duplicates.size); assertEquals(1, r.invalid.size)
+        assertTrue("unsafe path refused", r.errors.any { it.second == "unsafe path" })
+        assertTrue("oversize refused", r.errors.any { it.second.contains("25 MB") })
+        assertEquals(before + 2, app.fonts.importedFonts().size)
+        tap(s(R.string.ok)); Thread.sleep(400)
+        // use an imported font in the title, save the project
+        val imported = app.fonts.importedFonts().first { it.displayName.contains("Bebas", true) }
+        rule.onAllNodesWithContentDescription("fonts_search", useUnmergedTree = true).onFirst().performTextReplacement(imported.displayName)
+        rule.waitForIdle(); desc("all ${imported.displayName}"); waitFor(s(R.string.alignment), 5_000)
+        assertEquals(imported.ref, draftFont())
+        ui { ctx.onBackPressedDispatcher.onBackPressed() }; rule.waitForIdle(); Thread.sleep(500)
+        desc(s(R.string.apply)); Thread.sleep(1000)
+        var saved: Boolean? = null
+        ui { vm().saveProject { saved = it } }; rule.waitUntil(20_000) { saved != null }
+        // delete it: the warning names the project; bundled fonts cannot be deleted (no long press)
+        tap(s(R.string.menu_sticker)); tap(s(R.string.title_sticker)); waitFor(s(R.string.enter_text_here))
+        rule.onAllNodes(hasSetTextAction()).onFirst().performTextInput("x")
+        ui { ctx.getSystemService(android.view.inputmethod.InputMethodManager::class.java).hideSoftInputFromWindow(ctx.window.decorView.windowToken, 0) }
+        Thread.sleep(800)
+        desc(s(R.string.title_preview_hint)); waitFor(s(R.string.alignment))
+        tap(s(R.string.tab_font)); waitFor(s(R.string.fonts_import_button))
+        rule.onAllNodesWithContentDescription("fonts_search", useUnmergedTree = true).onFirst().performTextReplacement(imported.displayName)
+        rule.waitForIdle()
+        rule.onAllNodesWithContentDescription("all ${imported.displayName}", useUnmergedTree = true).onFirst().performTouchInput { longClick() }
+        rule.waitUntil(10_000) { hasDesc("fonts_delete_used") }
+        shot("224_borrar_fuente_en_uso")
+        assertTrue(has("Fuentes12"))
+        tap(s(R.string.action_delete)); Thread.sleep(600)
+        assertFalse(app.fonts.importedFonts().any { it.ref == imported.ref })
+        assertFalse(imported.ref in app.settings.fontRecents)
+        // the project still has its own copy of the font
+        val doc = runBlocking { app.projects.load(projectIdOf("Fuentes12")) }
+        assertTrue("project keeps the font", doc.assets.keys.any { imported.ref.removePrefix("asset:") == it })
+        ui { vm().cancelTool() }
+    }
+    private fun projectIdOf(title: String) = app.projects.index.value.entries.first { it.title == title }.id
 }

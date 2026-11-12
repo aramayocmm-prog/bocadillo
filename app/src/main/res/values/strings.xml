@@ -538,7 +538,7 @@ Note: some fonts may be too large or too complex for Android; those are listed w
     <string name="fonts_delete_q">Remove “%1$s” from this device? Projects that use it keep their own copy.</string>
     <string name="fonts_report_title">Fonts imported</string>
     <string name="fonts_report_summary">Added: %1$d · Already present: %2$d · Not usable: %3$d</string>
-    <string name="fonts_report_errors">Not usable</string>
+    <string name="fonts_report_errors">Errors</string>
     <string name="fonts_report_dups">Already in the library (not copied again)</string>
     <string name="alignment">Alignment</string>
     <string name="fonts_missing">This project uses fonts that are not available: %1$s. They are shown with the default font until you import them.</string>
@@ -607,4 +607,19 @@ Note: some fonts may be too large or too complex for Android; those are listed w
     <string name="blank_error_small">Each side must be at least %1$d px.</string>
     <string name="blank_error_large">Each side can be at most %1$d px.</string>
     <string name="blank_error_memory">Too big for the memory of this device (at most %1$s million pixels).</string>
+    <!-- 1.2.0 fonts -->
+    <string name="fonts_import_button">Import fonts</string>
+    <string name="fonts_import_short">Import TTF, OTF or ZIP fonts from your device</string>
+    <string name="fonts_help_title">Help: importing fonts</string>
+    <string name="fonts_help_text">Files: choose one or more .ttf or .otf files from this device, a USB drive or a cloud drive (Drive, OneDrive…).\n\nZIP: a .zip installs every valid font it contains at once; folders inside the ZIP are fine. Files that are not fonts are ignored.\n\nChecks: each font is validated. Fonts you already have (or that come with the app) are skipped as duplicates; damaged or unsupported files are not installed. A summary shows what was installed, skipped, invalid or failed.\n\nLimits: up to 25 MB per font and 400 MB per unpacked ZIP; the import stops if the storage runs low.\n\nManaging: tap a font to use it; tap the star to keep it in Favourites; touch and hold a font you imported to delete it from this device (projects that use it keep their own copy). Fonts that come with the app cannot be deleted.\n\nLicences: import only fonts you are allowed to use.</string>
+    <string name="fonts_importing">Importing fonts… %1$d of %2$d</string>
+    <string name="fonts_favorites">Favourites</string>
+    <string name="fonts_recent">Recently used</string>
+    <string name="fonts_all">All fonts (A–Z)</string>
+    <string name="fonts_imported_tag">imported</string>
+    <string name="fonts_favorite_toggle">Favourite: %1$s</string>
+    <string name="fonts_none_found">No font with that name.</string>
+    <string name="fonts_delete_used">Used in %1$d project(s): %2$s. They keep their own copy and still show it.</string>
+    <string name="fonts_report_summary4">Installed: %1$d · Duplicates skipped: %2$d · Invalid: %3$d · Errors: %4$d</string>
+    <string name="fonts_report_invalid">Invalid (not a font or damaged)</string>
 </resources>

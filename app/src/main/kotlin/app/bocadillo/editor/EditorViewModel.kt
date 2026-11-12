@@ -1141,24 +1141,36 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
     fun dismissFontReport() { _fontReport.value = null }
 
     /** Imports .ttf / .otf files and .zip archives; shows a report; applies the first font. */
+    private val _fontImport = MutableStateFlow<Pair<Int, Int>?>(null)
+    /** Font import in progress (done, total) — shown without blocking the screen (1.2.0, decision 10). */
+    val fontImport: StateFlow<Pair<Int, Int>?> = _fontImport
+
     fun importFonts(uris: List<Uri>, onDone: (String) -> Unit) {
+        if (_fontImport.value != null) return
+        _fontImport.value = 0 to uris.size
         viewModelScope.launch {
             try {
                 val report = withContext(Dispatchers.IO) {
-                    val items = uris.map { u -> ImageIo.read(app.contentResolver, u).let { it.displayName to it.bytes } }
-                    app.fonts.importAll(items)
+                    // each file is streamed when its turn comes (a big ZIP is never read twice)
+                    val sources = uris.map { u -> FontRepository.Source(ImageIo.displayName(app.contentResolver, u)) { app.contentResolver.openInputStream(u) ?: throw java.io.IOException("cannot open") } }
+                    app.fonts.importSources(sources) { d, t -> _fontImport.value = d to maxOf(t, d) }
                 }
                 report.firstRef?.let { ref -> app.fonts.libraryBytes(ref)?.let { assets[ref.removePrefix("asset:")] = it } }
                 bumpAssets()
                 _fontReport.value = report
-                report.firstRef?.let(onDone)
+                report.firstRef?.takeIf { report.added.isNotEmpty() }?.let(onDone)
             } catch (e: Exception) {
                 _messages.send(UiMessage.Res(R.string.font_import_failed))
+            } finally {
+                _fontImport.value = null
             }
         }
     }
 
-    fun deleteFont(ref: String) { app.fonts.delete(ref); bumpAssets() }
+    fun deleteFont(ref: String) { app.fonts.delete(ref); app.settings.forgetFont(ref); bumpAssets() }
+
+    /** Titles of the saved projects whose texts use font [ref] (reads only each project's document). */
+    suspend fun projectsUsingFont(ref: String): List<String> = withContext(Dispatchers.IO) { app.projects.projectsUsingFont(ref) }
 
     fun importFont(uri: Uri, onDone: (String) -> Unit) {
         viewModelScope.launch {

@@ -4,3 +4,5 @@ nueva_imagen app.bocadillo.Mac12Test#newBlankImageFormatsAndLimits
 selector_color app.bocadillo.Mac12Test#colorPickerHexFavouritesRecentsEyedropper
 miniatura app.bocadillo.Mac11Test#homeThumbnailFitsHorizontalBox
 pintar app.bocadillo.MacFlowsTest#homeTitleAndPaint
+fuentes app.bocadillo.Mac12Test#fontsCompactHeaderFavouritesRecentsImportDelete
+catalogo_fuentes app.bocadillo.Mac11Test#fontCatalogueSearchPickPersist

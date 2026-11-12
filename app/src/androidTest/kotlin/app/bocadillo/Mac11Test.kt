@@ -591,20 +591,22 @@ class Mac11Test {
         Thread.sleep(800)
         desc(s(R.string.title_preview_hint)); waitFor(s(R.string.alignment))
         val t0 = System.nanoTime()
-        tap(s(R.string.tab_font)); waitFor(s(R.string.fonts_custom_files))
-        log("FONTS open list ${(System.nanoTime() - t0) / 1_000_000} ms, fonts=${app.fonts.all().size} library=${app.fonts.libraryFonts.size}")
+        tap(s(R.string.tab_font)); waitFor(s(R.string.fonts_import_button))
+        log("FONTS open list ${(System.nanoTime() - t0) / 1_000_000} ms, fonts=${app.fonts.all().size}")
         shot("140_fuentes_lista")
         // scroll to the end (System Fonts) and back: time it
         val t1 = System.nanoTime()
-        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText(s(R.string.fonts_system_header), substring = true))
-        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText(s(R.string.fonts_custom_files)))
+        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText("Typewriter"))
+        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText(s(R.string.fonts_import_button)))
         log("FONTS scroll whole list ${(System.nanoTime() - t1) / 1_000_000} ms")
         // search, open the Creato Display family? (bundled fonts are single rows) — pick Creato Display Black
         rule.onAllNodesWithContentDescription("fonts_search", useUnmergedTree = true).onFirst().performTextInput("creato")
         Thread.sleep(600); shot("141_fuentes_busqueda")
         assertTrue(has("Creato Display Black")); assertTrue("search filters", !has("Comfortaa"))
         tap("Creato Display Black")
-        backKey(); Thread.sleep(500); shot("142_titulo_con_fuente")
+        // 1.2.0, decision 8: the tap applies the font and returns to the text by itself
+        waitFor(s(R.string.alignment), 5_000); Thread.sleep(500); shot("142_titulo_con_fuente")
+        assertTrue("back at the text style", !has(s(R.string.fonts_import_button)))
         backKey()
         desc(s(R.string.apply)); Thread.sleep(1000)
         TestNav.leaveEditor(rule, ::s)
@@ -613,33 +615,6 @@ class Mac11Test {
         assertEquals("bundled:CreatoDisplay-Black.otf", t.style.font)
         openProject("Catalogo"); shot("143_fuente_reabierta", 2500)
         assertTrue("no missing-font warning", !has("not available") && !has("no están disponibles"))
-    }
-
-    /** Only on the personal test APK (fonts added by tools/personal_fonts/make_personal_apk.py). */
-    @Test fun personalLibraryFonts() {
-        val lib = app.fonts.libraryFonts
-        log("LIBRARY ${lib.map { it.displayName + " ← " + it.ref }}")
-        assertTrue("personal library present", lib.isNotEmpty())
-        for (f in lib) {
-            val tf = app.fonts.typeface(f.ref, false, false, emptyMap())
-            assertTrue("${f.ref} loads (not the default font)", tf !== android.graphics.Typeface.DEFAULT)
-            assertEquals(FontOption.Kind.LIBRARY, f.kind)
-        }
-        val id = newProject("Biblioteca"); openProject("Biblioteca")
-        tap(s(R.string.menu_sticker)); tap(s(R.string.title_sticker)); waitFor(s(R.string.enter_text_here))
-        rule.onAllNodes(hasSetTextAction()).onFirst().performTextInput("Mi fuente")
-        rule.runOnUiThread { ctx.getSystemService(android.view.inputmethod.InputMethodManager::class.java).hideSoftInputFromWindow(ctx.window.decorView.windowToken, 0) }
-        Thread.sleep(800)
-        desc(s(R.string.title_preview_hint)); waitFor(s(R.string.alignment))
-        tap(s(R.string.tab_font)); waitFor(s(R.string.fonts_library), 10_000); shot("145_biblioteca_personal")
-        val pick = lib.first()
-        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText(pick.displayName))
-        tap(pick.displayName)
-        backKey(); backKey()
-        desc(s(R.string.apply)); Thread.sleep(1000)
-        TestNav.leaveEditor(rule, ::s)
-        val t = runBlocking { app.projects.load(id) }.document.objects.filterIsInstance<TextObject>().single()
-        assertEquals(pick.ref, t.style.font)
     }
 
     // ------------------------------------------------------------------ 6. home thumbnail

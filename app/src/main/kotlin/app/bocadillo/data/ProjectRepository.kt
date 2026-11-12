@@ -80,6 +80,27 @@ class ProjectRepository(context: Context) {
         }
     }
 
+    /**
+     * Titles of the saved projects whose texts use font [ref] (1.2.0, decision 10): only each
+     * project's document.json is read, never its pictures.
+     */
+    fun projectsUsingFont(ref: String): List<String> {
+        val needle = "\"" + ref.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+        return loadIndex().entries.mapNotNull { e ->
+            val used = runCatching {
+                java.util.zip.ZipInputStream(projectFile(e.id).inputStream().buffered()).use { z ->
+                    var hit = false
+                    while (true) {
+                        val en = z.nextEntry ?: break
+                        if (en.name == "document.json") { hit = z.readBytes().decodeToString().contains(needle); break }
+                    }
+                    hit
+                }
+            }.getOrDefault(false)
+            if (used) e.title else null
+        }
+    }
+
     suspend fun load(id: String): ProjectBundle = withContext(Dispatchers.IO) {
         projectFile(id).inputStream().buffered().use { ProjectArchive.read(it) }
     }

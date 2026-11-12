@@ -285,8 +285,8 @@ class Mac10FlowsTest {
         val r = app.fonts.importAll(listOf("fonts_test.zip" to zip.readBytes()))
         assertEquals(listOf("Comfortaa Bold", "Creato Display Black"), r.added)
         assertEquals(1, r.duplicates.size)
-        assertEquals(1, r.errors.size)
-        assertTrue(r.errors.single().first == "broken.ttf")
+        assertEquals(1, r.invalid.size + r.errors.size)
+        assertTrue((r.invalid + r.errors).single().first == "broken.ttf")
         // importing the same ZIP again adds nothing
         assertEquals(0, app.fonts.importAll(listOf("fonts_test.zip" to zip.readBytes())).added.size)
         // a font identical to one shipped in the APK is reported as a duplicate, not copied

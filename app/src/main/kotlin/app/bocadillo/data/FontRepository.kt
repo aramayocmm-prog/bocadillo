@@ -12,11 +12,11 @@ data class FontOption(
     val family: String = displayName, val style: String = "",
 ) {
     /**
-     * IMPORTED: installed by the user on this phone. LIBRARY (1.1.0): the owner's own fonts built
-     * into a personal APK (assets/fonts/personal, never in the published APK or the repository).
-     * BUNDLED: free-licence fonts in every APK. SYSTEM: Android's.
+     * IMPORTED: installed by the user on this phone. BUNDLED: fonts whose licence allows them to
+     * be inside the app. SYSTEM: Android's. (1.2.0: one app only; the 1.1 «personal library» of
+     * fonts built into a separate APK no longer exists — the user imports such fonts.)
      */
-    enum class Kind { SYSTEM, BUNDLED, IMPORTED, LIBRARY }
+    enum class Kind { SYSTEM, BUNDLED, IMPORTED }
 }
 
 /**
@@ -100,28 +100,9 @@ class FontRepository(private val context: Context) {
         entries().sortedWith(compareBy({ it.family.lowercase() }, { it.style.lowercase() }))
             .map { FontOption("asset:fonts/${it.file}", it.displayName, FontOption.Kind.IMPORTED, it.family, it.style) }
 
-    /**
-     * The owner's font library built into a personal APK (1.1.0): assets/fonts/personal/index.json
-     * lists file, family, style and SHA-1 of each font. Empty in the published APK.
-     */
-    val libraryFonts: List<FontOption> by lazy {
-        runCatching {
-            val arr = org.json.JSONArray(context.assets.open("fonts/personal/index.json").bufferedReader().use { it.readText() })
-            (0 until arr.length()).map { i ->
-                val o = arr.getJSONObject(i)
-                val fam = o.getString("family"); val st = o.optString("style", "")
-                FontOption("bundled:personal/" + o.getString("file"), if (st.isEmpty() || st.equals("Regular", true)) fam else "$fam $st", FontOption.Kind.LIBRARY, fam, st)
-            }.sortedWith(compareBy({ it.family.lowercase() }, { styleRank(it.style) }, { it.style.lowercase() }))
-        }.getOrDefault(emptyList())
-    }
-
     /** SHA-1 (12 hex) of the fonts already inside the APK: importing them again is reported as a duplicate. */
     private val shippedHashes: Set<String> by lazy {
         val out = HashSet<String>()
-        runCatching {
-            val arr = org.json.JSONArray(context.assets.open("fonts/personal/index.json").bufferedReader().use { it.readText() })
-            for (i in 0 until arr.length()) arr.getJSONObject(i).optString("sha1").takeIf { it.isNotEmpty() }?.let { out += it.take(12) }
-        }
         for (f in bundledFonts) runCatching { context.assets.open("fonts/" + f.ref.removePrefix("bundled:")).use { out += sha1(it.readBytes()) } }
         out
     }
@@ -133,61 +114,119 @@ class FontRepository(private val context: Context) {
         return w * 2 + if ("italic" in l || "oblique" in l) 1 else 0
     }
 
-    /** Result of importing font files or a ZIP. */
-    data class ImportReport(val added: List<String>, val duplicates: List<String>, val errors: List<Pair<String, String>>, val firstRef: String?)
+    /**
+     * Result of importing font files or ZIPs (1.2.0, decision 10): installed, duplicates skipped,
+     * invalid files (not a font, damaged, Android cannot load it) and other errors (unreadable
+     * ZIP, unsafe path, too big, not enough storage).
+     */
+    data class ImportReport(
+        val added: List<String>, val duplicates: List<String>, val invalid: List<Pair<String, String>>,
+        val errors: List<Pair<String, String>>, val firstRef: String?,
+    )
+
+    /** One file chosen by the user: name, size if known, and a way to open it (read once, streamed). */
+    class Source(val name: String, val open: () -> java.io.InputStream)
+
+    /** Limits that protect the phone from huge or hostile ZIP files. */
+    object Limits {
+        const val MAX_FONT_BYTES = 25L * 1024 * 1024
+        const val MAX_ZIP_TOTAL = 400L * 1024 * 1024
+        const val MAX_ZIP_ENTRIES = 5000
+        /** Storage kept free after an import. */
+        const val KEEP_FREE = 50L * 1024 * 1024
+    }
+
+    @Synchronized
+    fun importAll(items: List<Pair<String, ByteArray>>): ImportReport =
+        importSources(items.map { (n, b) -> Source(n) { b.inputStream() } }) { _, _ -> }
 
     /**
-     * Imports .ttf / .otf files and .zip archives of them. Each font is checked (sfnt header,
-     * name table, Android can load it); identical files (SHA-1) are reported as duplicates and
-     * not copied twice. Family and style come from the font's own name table.
+     * Imports .ttf / .otf files and .zip archives of them (all valid fonts of a ZIP). Each font is
+     * checked (sfnt header, size, Android can load it); identical files (SHA-1) are duplicates and
+     * not copied twice. ZIP entries are read with a size limit (no unbounded reads), paths with
+     * "..", absolute paths and too many entries are refused, and the import stops before the
+     * storage runs low. [progress] (done, total) is called for every font (any thread).
      */
     @Synchronized
-    fun importAll(items: List<Pair<String, ByteArray>>): ImportReport {
+    fun importSources(items: List<Source>, progress: (Int, Int) -> Unit): ImportReport {
         val list = entries().toMutableList()
-        val added = ArrayList<String>(); val dups = ArrayList<String>(); val errors = ArrayList<Pair<String, String>>()
+        val added = ArrayList<String>(); val dups = ArrayList<String>()
+        val invalid = ArrayList<Pair<String, String>>(); val errors = ArrayList<Pair<String, String>>()
         var first: String? = null
+        var done = 0
+        val total = items.size
+        var expected = total
+        fun storageOk(size: Long) = library.usableSpace - size > Limits.KEEP_FREE
         fun one(name: String, bytes: ByteArray) {
             val base = name.substringAfterLast('/')
-            if (!isFontName(base)) { errors += base to "not .ttf/.otf"; return }
-            if (bytes.size < 100) { errors += base to "empty or truncated"; return }
-            if (bytes.size > 25 * 1024 * 1024) { errors += base to "larger than 25 MB"; return }
+            if (!isFontName(base)) { invalid += base to "not .ttf/.otf"; return }
+            if (bytes.size < 100) { invalid += base to "empty or damaged"; return }
+            if (bytes.size > Limits.MAX_FONT_BYTES) { errors += base to "larger than 25 MB"; return }
             val tag = String(bytes, 0, 4, Charsets.ISO_8859_1)
-            if (tag != "OTTO" && tag != "true" && !(bytes[0].toInt() == 0 && bytes[1].toInt() == 1 && bytes[2].toInt() == 0 && bytes[3].toInt() == 0)) { errors += base to "not a TrueType/OpenType font"; return }
+            if (tag != "OTTO" && tag != "true" && !(bytes[0].toInt() == 0 && bytes[1].toInt() == 1 && bytes[2].toInt() == 0 && bytes[3].toInt() == 0)) { invalid += base to "not a TrueType/OpenType font"; return }
             val hash = sha1(bytes)
             list.firstOrNull { it.sha1 == hash }?.let { dups += base; if (first == null) first = "asset:fonts/${it.file}"; return }
-            if (hash in shippedHashes) { dups += base; return } // already in the APK (bundled or personal library)
+            if (hash in shippedHashes) { dups += base; return } // already in the APK
+            if (!storageOk(bytes.size.toLong())) { errors += base to "not enough storage"; return }
             val meta = FontMeta.read(bytes)
             val ext = if (base.endsWith(".otf", true)) "otf" else "ttf"
-            var stem = base.substringBeforeLast('.').replace(Regex("[^A-Za-z0-9 _.()-]"), "_").trim().ifEmpty { "font" }.take(60)
+            val stem = base.substringBeforeLast('.').replace(Regex("[^A-Za-z0-9 _.()-]"), "_").trim().ifEmpty { "font" }.take(60)
             var file = File(library, "$stem.$ext")
             var k = 2
             while (file.exists()) { file = File(library, "$stem ($k).$ext"); k++ }
-            file.writeBytes(bytes)
+            try { file.writeBytes(bytes) } catch (e: java.io.IOException) { file.delete(); errors += base to "cannot be written"; return }
             val tf = runCatching { Typeface.createFromFile(file) }.getOrNull()
-            if (tf == null) { file.delete(); errors += base to "Android cannot load this font"; return }
+            if (tf == null) { file.delete(); invalid += base to "damaged: Android cannot load this font"; return }
             val e = Entry(file.name, meta?.family?.ifBlank { null } ?: stem, meta?.style ?: "", hash, base)
             list += e; added += e.displayName
             cache.remove("asset:fonts/${file.name}")
             if (first == null) first = "asset:fonts/${file.name}"
         }
-        for ((name, bytes) in items) {
+        for (src in items) {
+            val name = src.name
             if (name.endsWith(".zip", true)) {
+                var zipTotal = 0L; var count = 0
                 runCatching {
-                    java.util.zip.ZipInputStream(bytes.inputStream()).use { z ->
+                    java.util.zip.ZipInputStream(src.open().buffered()).use { z ->
                         while (true) {
                             val en = z.nextEntry ?: break
-                            val n = en.name
+                            val n = en.name.replace('\\', '/')
                             if (en.isDirectory || n.contains("__MACOSX") || n.substringAfterLast('/').startsWith(".")) continue
-                            if (n.contains("..")) { errors += n to "unsafe path"; continue }
                             if (!isFontName(n)) continue
-                            one(n, z.readBytes())
+                            if (n.split('/').any { it == ".." } || n.startsWith("/") || n.contains(':')) { errors += n to "unsafe path"; continue }
+                            if (++count > Limits.MAX_ZIP_ENTRIES) { errors += name to "too many files"; break }
+                            expected++
+                            // bounded read: a ZIP entry may claim any size
+                            val buf = java.io.ByteArrayOutputStream()
+                            val chunk = ByteArray(64 * 1024); var tooBig = false
+                            while (true) {
+                                val r = z.read(chunk); if (r < 0) break
+                                buf.write(chunk, 0, r)
+                                if (buf.size() > Limits.MAX_FONT_BYTES) { tooBig = true; break }
+                            }
+                            zipTotal += buf.size()
+                            if (tooBig) errors += n.substringAfterLast('/') to "larger than 25 MB"
+                            else if (zipTotal > Limits.MAX_ZIP_TOTAL) { errors += name to "ZIP larger than 400 MB once unpacked"; break }
+                            else one(n, buf.toByteArray())
+                            done++; progress(done, expected)
                         }
                     }
-                }.onFailure { errors += name to "ZIP could not be read" }
-            } else one(name, bytes)
+                }.onFailure { errors += name.substringAfterLast('/') to "ZIP could not be read (damaged?)" }
+                expected--
+            } else {
+                val bytes = runCatching { src.open().use { inp -> readBounded(inp, Limits.MAX_FONT_BYTES) } }.getOrNull()
+                if (bytes == null) errors += name to "cannot be read, or larger than 25 MB" else one(name, bytes)
+                done++; progress(done, expected)
+            }
         }
         saveIndex(list)
-        return ImportReport(added, dups, errors, first)
+        return ImportReport(added, dups, invalid, errors, first)
+    }
+
+    private fun readBounded(inp: java.io.InputStream, max: Long): ByteArray? {
+        val buf = java.io.ByteArrayOutputStream(); val chunk = ByteArray(64 * 1024)
+        while (true) { val r = inp.read(chunk); if (r < 0) break; buf.write(chunk, 0, r); if (buf.size() > max) return null }
+        return buf.toByteArray()
     }
 
     /** Removes an imported font from the library (projects keep their embedded copy). */
@@ -209,7 +248,7 @@ class FontRepository(private val context: Context) {
 
     private fun isFontName(n: String) = n.endsWith(".ttf", true) || n.endsWith(".otf", true)
 
-    fun all(): List<FontOption> = systemFonts + bundledFonts + libraryFonts + importedFonts()
+    fun all(): List<FontOption> = systemFonts + bundledFonts + importedFonts()
 
     /**
      * Adds a TTF/OTF to the library. Validates it by loading it; returns its reference.
@@ -217,7 +256,7 @@ class FontRepository(private val context: Context) {
      */
     fun import(displayName: String, bytes: ByteArray): String {
         val r = importAll(listOf(displayName to bytes))
-        return r.firstRef ?: throw IllegalArgumentException(r.errors.firstOrNull()?.second ?: "Invalid font")
+        return r.firstRef ?: throw IllegalArgumentException((r.invalid + r.errors).firstOrNull()?.second ?: "Invalid font")
     }
 
     /** Bytes of a library font, to embed in the project archive. */

@@ -199,7 +199,7 @@ fun FontList(fonts: List<FontOption>, selected: String, typeface: (String) -> Ty
             if (f.kind != lastKind) {
                 lastKind = f.kind
                 Text(
-                    stringResource(when (f.kind) { FontOption.Kind.SYSTEM -> R.string.fonts_system; FontOption.Kind.BUNDLED -> R.string.fonts_bundled; FontOption.Kind.IMPORTED -> R.string.fonts_imported; FontOption.Kind.LIBRARY -> R.string.fonts_library }),
+                    stringResource(when (f.kind) { FontOption.Kind.SYSTEM -> R.string.fonts_system; FontOption.Kind.BUNDLED -> R.string.fonts_bundled; FontOption.Kind.IMPORTED -> R.string.fonts_imported }),
                     color = light.LightHeaderText, fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                     modifier = Modifier.fillMaxWidth().background(light.LightHeader).padding(horizontal = 8.dp, vertical = 3.dp),
                 )
@@ -208,7 +208,7 @@ fun FontList(fonts: List<FontOption>, selected: String, typeface: (String) -> Ty
             Text(
                 f.displayName, fontFamily = FontFamily(typeface(f.ref)), fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = androidx.compose.ui.graphics.Color(0xFF111111),
-                modifier = Modifier.fillMaxWidth().background(if (sel) light.LightMore else light.LightRow).clickable { onPick(f.ref) }.padding(horizontal = 8.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().background(if (sel) light.LightMore else light.LightRow).clickable { onPick(f.ref); app.bocadillo.data.AppSettings.current?.addFontRecent(f.ref) }.padding(horizontal = 8.dp, vertical = 8.dp),
             )
             HorizontalDivider(color = light.LightDivider)
         }

@@ -27,6 +27,13 @@ object ImageIo {
         val scaled: Boolean get() = bitmap.width != fullWidth || bitmap.height != fullHeight
     }
 
+    /** The name the user sees for a picked file (or the last part of the URI). */
+    fun displayName(resolver: ContentResolver, uri: Uri): String {
+        var name: String? = null
+        runCatching { resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) name = c.getString(0) } }
+        return name ?: uri.lastPathSegment?.substringAfterLast('/') ?: "file"
+    }
+
     /** Reads the raw bytes of a picture the user picked/shared (never re-encoded). */
     @Throws(IOException::class)
     fun read(resolver: ContentResolver, uri: Uri): Imported {
