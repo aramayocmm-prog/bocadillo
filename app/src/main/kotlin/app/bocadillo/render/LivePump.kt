@@ -26,31 +26,35 @@ class LivePump(private val budgetMs: Float = 4f) {
 
     /** Main thread. [job] computes (any thread) and returns what to apply on the main thread. */
     fun submit(final: Boolean, job: () -> (() -> Unit)?) {
-        if (busy) {
-            // a newer intermediate update replaces a waiting intermediate one
-            if (!final && queue.isNotEmpty() && !queue.last().second) queue.removeLast()
-            queue.addLast(job to final)
-            return
-        }
-        if (lastMs <= budgetMs) {
-            val t0 = System.nanoTime()
-            val apply = job()
-            lastMs = (System.nanoTime() - t0) / 1e6f
-            onTiming?.invoke(lastMs, false)
-            apply?.invoke()
-            return
-        }
-        busy = true
-        exec.execute {
-            val t0 = System.nanoTime()
-            val apply = runCatching { job() }.getOrNull()
-            val ms = (System.nanoTime() - t0) / 1e6f
-            main.post {
-                lastMs = ms
-                onTiming?.invoke(ms, true)
+        // a newer intermediate update replaces a waiting intermediate one; finals always stay
+        if (!final && queue.isNotEmpty() && !queue.last().second) queue.removeLast()
+        queue.addLast(job to final)
+        pump()
+    }
+
+    /** Runs the waiting jobs in order: inline while cheap, one at a time in the background otherwise. */
+    private fun pump() {
+        while (!busy && queue.isNotEmpty()) {
+            val (job, _) = queue.removeFirst()
+            if (lastMs <= budgetMs) {
+                val t0 = System.nanoTime()
+                val apply = job()
+                lastMs = (System.nanoTime() - t0) / 1e6f
+                onTiming?.invoke(lastMs, false)
                 apply?.invoke()
-                busy = false
-                queue.removeFirstOrNull()?.let { (j, f) -> submit(f, j) }
+                continue
+            }
+            busy = true
+            exec.execute {
+                val t0 = System.nanoTime()
+                val apply = runCatching { job() }.getOrNull()
+                val ms = (System.nanoTime() - t0) / 1e6f
+                main.post {
+                    lastMs = ms
+                    onTiming?.invoke(ms, true)
+                    try { apply?.invoke() } finally { busy = false }
+                    pump()
+                }
             }
         }
     }

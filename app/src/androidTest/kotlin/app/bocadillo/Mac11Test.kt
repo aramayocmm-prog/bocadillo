@@ -159,7 +159,7 @@ class Mac11Test {
                 val t = vm().state.value.tool as ToolState.Draw
                 vm().setBrush(t.brush.copy(color = colors[k], size = b[0], hardness = b[1], opacity = b[2]))
             }
-            ui { vm().liveTimings.clear() }
+            ui { vm().liveTimings.clear(); vm().liveBackgroundCount = 0 }
             var live: Pair<Int, IntArray>? = null
             drawWithFinger(area, path, delay) {
                 rule.waitUntil(20_000) { var p = true; ui { p = vm().livePending() }; !p } // background work, if any, done
@@ -189,7 +189,7 @@ class Mac11Test {
         ui { vm().redoStroke() }; Thread.sleep(1500)
         assertEquals(cases.size, (vm().state.value.tool as ToolState.Draw).strokes.size)
         // long session: 60 more quick strokes
-        ui { vm().liveTimings.clear() }
+        ui { vm().liveTimings.clear(); vm().liveBackgroundCount = 0 }
         repeat(60) { i ->
             val y = 0.1f + (i % 20) * 0.04f
             drawWithFinger(area, (0..12).map { j -> 0.1f + j * 0.06f to y + (j % 2) * 0.01f }, 0L) {}
@@ -320,7 +320,7 @@ class Mac11Test {
         val markerB = findMarker(area, nearX = area.right) ?: throw AssertionError("marker B not visible")
         log("CUT marker A on screen $markerA, B $markerB")
         // one short stroke exactly on marker A
-        ui { vm().liveTimings.clear() }
+        ui { vm().liveTimings.clear(); vm().liveBackgroundCount = 0 }
         rule.onRoot().performTouchInput { down(markerA); moveTo(markerA + Offset(2f, 0f)); moveTo(markerA - Offset(2f, 0f)); up() }
         rule.waitForIdle(); Thread.sleep(800)
         rule.waitUntil(20_000) { var p = true; ui { p = vm().livePending() }; !p }
