@@ -21,8 +21,10 @@ import kotlin.math.min
 class IncrementalStroke(val width: Int, val height: Int) {
     /** Coverage of the final segments (full raster, 0..1). */
     val committed = FloatArray(width * height)
-    private var tail = FloatArray(0)
-    private var tailBox: IntArray? = null // x0, y0, x1, y1 (exclusive)
+    @PublishedApi internal var tail = FloatArray(0)
+    @PublishedApi internal var tailBox: IntArray? = null // x0, y0, x1, y1 (exclusive)
+    /** The separate areas changed by the last [update] (new settled dabs, old tail, new tail). */
+    val changedAreas = ArrayList<IntArray>(3)
     private var doneSegments = 0
     private var lastDone = false
     /** Everything this stroke touched (to clear it afterwards). */
@@ -52,7 +54,8 @@ class IncrementalStroke(val width: Int, val height: Int) {
         val step = StrokeRasterizer.spacing(maxR)
         val hard = s.hardness.coerceIn(0f, 1f)
         var dirty: IntArray? = null
-        fun grow(b: IntArray?) { if (b != null) dirty = union(dirty, b) }
+        changedAreas.clear()
+        fun grow(b: IntArray?) { if (b != null) { dirty = union(dirty, b); addArea(b) } }
 
         // segments that can no longer change
         val finalSegments = if (final) n - 1 else max(0, n - 3)
@@ -83,6 +86,40 @@ class IncrementalStroke(val width: Int, val height: Int) {
         }
         dirty?.let { touched = union(touched, it) }
         return dirty
+    }
+
+    /** Adds [b] to [changedAreas], merging it with an area it overlaps (no pixel is visited twice). */
+    private fun addArea(b: IntArray) {
+        var cur = b.copyOf()
+        var merged = true
+        while (merged) {
+            merged = false
+            val it = changedAreas.iterator()
+            while (it.hasNext()) {
+                val a = it.next()
+                if (a[0] < cur[2] && cur[0] < a[2] && a[1] < cur[3] && cur[1] < a[3]) { cur = union(a, cur); it.remove(); merged = true }
+            }
+        }
+        changedAreas += cur
+    }
+
+    /**
+     * Calls [f] for every pixel of area [r] with its index and coverage (settled ∪ tail), without
+     * a function call per pixel.
+     */
+    inline fun forEachIn(r: IntArray, f: (i: Int, c: Float) -> Unit) {
+        val tb = tailBox
+        val tw = if (tb != null) tb[2] - tb[0] else 0
+        for (y in r[1] until r[3]) {
+            val row = y * width
+            val inTailRow = tb != null && y >= tb[1] && y < tb[3]
+            for (x in r[0] until r[2]) {
+                val i = row + x
+                var c = committed[i]
+                if (inTailRow && x >= tb!![0] && x < tb[2]) { val t = tail[(y - tb[1]) * tw + (x - tb[0])]; if (t > c) c = t }
+                f(i, c)
+            }
+        }
     }
 
     /** Clears what the stroke touched, ready for the next one. */

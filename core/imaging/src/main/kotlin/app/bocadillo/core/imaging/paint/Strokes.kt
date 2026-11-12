@@ -150,10 +150,30 @@ object StrokeRasterizer {
         val xa = max(ox, floor(cx - r).toInt()); val xb = min(ox + bw - 1, ceil(cx + r).toInt())
         val ya = max(oy, floor(cy - r).toInt()); val yb = min(oy + bh - 1, ceil(cy + r).toInt())
         val r2 = (r + 0.5f) * (r + 0.5f)
+        val ir = inner - 0.5f // pixels at distance ≤ ir get the full value
         for (y in ya..yb) {
             val dy = y + 0.5f - cy
             val row = (y - oy) * bw - ox
-            for (x in xa..xb) {
+            // 1.1.0 speed-ups, same values: (1) only the columns the dab can reach on this row;
+            // (2) a solid core (1 px inside the full-value disc) written without a square root;
+            // (3) pixels already at the dab's maximum are skipped (max can't raise them).
+            var x0 = xa; var x1 = xb
+            var c0 = Int.MAX_VALUE; var c1 = Int.MIN_VALUE
+            if (square) {
+                if (kotlin.math.abs(dy) > r + 0.5f) continue
+                if (ir > 1.5f && kotlin.math.abs(dy) <= ir - 1f) { c0 = ceil(cx - (ir - 1f) - 0.5f).toInt(); c1 = floor(cx + (ir - 1f) - 0.5f).toInt() }
+            } else {
+                val q = r2 - dy * dy
+                if (q < 0f) continue
+                val span = sqrt(q)
+                x0 = max(xa, floor(cx - 0.5f - span).toInt() - 1); x1 = min(xb, ceil(cx - 0.5f + span).toInt() + 1)
+                val qi = ir * ir - dy * dy
+                if (ir > 1.5f && qi > 0f) { val hw = sqrt(qi) - 1f; if (hw > 0f) { c0 = ceil(cx - hw - 0.5f).toInt(); c1 = floor(cx + hw - 0.5f).toInt() } }
+            }
+            for (x in x0..x1) {
+                val i = row + x
+                if (cov[i] >= alpha) continue
+                if (x in c0..c1) { cov[i] = alpha; continue }
                 val dx = x + 0.5f - cx
                 val d: Float
                 if (square) {
@@ -170,7 +190,6 @@ object StrokeRasterizer {
                     else -> { val t = ((d - inner) / (r - inner)).coerceIn(0f, 1f); 1f - t * t * (3f - 2f * t) }
                 }
                 v *= alpha
-                val i = row + x
                 if (v > cov[i]) cov[i] = v
             }
         }

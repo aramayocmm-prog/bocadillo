@@ -588,4 +588,5 @@ Note: some fonts may be too large or too complex for Android; those are listed w
     <string name="fonts_search">Search font</string>
     <string name="fonts_library">My font library</string>
     <string name="fonts_styles_count">%1$d styles</string>
+    <string name="draw_area">Drawing area</string>
 </resources>

@@ -1,5 +1,7 @@
 package app.bocadillo.editor
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -72,7 +74,8 @@ fun DrawLayer(
     onSample: (Float, Float) -> Unit,
 ) {
     val pick by rememberUpdatedState(eyedropper)
-    Box(Modifier.fillMaxSize()) {
+    val areaLabel = stringResource(R.string.draw_area)
+    Box(Modifier.fillMaxSize().semantics { contentDescription = areaLabel }) {
         maskOverlay?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds) }
         if (maskTiles != null) androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
             maskTiles.version

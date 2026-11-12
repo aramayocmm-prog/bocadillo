@@ -110,7 +110,8 @@ class Mac11Test {
         if (!has(title)) { desc(s(R.string.home_more)); tap(s(R.string.more_recent_projects)) }
         tap(title); waitFor(s(R.string.menu_adjust)); Thread.sleep(2500)
     }
-    private fun atHome() = has(s(R.string.open_image)) || has(s(R.string.more_recent_projects))
+    /** Out of the editor (home main page, More… or the recent-projects list). */
+    private fun atHome() = !has(s(R.string.menu_adjust)) && !has(s(R.string.finish_title))
 
     private fun stats(xs: List<Float>): String {
         if (xs.isEmpty()) return "n=0"
@@ -137,7 +138,8 @@ class Mac11Test {
         newProject("Trazo", 4000, 3000)
         openProject("Trazo")
         tap(s(R.string.menu_effect)); tap(s(R.string.paint)); Thread.sleep(800)
-        val area = rule.onRoot().fetchSemanticsNode().boundsInRoot.let { androidx.compose.ui.geometry.Rect(it.left, it.top + it.height * 0.18f, it.right, it.bottom - it.height * 0.18f) }
+        // the picture's own box (strokes start inside the picture)
+        val area = boundsOf(s(R.string.draw_area))
         val cases = listOf(
             // name, brush size, hardness, opacity, colour, path, delay between moves
             Triple("lento_fino", floatArrayOf(0.008f, 1f, 1f), (0..120).map { i -> 0.1f + i * 0.0065f to 0.30f + 0.05f * kotlin.math.sin(i * 0.08f) }) to 16L,
@@ -160,11 +162,12 @@ class Mac11Test {
             ui { vm().liveTimings.clear() }
             var live: Pair<Int, IntArray>? = null
             drawWithFinger(area, path, delay) {
+                rule.waitUntil(20_000) { var p = true; ui { p = vm().livePending() }; !p } // background work, if any, done
                 ui { assertTrue("$name: live tiles while the finger is down", vm().liveTilesShown()); live = vm().liveSnapshot() }
                 if (k == 4) shot("100_trazo_dedo_abajo", 200)
             }
             val times = vm().liveTimings.toList(); allTimes.addAll(times)
-            log("PERF stroke=$name points=${path.size} ${stats(times)}")
+            log("PERF stroke=$name points=${path.size} ${stats(times)} background=${vm().liveBackgroundCount}")
             // the rendered picture replaces the live tiles; compare pixel by pixel
             rule.waitUntil(30_000) { var gone = false; ui { gone = !vm().liveTilesShown() }; gone }
             val fin = vm().state.value.preview!!.asAndroidBitmap().copy(Bitmap.Config.ARGB_8888, false)
@@ -320,6 +323,7 @@ class Mac11Test {
         ui { vm().liveTimings.clear() }
         rule.onRoot().performTouchInput { down(markerA); moveTo(markerA + Offset(2f, 0f)); moveTo(markerA - Offset(2f, 0f)); up() }
         rule.waitForIdle(); Thread.sleep(800)
+        rule.waitUntil(20_000) { var p = true; ui { p = vm().livePending() }; !p }
         shot("121_silueta_borrado_en_el_marcador")
         val snap = vm().cutSnapshot()!!
         val (w, h, px) = snap
@@ -335,7 +339,7 @@ class Mac11Test {
         desc(s(R.string.ins_restore_brush)); desc(s(R.string.collapse))
         rule.onRoot().performTouchInput { down(p0); for (i in 1..40) moveTo(p0 + Offset(i * 3f - 60f, kotlin.math.cos(i * 0.3f) * 40f)); up() }
         rule.waitForIdle(); Thread.sleep(600)
-        log("PERF cutout ${stats(vm().liveTimings.toList())}")
+        log("PERF cutout ${stats(vm().liveTimings.toList())} background=${vm().liveBackgroundCount}")
         assertEquals(3, Cutout.strokes(insertTool().draft.cutout).size)
         desc(s(R.string.undo)); assertEquals(2, Cutout.strokes(insertTool().draft.cutout).size)
         desc(s(R.string.more_options)); tap(s(R.string.redo)); assertEquals(3, Cutout.strokes(insertTool().draft.cutout).size)
@@ -346,9 +350,12 @@ class Mac11Test {
         val d = insertTool().draft
         val raw = BitmapFactory.decodeByteArray(vm().assetsSnapshot()[d.source.removePrefix("asset:")]!!, 0, vm().assetsSnapshot()[d.source.removePrefix("asset:")]!!.size)
         val out = processPicture(raw, d.crop, d.cutout)
-        val (w2, h2, live) = vm().cutSnapshot()!!
+        rule.waitUntil(20_000) { var p = true; ui { p = vm().livePending() }; !p }
+        val (w2, h2, liveRaw) = vm().cutSnapshot()!!
         assertEquals(out.width, w2); assertEquals(out.height, h2)
         val ex = IntArray(w2 * h2).also { out.getPixels(it, 0, w2, 0, 0, w2, h2) }
+        // both through an Android Bitmap, as on screen (premultiplied alpha rounds soft edges the same way)
+        val live = IntArray(w2 * h2).also { Bitmap.createBitmap(liveRaw, w2, h2, Bitmap.Config.ARGB_8888).getPixels(it, 0, w2, 0, 0, w2, h2) }
         var diff = 0; for (i in ex.indices) if (ex[i] != live[i]) diff++
         log("CUT live vs export differing=$diff/${ex.size}")
         assertEquals("Cut Out on screen = export", 0, diff)
@@ -523,6 +530,6 @@ class Mac11Test {
         shot("150_inicio_miniatura")
         assertTrue("long side about 116 dp (twice 58): $long", long in 100f..120f)
         assertTrue("photo proportions 4:3 kept: ${long / short}", abs(long / short - 4f / 3f) < 0.06f)
-        assertTrue("top right", r.right > ctx.resources.displayMetrics.widthPixels - 40 * dp && r.top < 40 * dp)
+        assertTrue("top right (${r.right / dp}, ${r.top / dp} dp)", r.right > ctx.resources.displayMetrics.widthPixels - 40 * dp && r.top < 110 * dp)
     }
 }

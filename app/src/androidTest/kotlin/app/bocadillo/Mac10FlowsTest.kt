@@ -236,6 +236,7 @@ class Mac10FlowsTest {
         Thread.sleep(700)
         shot("70_live_finger_down", 300)
         var live: Pair<Int, IntArray>? = null
+        rule.waitUntil(20_000) { var p = true; rule.runOnUiThread { p = vm().livePending() }; !p }
         rule.runOnUiThread { live = vm().liveSnapshot(); assertTrue("live tiles on screen while the finger is down", vm().liveTilesShown()) }
         assertNotNull("live preview while the finger is down", live)
         rule.onRoot().performTouchInput { up() }
@@ -302,7 +303,7 @@ class Mac10FlowsTest {
         assertTrue(has(s(R.string.line_height)) && has(s(R.string.fill_color)) && has(s(R.string.outline_color)) && has(s(R.string.text_size)))
         tap(s(R.string.tab_font)); waitFor(s(R.string.fonts_custom_files)); shot("81_more_fonts")
         // the System Fonts header lies further down the list: scroll to it, then back up
-        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText(s(R.string.fonts_system_header)))
+        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText(s(R.string.fonts_system_header), substring = true))
         assertTrue("System Fonts header", has(s(R.string.fonts_system_header))); shot("81b_more_fonts_system")
         // back to the Custom Font Files section: the imported copy comes before the bundled one
         rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText(s(R.string.fonts_import_files)))

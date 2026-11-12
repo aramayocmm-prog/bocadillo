@@ -81,8 +81,9 @@ class IncrementalStrokeTest {
             val blend = StrokePainter.Blender(s)
             val n = pts.size / 3
             for (k in 1..n) {
-                val d = inc.update(prefix(pts, k, b), k == n) ?: continue
-                for (y in d[1] until d[3]) for (x in d[0] until d[2]) out[y * w + x] = blend.blend(base[y * w + x], inc.coverageAt(x, y))
+                inc.update(prefix(pts, k, b), k == n) ?: continue
+                // as the editor does it: each changed area once, coverage from forEachIn
+                for (d in inc.changedAreas) inc.forEachIn(d) { i, c -> out[i] = if (c <= 0f) base[i] else blend.blend(base[i], c) }
             }
             for (i in out.indices) if (out[i] != ref[i]) throw AssertionError("pixel $i: ${Integer.toHexString(out[i])} != ${Integer.toHexString(ref[i])}")
         }
@@ -99,8 +100,8 @@ class IncrementalStrokeTest {
             val out = Cutout.apply(PixelBuffer(w, h, src), m).pixels
             val n = live.pointCount
             for (k in 1..n) {
-                val d = inc.update(live.copy(points = live.points.copyOf(k * 3)), k == n) ?: continue
-                for (y in d[1] until d[3]) for (x in d[0] until d[2]) { val i = y * w + x; out[i] = Cutout.pixel(src[i], Cutout.liveMask(m[i], inc.coverageAt(x, y), live)) }
+                inc.update(live.copy(points = live.points.copyOf(k * 3)), k == n) ?: continue
+                for (d in inc.changedAreas) inc.forEachIn(d) { i, c -> out[i] = Cutout.pixel(src[i], Cutout.liveMask(m[i], c, live)) }
             }
             for (i in out.indices) assertEquals("pixel $i", ref[i], out[i])
         }
@@ -132,6 +133,21 @@ class IncrementalStrokeTest {
         var t0 = System.nanoTime(); StrokePainter.paintInPlace(px, pw, ph, prefix(pts, 50, b)); val full50 = (System.nanoTime() - t0) / 1e6
         t0 = System.nanoTime(); StrokePainter.paintInPlace(px, pw, ph, prefix(pts, n - 10, b)); val fullLate = (System.nanoTime() - t0) / 1e6
         println("PERF incremental per move: early=%.3f ms late=%.3f ms | 1.0 full repaint: at 50 points=%.2f ms, at %d points=%.2f ms".format(early, late, full50, n - 10, fullLate))
+        // thick brush, sparse points (fast finger without intermediate samples): coverage + composite per move
+        val big = Stroke(FloatArray(0), 0.12f, 0.9f, 1f, 0xFF2040C0.toInt())
+        val fast = FloatArray(9 * 3) { k -> when (k % 3) { 0 -> 0.08f + (k / 3) * 0.105f; 1 -> if ((k / 3) % 2 == 0) 0.35f else 0.65f; else -> 1f } }
+        val base = IntArray(pw * ph) { 0xFF808080.toInt() }; val out = base.copyOf(); val blend = StrokePainter.Blender(big)
+        val tFast = ArrayList<Double>()
+        repeat(3) { round ->
+            val inc2 = IncrementalStroke(pw, ph)
+            for (k in 1..9) {
+                val t1 = System.nanoTime()
+                inc2.update(big.copy(points = fast.copyOf(k * 3)), k == 9)
+                for (d in inc2.changedAreas) inc2.forEachIn(d) { i, c -> out[i] = if (c <= 0f) base[i] else blend.blend(base[i], c) }
+                if (round == 2) tFast += (System.nanoTime() - t1) / 1e6
+            }
+        }
+        println("PERF thick fast stroke (12%%, 9 points over 2048 px): per move median=%.2f ms max=%.2f ms".format(tFast.sorted()[tFast.size / 2], tFast.max()))
         assertTrue("incremental cost stays flat ($early → $late ms)", late < early * 3 + 0.5)
     }
 }
