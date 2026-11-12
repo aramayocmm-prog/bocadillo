@@ -10,6 +10,10 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.hasScrollToNodeAction
+import app.bocadillo.core.model.StickerCategories
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -351,16 +355,16 @@ class Mac12Test {
         tap(s(R.string.menu_sticker)); Thread.sleep(800)
         shot("240_categorias_stickers")
         val missing = ArrayList<String>()
-        for (cat in app.bocadillo.core.model.StickerCategories.all) {
-            rule.onAllNodes(androidx.compose.ui.test.hasScrollToNodeAction()).onFirst()
-                .performScrollToNode(androidx.compose.ui.test.hasContentDescription("icon_${cat.id}"))
+        for (cat in StickerCategories.all) {
+            rule.onAllNodes(hasScrollToNodeAction()).onFirst()
+                .performScrollToNode(hasContentDescription("icon_${cat.id}"))
             if (!hasDesc("icon_${cat.id}")) missing += cat.id
         }
         shot("241_categorias_stickers_final")
-        log("ICONS ${app.bocadillo.core.model.StickerCategories.all.size} categories, missing=$missing, pending notes=${rule.onAllNodesWithText(s(R.string.sticker_pending_short), useUnmergedTree = true).fetchSemanticsNodes().size}")
+        log("ICONS ${StickerCategories.all.size} categories, missing=$missing, pending notes=${rule.onAllNodesWithText(s(R.string.sticker_pending_short), useUnmergedTree = true).fetchSemanticsNodes().size}")
         assertTrue("all categories illustrated: missing $missing", missing.isEmpty())
         // an empty category: the large illustration and the pending text, no invented stickers
-        val empty = app.bocadillo.core.model.StickerCategories.all.firstOrNull { app.stickerPacks.index.inCategory(it.id).isEmpty() }
+        val empty = StickerCategories.all.firstOrNull { app.stickerPacks.index.inCategory(it.id).isEmpty() }
         if (empty != null) {
             tap(empty.name(java.util.Locale.getDefault().language)); Thread.sleep(800)
             shot("242_categoria_vacia")
