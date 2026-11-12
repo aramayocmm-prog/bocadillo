@@ -1,0 +1,20 @@
+BLANK default: 1080 × 1920 px
+BLANK 4:5: 1080 × 1350 px
+BLANK 1:1: 1080 × 1080 px
+BLANK 16:9: 1920 × 1080 px
+BLANK 9:16: 1080 × 1920 px
+BLANK swapped: 1350 × 1080 px
+BLANK 20000: Cada lado puede tener como máximo 10000 px.
+BLANK 9000×9000: Demasiado grande para la memoria de este dispositivo (máximo 9,4 millones de píxeles). (max pixels 9437184)
+BLANK created 1234×777 centre=#FFFF3366
+PICK hex → #80112233
+PICK eyedropper left of centre (k=1.08) → #FFFF0000
+PICK eyedropper right of centre → #FF0000FF
+FONTS12 header: button=333.0 line=433.0 search=528.0
+FONTS12 search 'comf' shown in 1473 ms (fonts=35)
+FONTS12 ZIP import 1159 ms, progress seen=true
+FONTS12 report added=[Lora, Bebas Neue] dups=[Comfortaa-Bold.ttf] invalid=[(broken.ttf, not a TrueType/OpenType font)] errors=[(huge.ttf, larger than 25 MB), (../evil.ttf, unsafe path)]
+BACK menu → options → tool: ok
+BACK picker cancelled: editor=true saveDialog=false pending=true
+BACK saved project ops=1
+ICONS 32 categories, missing=[], pending notes=11

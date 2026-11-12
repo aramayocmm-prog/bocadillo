@@ -1,0 +1,897 @@
+=== UPGRADE: install 1.1.0 and create data with it
+Performing Streamed Install
+Success
+Performing Streamed Install
+Success
+=== 1.1.0 StickerLibraryFlowTest (creates a project and the sticker library)
+INSTRUMENTATION_STATUS: class=app.bocadillo.StickerLibraryFlowTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.StickerLibraryFlowTest:
+INSTRUMENTATION_STATUS: test=importInsertTransformDuplicateDelete
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.StickerLibraryFlowTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=importInsertTransformDuplicateDelete
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 61.946
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== 1.1.0 Mac10FlowsTest#fontsImportPickAndPersist (imports fonts, project with a title)
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac10FlowsTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.Mac10FlowsTest:
+INSTRUMENTATION_STATUS: test=fontsImportPickAndPersist
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac10FlowsTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=fontsImportPickAndPersist
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 49.997
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+app/src/main/assets/fonts/Comfortaa-Bold.ttf: 1 file pushed, 0 skipped. 2.4 MB/s (134916 bytes in 0.053s)
+--- 1.1.0 data and preferences before the update
+files:
+fonts
+profileInstalled
+projects
+screens
+sticker_library
+sticker_packs
+thumbs
+upgrade_marker.txt
+
+files/fonts:
+Comfortaa-Bold.ttf
+UpgradeFont.ttf
+index.json
+
+files/projects:
+3952fba1-4076-4b56-903f-9f253ac6a859.bcproj
+c40a177d-52bb-4925-ab2e-440b8929fcc7.bcproj
+drafts.txt
+index.json
+open_session
+
+files/screens:
+20_sticker_menu.png
+21_sticker_empty_category.png
+22_sticker_category.png
+23_sticker_inserted.png
+24_sticker_transformed.png
+25_sticker_duplicated.png
+80_title_style_panel.png
+81_more_fonts.png
+81b_more_fonts_system.png
+82_title_with_font.png
+83_reopened_font.png
+
+files/sticker_library:
+
+files/sticker_packs:
+files
+index.json
+
+files/sticker_packs/files:
+72b8e2bfdf4aa0481a96a31b9817d812752281fef9d1fce05f6c1949cf7b6c7c.svg
+ada8d635108450dcf94b1492c33fa5870bc203b764b1d83efc4cf7e9eb52ecac.png
+
+files/thumbs:
+3952fba1-4076-4b56-903f-9f253ac6a859.jpg
+c40a177d-52bb-4925-ab2e-440b8929fcc7.jpg
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <boolean name="panel_object" value="true" />
+</map>
+    versionCode=14 minSdk=29 targetSdk=35
+    versionName=1.1.0
+=== UPGRADE: install 1.2.0 over it (adb install -r, same signature)
+Performing Streamed Install
+Success
+Performing Streamed Install
+Success
+    versionCode=15 minSdk=29 targetSdk=35
+    versionName=1.2.0
+--- preferences after the update
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <boolean name="panel_object" value="true" />
+</map>
+=== app.bocadillo.LayoutAndUpgradeTest#dataSurvivedUpgrade
+INSTRUMENTATION_STATUS: class=app.bocadillo.LayoutAndUpgradeTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.LayoutAndUpgradeTest:
+INSTRUMENTATION_STATUS: test=dataSurvivedUpgrade
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=app.bocadillo.LayoutAndUpgradeTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=dataSurvivedUpgrade
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 3.238
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.Mac11Test#liveStrokeLatencyAndFidelity (recorded)
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac11Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.Mac11Test:
+INSTRUMENTATION_STATUS: test=liveStrokeLatencyAndFidelity
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac11Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=liveStrokeLatencyAndFidelity
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 281.26
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+--- frame statistics during the live-stroke test (dumpsys gfxinfo)
+=== app.bocadillo.Mac11Test#handleTapTogglesSizeAndPerspective (recorded)
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac11Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.Mac11Test:
+INSTRUMENTATION_STATUS: test=handleTapTogglesSizeAndPerspective
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac11Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=handleTapTogglesSizeAndPerspective
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 39.247
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.Mac11Test#cutOutVisibleWhileFingerMoves (recorded)
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac11Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.Mac11Test:
+INSTRUMENTATION_STATUS: test=cutOutVisibleWhileFingerMoves
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac11Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=cutOutVisibleWhileFingerMoves
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 41.488
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.Mac11Test#cutOutUnderTheFinger (recorded)
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac11Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.Mac11Test:
+INSTRUMENTATION_STATUS: test=cutOutUnderTheFinger
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac11Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=cutOutUnderTheFinger
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 47.969
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+--- frame statistics during the Cut Out test (dumpsys gfxinfo)
+=== app.bocadillo.Mac11Test#finishSaveAndBackNavigation (recorded)
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac11Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.Mac11Test:
+INSTRUMENTATION_STATUS: test=finishSaveAndBackNavigation
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac11Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=finishSaveAndBackNavigation
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 90.634
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.Mac11Test#fontCatalogueSearchPickPersist (recorded)
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac11Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.Mac11Test:
+INSTRUMENTATION_STATUS: test=fontCatalogueSearchPickPersist
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac11Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=fontCatalogueSearchPickPersist
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 48.857
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.Mac11Test#homeThumbnailFitsHorizontalBox
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac11Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.Mac11Test:
+INSTRUMENTATION_STATUS: test=homeThumbnailFitsHorizontalBox
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac11Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=homeThumbnailFitsHorizontalBox
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 280.054
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.Mac12Test#newBlankImageFormatsAndLimits (recorded)
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac12Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.Mac12Test:
+INSTRUMENTATION_STATUS: test=newBlankImageFormatsAndLimits
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac12Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=newBlankImageFormatsAndLimits
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 29.226
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.Mac12Test#colorPickerHexFavouritesRecentsEyedropper (recorded)
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac12Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.Mac12Test:
+INSTRUMENTATION_STATUS: test=colorPickerHexFavouritesRecentsEyedropper
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac12Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=colorPickerHexFavouritesRecentsEyedropper
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 28.078
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.Mac12Test#fontsCompactHeaderFavouritesRecentsImportDelete (recorded)
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac12Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.Mac12Test:
+INSTRUMENTATION_STATUS: test=fontsCompactHeaderFavouritesRecentsImportDelete
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac12Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=fontsCompactHeaderFavouritesRecentsImportDelete
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 40.105
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.Mac12Test#backHierarchyAndFilePickerCancel (recorded)
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac12Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.Mac12Test:
+INSTRUMENTATION_STATUS: test=backHierarchyAndFilePickerCancel
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac12Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=backHierarchyAndFilePickerCancel
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 39.781
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.Mac12Test#stickerCategoryIllustrations (recorded)
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac12Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.Mac12Test:
+INSTRUMENTATION_STATUS: test=stickerCategoryIllustrations
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac12Test
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=stickerCategoryIllustrations
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 16.397
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+--------- beginning of main
+11-12 10:17:01.296  6341  6362 I Upgrade : projects=2 stickers=2 fonts=[Comfortaa Bold, Comfortaa Bold]
+11-12 10:20:27.676  6546  6582 I Mac11   : PERF stroke=lento_fino points=121 n=121 median=2,43 ms p95=22,97 ms max=43,27 ms background=47
+11-12 10:20:27.678  6546  6582 I Mac11   : FIDELITY stroke=lento_fino render requests: [addStroke < invoke$lambda$20$lambda$19 < $r8$lambda$J7-kTEVZwy1RZUZrkRQiz8f3AXc]
+11-12 10:20:27.898  6546  6582 I Mac11   : FIDELITY stroke=lento_fino right after the tiles were removed: differing=22463
+11-12 10:20:29.471  6546  6582 I Mac11   : FIDELITY stroke=lento_fino differing=0/3145728 max=0
+11-12 10:20:30.064  6546  6582 I Mac11   : PERF stroke=rapido_grueso points=9 n=4 median=104,46 ms p95=253,61 ms max=253,61 ms background=3
+11-12 10:20:30.322  6546  6582 I Mac11   : FIDELITY stroke=rapido_grueso render requests: [addStroke < invoke$lambda$20$lambda$19 < $r8$lambda$J7-kTEVZwy1RZUZrkRQiz8f3AXc]
+11-12 10:20:30.434  6546  6582 I Mac11   : FIDELITY stroke=rapido_grueso right after the tiles were removed: differing=0
+11-12 10:20:32.003  6546  6582 I Mac11   : FIDELITY stroke=rapido_grueso differing=0/3145728 max=0
+11-12 10:20:37.049  6546  6582 I Mac11   : PERF stroke=curva_cerrada points=71 n=49 median=17,83 ms p95=62,31 ms max=101,19 ms background=47
+11-12 10:20:37.383  6546  6582 I Mac11   : FIDELITY stroke=curva_cerrada render requests: [addStroke < invoke$lambda$20$lambda$19 < $r8$lambda$J7-kTEVZwy1RZUZrkRQiz8f3AXc]
+11-12 10:20:37.466  6546  6582 I Mac11   : FIDELITY stroke=curva_cerrada right after the tiles were removed: differing=0
+11-12 10:20:39.040  6546  6582 I Mac11   : FIDELITY stroke=curva_cerrada differing=0/3145728 max=0
+11-12 10:20:40.058  6546  6582 I Mac11   : PERF stroke=zigzag points=25 n=8 median=85,10 ms p95=220,43 ms max=220,43 ms background=7
+11-12 10:20:40.568  6546  6582 I Mac11   : FIDELITY stroke=zigzag render requests: [addStroke < invoke$lambda$20$lambda$19 < $r8$lambda$J7-kTEVZwy1RZUZrkRQiz8f3AXc]
+11-12 10:20:40.653  6546  6582 I Mac11   : FIDELITY stroke=zigzag right after the tiles were removed: differing=0
+11-12 10:20:42.227  6546  6582 I Mac11   : FIDELITY stroke=zigzag differing=0/3145728 max=0
+11-12 10:21:00.276  6546  6582 I Mac11   : PERF stroke=largo points=301 n=160 median=21,25 ms p95=76,48 ms max=154,49 ms background=158
+11-12 10:21:01.134  6546  6582 I Mac11   : FIDELITY stroke=largo render requests: [addStroke < invoke$lambda$20$lambda$19 < $r8$lambda$J7-kTEVZwy1RZUZrkRQiz8f3AXc]
+11-12 10:21:01.254  6546  6582 I Mac11   : FIDELITY stroke=largo right after the tiles were removed: differing=0
+11-12 10:21:02.830  6546  6582 I Mac11   : FIDELITY stroke=largo differing=0/3145728 max=0
+11-12 10:21:46.070  6546  6582 I Mac11   : PERF session=60_strokes n=256 median=36,53 ms p95=265,98 ms max=376,83 ms heap_before=52MB heap_after=128MB native=69MB
+11-12 10:21:46.076  6546  6582 I Mac11   : PERF all_strokes n=342 median=14,78 ms p95=72,15 ms max=253,61 ms
+11-12 10:21:46.076  6546  6582 I Mac11   : FIDELITY total differing=0/15728640 max=0
+11-12 10:23:07.293  7183  7203 I Mac11   : CUT12 picture left edge on screen at x=297 (row 1275.0)
+11-12 10:23:08.080  7183  7203 I Mac11   : CUT12 edge stroke from outside, finger down: diff inside edge=462
+11-12 10:23:10.399  7183  7203 I Mac11   : CUT12 slow erase, finger down: diff start=422 end=425 far=0 strokes committed=1
+11-12 10:23:10.787  7183  7203 I Mac11   : CUT12 fast erase + direction change, finger down: diff=414
+11-12 10:23:11.253  7183  7203 I Mac11   : CUT12 after lifting: still erased at start=422 (no jump back)
+11-12 10:23:12.871  7183  7203 I Mac11   : CUT12 restore, finger down: vs original=0 vs erased=516
+11-12 10:23:14.759  7183  7203 I Mac11   : CUT12 alternate erase (short), finger down: diff=256
+11-12 10:23:15.168  7183  7203 I Mac11   : CUT12 live vs export differing=0/540000 strokes=4
+11-12 10:23:16.960  7183  7203 I Mac11   : CUT12 saved=true reloaded cutout strokes=4 equal=true
+11-12 10:23:52.264  7424  7444 I Mac11   : CUT transform rotation=13.727506 scale=1.0933806 perspective=[0.0, 0.0, 0.0, 0.0, 0.28010055, 0.068123326, 0.0, 0.0]
+11-12 10:23:59.052  7424  7444 I Mac11   : CUT marker A on screen Offset(260.3, 1010.8), B Offset(940.5, 1509.3)
+11-12 10:24:01.236  7424  7444 I Mac11   : CUT alpha at marker A=0 (erased under the finger), B=255 (untouched) raster=900x600
+11-12 10:24:04.495  7424  7444 I Mac11   : PERF cutout n=10 median=7,08 ms p95=67,44 ms max=67,44 ms background=6
+11-12 10:24:10.925  7424  7444 I Mac11   : CUT live vs export differing=0/540000
+11-12 10:25:18.382  7697  7716 I Mac11   : GALLERY prueba_png_11.png in Pictures/MAC Editor para MEMES/
+11-12 10:25:28.079  7697  7716 I Mac11   : GALLERY prueba_jpg_11.jpg in Pictures/MAC Editor para MEMES/
+11-12 10:25:28.081  7697  7716 I Mac11   : SAVE png=147685 B jpg=63717 B
+11-12 10:26:22.110  8093  8113 I Mac11   : FONTS open list 541 ms, fonts=35
+11-12 10:26:23.958  8093  8113 I Mac11   : FONTS scroll whole list 306 ms
+11-12 10:27:24.942  8302  8322 I Mac11   : THUMB Mini916 1080x1920: picture 56.38095 × 100.190475 dp in box 140.19048 × 100.190475 dp; open button top 649.9048 dp
+11-12 10:27:44.223  8302  8322 I Mac11   : THUMB Mini11 1000x1000: picture 100.190475 × 100.190475 dp in box 140.19048 × 100.190475 dp; open button top 649.9048 dp
+11-12 10:28:19.085  8302  8322 I Mac11   : THUMB Mini169 1920x1080: picture 140.19048 × 78.85714 dp in box 140.19048 × 100.190475 dp; open button top 649.9048 dp
+11-12 10:28:23.102  8302  8322 I Mac11   : THUMB MiniTransp 800x600: picture 133.33333 × 100.190475 dp in box 140.19048 × 100.190475 dp; open button top 649.9048 dp
+11-12 10:31:25.797  8302  8322 I Mac11   : THUMB MiniGrande 4000x3000: picture 133.33333 × 100.190475 dp in box 140.19048 × 100.190475 dp; open button top 649.9048 dp
+11-12 10:31:36.723  8522  8542 I Mac12   : BLANK default: 1080 × 1920 px
+11-12 10:31:37.352  8522  8542 I Mac12   : BLANK 4:5: 1080 × 1350 px
+11-12 10:31:38.082  8522  8542 I Mac12   : BLANK 1:1: 1080 × 1080 px
+11-12 10:31:39.107  8522  8542 I Mac12   : BLANK 16:9: 1920 × 1080 px
+11-12 10:31:39.493  8522  8542 I Mac12   : BLANK 9:16: 1080 × 1920 px
+11-12 10:31:41.032  8522  8542 I Mac12   : BLANK swapped: 1350 × 1080 px
+11-12 10:31:43.472  8522  8542 I Mac12   : BLANK 20000: Cada lado puede tener como máximo 10000 px.
+11-12 10:31:45.070  8522  8542 I Mac12   : BLANK 9000×9000: Demasiado grande para la memoria de este dispositivo (máximo 9,4 millones de píxeles). (max pixels 9437184)
+11-12 10:31:56.302  8522  8542 I Mac12   : BLANK created 1234×777 centre=#FFFF3366
+11-12 10:32:19.906  8773  8792 I Mac12   : PICK hex → #80112233
+11-12 10:32:27.091  8773  8792 I Mac12   : PICK eyedropper left of centre (k=1.08) → #FFFF0000
+11-12 10:32:29.526  8773  8792 I Mac12   : PICK eyedropper right of centre → #FF0000FF
+11-12 10:32:51.737  9068  9087 I Mac12   : FONTS12 header: button=333.0 line=433.0 search=528.0
+11-12 10:32:56.572  9068  9087 I Mac12   : FONTS12 search 'comf' shown in 1473 ms (fonts=35)
+11-12 10:33:00.990  9068  9087 I Mac12   : FONTS12 ZIP import 1159 ms, progress seen=true
+11-12 10:33:02.023  9068  9087 I Mac12   : FONTS12 report added=[Lora, Bebas Neue] dups=[Comfortaa-Bold.ttf] invalid=[(broken.ttf, not a TrueType/OpenType font)] errors=[(huge.ttf, larger than 25 MB), (../evil.ttf, unsafe path)]
+11-12 10:33:37.962  9408  9427 I Mac12   : BACK menu → options → tool: ok
+11-12 10:33:55.773  9408  9427 I Mac12   : BACK picker cancelled: editor=true saveDialog=false pending=true
+11-12 10:33:58.716  9408  9427 I Mac12   : BACK saved project ops=1
+11-12 10:34:22.443  9862  9881 I Mac12   : ICONS 32 categories, missing=[], pending notes=11
+=== homeVariants font 1.0 (es)
+INSTRUMENTATION_STATUS: class=app.bocadillo.LayoutAndUpgradeTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.LayoutAndUpgradeTest:
+INSTRUMENTATION_STATUS: test=homeVariants
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.LayoutAndUpgradeTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=homeVariants
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 8.082
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== homeVariants font 1.3 (es)
+INSTRUMENTATION_STATUS: class=app.bocadillo.LayoutAndUpgradeTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.LayoutAndUpgradeTest:
+INSTRUMENTATION_STATUS: test=homeVariants
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.LayoutAndUpgradeTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=homeVariants
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 7.805
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== homeVariants font 2.0 (es)
+INSTRUMENTATION_STATUS: class=app.bocadillo.LayoutAndUpgradeTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.LayoutAndUpgradeTest:
+INSTRUMENTATION_STATUS: test=homeVariants
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.LayoutAndUpgradeTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=homeVariants
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 7.727
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== homeVariants landscape (es)
+INSTRUMENTATION_STATUS: class=app.bocadillo.LayoutAndUpgradeTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.LayoutAndUpgradeTest:
+INSTRUMENTATION_STATUS: test=homeVariants
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.LayoutAndUpgradeTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=homeVariants
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 10.428
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.Mac10FlowsTest#fontsImportPickAndPersist (es)
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac10FlowsTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.Mac10FlowsTest:
+INSTRUMENTATION_STATUS: test=fontsImportPickAndPersist
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac10FlowsTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=fontsImportPickAndPersist
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 45.747
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.Mac10FlowsTest#liveStrokeEqualsAppliedStroke (es)
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac10FlowsTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.Mac10FlowsTest:
+INSTRUMENTATION_STATUS: test=liveStrokeEqualsAppliedStroke
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac10FlowsTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=liveStrokeEqualsAppliedStroke
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 38.311
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.Mac10FlowsTest#insertPictureCropPlaceCutOut (es)
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac10FlowsTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.Mac10FlowsTest:
+INSTRUMENTATION_STATUS: test=insertPictureCropPlaceCutOut
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.Mac10FlowsTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=insertPictureCropPlaceCutOut
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 87.8
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.ReferenceScreensTest
+INSTRUMENTATION_STATUS: class=app.bocadillo.ReferenceScreensTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.ReferenceScreensTest:
+INSTRUMENTATION_STATUS: test=captureReferenceScreens
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.ReferenceScreensTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=captureReferenceScreens
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 86.137
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.StickerLibraryFlowTest
+INSTRUMENTATION_STATUS: class=app.bocadillo.StickerLibraryFlowTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.StickerLibraryFlowTest:
+INSTRUMENTATION_STATUS: test=importInsertTransformDuplicateDelete
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.StickerLibraryFlowTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=importInsertTransformDuplicateDelete
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 41.678
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.MacFlowsTest#largePictureAsksForSize
+INSTRUMENTATION_STATUS: class=app.bocadillo.MacFlowsTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.MacFlowsTest:
+INSTRUMENTATION_STATUS: test=largePictureAsksForSize
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.MacFlowsTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=largePictureAsksForSize
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 6.45
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.MacFlowsTest#homeTitleAndPaint
+INSTRUMENTATION_STATUS: class=app.bocadillo.MacFlowsTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.MacFlowsTest:
+INSTRUMENTATION_STATUS: test=homeTitleAndPaint
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.MacFlowsTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=homeTitleAndPaint
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 52.62
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.MacFlowsTest#insertedPictureSkewPerspectiveSaveReopenExport
+INSTRUMENTATION_STATUS: class=app.bocadillo.MacFlowsTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.MacFlowsTest:
+INSTRUMENTATION_STATUS: test=insertedPictureSkewPerspectiveSaveReopenExport
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.MacFlowsTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=insertedPictureSkewPerspectiveSaveReopenExport
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 44.921
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+=== app.bocadillo.MacFlowsTest#svgShapeAndLineStyle
+INSTRUMENTATION_STATUS: class=app.bocadillo.MacFlowsTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+app.bocadillo.MacFlowsTest:
+INSTRUMENTATION_STATUS: test=svgShapeAndLineStyle
+INSTRUMENTATION_STATUS_CODE: 1
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+INSTRUMENTATION_STATUS: class=app.bocadillo.MacFlowsTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=svgShapeAndLineStyle
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 38.828
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
