@@ -589,4 +589,22 @@ Nota: algunas fuentes pueden ser demasiado grandes o complejas para Android; se 
     <string name="fonts_library">Mi biblioteca de fuentes</string>
     <string name="fonts_styles_count">%1$d estilos</string>
     <string name="draw_area">Área de dibujo</string>
+    <!-- 1.2.0 selector de color unificado -->
+    <string name="color_presets">Colores</string>
+    <string name="color_recent">Recientes</string>
+    <string name="color_favorites">Favoritos</string>
+    <string name="color_favorite_toggle">Color favorito</string>
+    <string name="color_hex">Código de color HEX</string>
+    <string name="color_square">Saturación y brillo</string>
+    <string name="eyedropper_overlay_hint">Toca y desliza sobre la imagen; al soltar se usa el color. Dos dedos: zoom y mover.</string>
+    <string name="eyedropper_loupe">Lupa del cuentagotas</string>
+    <string name="eyedropper_picture">Imagen para tomar un color</string>
+    <string name="blank_format">Formato</string>
+    <string name="blank_custom">Personalizado</string>
+    <string name="blank_swap">Intercambiar ancho y alto</string>
+    <string name="blank_size_info">%1$d × %2$d px</string>
+    <string name="blank_error_invalid">Escribe el ancho y el alto.</string>
+    <string name="blank_error_small">Cada lado debe tener al menos %1$d px.</string>
+    <string name="blank_error_large">Cada lado puede tener como máximo %1$d px.</string>
+    <string name="blank_error_memory">Demasiado grande para la memoria de este dispositivo (máximo %1$s millones de píxeles).</string>
 </resources>

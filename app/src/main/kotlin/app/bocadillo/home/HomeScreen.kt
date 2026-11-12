@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.PaddingValues
@@ -100,6 +101,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.SwapHoriz
 import kotlinx.coroutines.Dispatchers
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -168,23 +170,26 @@ fun HomeScreen(vm: HomeViewModel, onOpen: (String) -> Unit) {
                     IconButton(onClick = { page = HomePage.MORE }, modifier = Modifier.align(Alignment.TopStart).padding(4.dp)) {
                         Icon(Icons.Filled.Menu, stringResource(R.string.home_more), tint = Classic.TextDim, modifier = Modifier.size(30.dp))
                     }
-                    // last work (1.1.0: about twice as big — long side 116 dp instead of 58 — with the
-                    // photo's own proportions instead of a crop; smaller when the screen is short)
+                    // last work (1.2.0, decision 3): a horizontal box of about 140 × 100 dp at the top
+                    // right, smaller when the screen is narrow or short; the whole picture is shown
+                    // inside it with its own proportions (Fit: never stretched, never cropped)
                     val recent = index.recent().firstOrNull()
                     val bmp = recent?.let { last -> remember(last.id, last.modifiedAt) { runCatching { android.graphics.BitmapFactory.decodeFile(vm.thumbFile(last.id).path)?.asImageBitmap() }.getOrNull() } }
                     val cfg = androidx.compose.ui.platform.LocalConfiguration.current
                     var thumbBottom = 0.dp
                     if (recent != null && bmp != null) {
-                        val long = minOf(116.dp, cfg.screenWidthDp.dp * 0.28f, cfg.screenHeightDp.dp * 0.22f)
+                        val k = minOf(1f, cfg.screenWidthDp * 0.36f / 140f, cfg.screenHeightDp * 0.2f / 100f)
+                        val boxW = 140.dp * k; val boxH = 100.dp * k
                         val aspect = bmp.width.toFloat() / bmp.height.coerceAtLeast(1)
-                        val tw = if (aspect >= 1f) long else long * aspect
-                        val th = if (aspect >= 1f) long / aspect else long
-                        thumbBottom = th + 8.dp + 4.dp
-                        androidx.compose.foundation.Image(
-                            bmp, recent.title, contentScale = androidx.compose.ui.layout.ContentScale.FillBounds,
-                            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(tw, th)
-                                .border(2.dp, Classic.Text).clickable { onOpen(recent.id) },
-                        )
+                        val fitW = if (aspect >= 1.4f) boxW else boxH * aspect
+                        val fitH = if (aspect >= 1.4f) boxW / aspect else boxH
+                        thumbBottom = boxH + 8.dp + 4.dp
+                        Box(Modifier.align(Alignment.TopEnd).padding(8.dp).size(boxW, boxH).semantics { contentDescription = "home_thumb_box" }, contentAlignment = Alignment.TopEnd) {
+                            androidx.compose.foundation.Image(
+                                bmp, recent.title, contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                                modifier = Modifier.size(fitW, fitH).border(2.dp, Classic.Text).clickable { onOpen(recent.id) },
+                            )
+                        }
                     }
                     // logo, two-line title, glass button and, at the bottom, the short description;
                     // scrolls when space is short (landscape, very large text) instead of overlapping
@@ -514,30 +519,72 @@ private fun SettingsPage(settings: app.bocadillo.data.AppSettings, onBack: () ->
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun BlankDialog(onDismiss: () -> Unit, onCreate: (Int, Int, Int) -> Unit) {
+    // 1.2.0, decision 4: 1080 × 1920 (9:16) by default, quick formats, custom size with limits
+    // from the memory available to the app, and the unified colour picker for the background
+    val formats = listOf("9:16" to (1080 to 1920), "4:5" to (1080 to 1350), "1:1" to (1080 to 1080), "16:9" to (1920 to 1080))
+    var format by remember { mutableStateOf("9:16") }
     var w by remember { mutableStateOf("1080") }
-    var h by remember { mutableStateOf("1080") }
+    var h by remember { mutableStateOf("1920") }
     var color by remember { mutableStateOf(0xFFFFFFFF.toInt()) }
     val wv = w.toIntOrNull(); val hv = h.toIntOrNull()
+    val maxPixels = remember { BlankLimits.maxPixels(Runtime.getRuntime().maxMemory()) }
+    val error = BlankLimits.check(wv, hv, maxPixels)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.blank_title)) },
         text = {
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(w, { w = it.filter(Char::isDigit).take(5) }, Modifier.width(110.dp), label = { Text(stringResource(R.string.blank_width)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                    Text("  ×  ")
-                    OutlinedTextField(h, { h = it.filter(Char::isDigit).take(5) }, Modifier.width(110.dp), label = { Text(stringResource(R.string.blank_height)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text(stringResource(R.string.blank_format), style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 6.dp)) {
+                    for ((name, size) in formats) androidx.compose.material3.FilterChip(format == name, onClick = { format = name; w = size.first.toString(); h = size.second.toString() }, label = { Text(name) })
+                    androidx.compose.material3.FilterChip(format == "custom", onClick = { format = "custom" }, label = { Text(stringResource(R.string.blank_custom)) })
                 }
-                ColorRow(stringResource(R.string.blank_color), color) { color = it }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(w, { w = it.filter(Char::isDigit).take(5); format = "custom" }, Modifier.width(104.dp), label = { Text(stringResource(R.string.blank_width)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    // swap: portrait ↔ landscape
+                    IconButton(onClick = { val t = w; w = h; h = t; format = formats.firstOrNull { it.second == (w.toIntOrNull() to h.toIntOrNull()) }?.first ?: "custom" }) {
+                        Icon(Icons.Filled.SwapHoriz, stringResource(R.string.blank_swap))
+                    }
+                    OutlinedTextField(h, { h = it.filter(Char::isDigit).take(5); format = "custom" }, Modifier.width(104.dp), label = { Text(stringResource(R.string.blank_height)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                }
+                Text(
+                    when (error) {
+                        BlankLimits.Error.NONE -> stringResource(R.string.blank_size_info, wv ?: 0, hv ?: 0)
+                        BlankLimits.Error.INVALID -> stringResource(R.string.blank_error_invalid)
+                        BlankLimits.Error.TOO_SMALL -> stringResource(R.string.blank_error_small, BlankLimits.MIN_SIDE)
+                        BlankLimits.Error.TOO_LARGE -> stringResource(R.string.blank_error_large, BlankLimits.MAX_SIDE)
+                        BlankLimits.Error.MEMORY -> stringResource(R.string.blank_error_memory, (maxPixels / 1_000_000.0).let { "%.1f".format(it) })
+                    },
+                    color = if (error == BlankLimits.Error.NONE) androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant else androidx.compose.material3.MaterialTheme.colorScheme.error,
+                    fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp).semantics { contentDescription = "blank_status" },
+                )
+                app.bocadillo.editor.ColorPicker(stringResource(R.string.blank_color), color, { color = it })
             }
         },
         confirmButton = {
-            TextButton(enabled = wv != null && hv != null && wv in 16..10000 && hv in 16..10000, onClick = { onCreate(wv!!, hv!!, color) }) { Text(stringResource(R.string.ok)) }
+            TextButton(enabled = error == BlankLimits.Error.NONE, onClick = { onCreate(wv!!, hv!!, color) }) { Text(stringResource(R.string.ok)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
+}
+
+/** Size limits of a new blank image (1.2.0, decision 4). */
+object BlankLimits {
+    const val MIN_SIDE = 16
+    const val MAX_SIDE = 10000
+    enum class Error { NONE, INVALID, TOO_SMALL, TOO_LARGE, MEMORY }
+    /** Pixels the editor can hold: about eight ARGB copies (picture, preview, history, export) in half the heap. */
+    fun maxPixels(maxHeapBytes: Long): Long = (maxHeapBytes / 2 / (8L * 4L)).coerceAtLeast(1_000_000L)
+    fun check(w: Int?, h: Int?, maxPixels: Long): Error = when {
+        w == null || h == null -> Error.INVALID
+        w < MIN_SIDE || h < MIN_SIDE -> Error.TOO_SMALL
+        w > MAX_SIDE || h > MAX_SIDE -> Error.TOO_LARGE
+        w.toLong() * h > maxPixels -> Error.MEMORY
+        else -> Error.NONE
+    }
 }
 
 /**

@@ -1,2 +1,6 @@
 silueta_en_vivo app.bocadillo.Mac11Test#cutOutVisibleWhileFingerMoves
 silueta_borrador app.bocadillo.Mac11Test#cutOutUnderTheFinger
+nueva_imagen app.bocadillo.Mac12Test#newBlankImageFormatsAndLimits
+selector_color app.bocadillo.Mac12Test#colorPickerHexFavouritesRecentsEyedropper
+miniatura app.bocadillo.Mac11Test#homeThumbnailFitsHorizontalBox
+pintar app.bocadillo.MacFlowsTest#homeTitleAndPaint

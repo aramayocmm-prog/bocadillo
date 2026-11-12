@@ -36,6 +36,30 @@ class AppSettings(context: Context) {
         prefs.edit().putString("paint_colors", paintColors.joinToString(",") { (it.toLong() and 0xffffffffL).toString() }).apply()
     }
 
+    // ---- unified colour picker (1.2.0, decision 5): recent colours and favourites, kept across sessions
+    private fun ints(key: String) = (prefs.getString(key, "") ?: "").split(',').mapNotNull { it.toLongOrNull()?.toInt() }
+    private fun putInts(key: String, v: List<Int>) = prefs.edit().putString(key, v.joinToString(",") { (it.toLong() and 0xffffffffL).toString() }).apply()
+
+    var recentColors by mutableStateOf(ints("recent_colors")); private set
+    /** Favourites; the colours added to the 1.1 Paint palette become the first favourites (kept, not lost). */
+    var favoriteColors by mutableStateOf(if (prefs.contains("favorite_colors")) ints("favorite_colors") else ints("paint_colors")); private set
+
+    fun addRecentColor(c: Int) {
+        if (recentColors.firstOrNull() == c) return
+        recentColors = app.bocadillo.core.imaging.color.ColorMath.pushRecent(recentColors, c, 12); putInts("recent_colors", recentColors)
+    }
+    fun toggleFavoriteColor(c: Int) {
+        favoriteColors = if (c in favoriteColors) favoriteColors - c else (listOf(c) + favoriteColors).take(24)
+        putInts("favorite_colors", favoriteColors)
+    }
+
+    init { current = this }
+
+    companion object {
+        /** The app's settings, for components without access to the application (colour picker). */
+        var current: AppSettings? = null; private set
+    }
+
     /** Forgets which tool panels were minimized. */
     fun resetPanels() = panels.edit().clear().apply()
 }

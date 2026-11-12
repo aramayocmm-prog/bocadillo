@@ -1592,6 +1592,17 @@ class EditorViewModel(private val app: BocadilloApp, private val projectId: Stri
         autosaveJob = viewModelScope.launch { delay(1200); saveNow() }
     }
 
+    /**
+     * The picture as it is seen, for the eyedropper (1.2.0, decision 5): the preview with every
+     * visible object drawn over it (the one being edited included).
+     */
+    suspend fun eyedropperImage(): ImageBitmap? = withContext(Dispatchers.Default) {
+        val base = lastPreview ?: return@withContext null
+        runCatching { composite(base, _state.value.displayObjects()).asImageBitmap() }.getOrNull()
+    }.also { lastEyedropperImage = it }
+    /** Test hook: the last picture given to the eyedropper. */
+    @Volatile var lastEyedropperImage: ImageBitmap? = null
+
     /** Draws [objects] over [base] with a private renderer (safe off the UI thread). */
     private fun composite(base: PixelBuffer, objects: List<CanvasObject>): Bitmap {
         val bmp = ImageIo.toMutableBitmap(base)

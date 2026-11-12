@@ -297,10 +297,12 @@ fun TitleStylePanel(
                 LabeledSlider(stringResource(R.string.line_height), st.lineHeight, 0.6f..2.5f, { "${(it * 100).roundToInt()} %" }) { v -> style { it.copy(lineHeight = v) } }
             }
             row(stringResource(R.string.fill_color), "fill") { Swatch(st.color) }
-            if (open == "fill") Column(Modifier.background(androidx.compose.ui.graphics.Color(0xFF262626)).padding(12.dp)) { HsbSliders(st.color) { c -> style { it.copy(color = c) } } }
+            if (open == "fill") Column(Modifier.background(androidx.compose.ui.graphics.Color(0xFF262626)).padding(12.dp)) { androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides androidx.compose.ui.graphics.Color.White) { ColorEditor(st.color, { c -> style { it.copy(color = c) } }) } }
             row(stringResource(R.string.outline_color), "outline") { Swatch(st.outlineColor) }
             if (open == "outline") Column(Modifier.background(androidx.compose.ui.graphics.Color(0xFF262626)).padding(12.dp)) {
-                HsbSliders(st.outlineColor) { c -> style { it.copy(outlineColor = c, outlineWidth = if (it.outlineWidth <= 0f) 0.08f else it.outlineWidth) } }
+                androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides androidx.compose.ui.graphics.Color.White) {
+                    ColorEditor(st.outlineColor, { c -> style { it.copy(outlineColor = c, outlineWidth = if (it.outlineWidth <= 0f) 0.08f else it.outlineWidth) } })
+                }
                 LabeledSlider(stringResource(R.string.outline_width), st.outlineWidth, 0f..0.4f, { "${(it * 100).roundToInt()}%" }) { v -> style { it.copy(outlineWidth = v) } }
             }
             row(stringResource(R.string.more_options), null, onClick = onMore) { Text("›", color = ink, fontSize = 22.sp) }

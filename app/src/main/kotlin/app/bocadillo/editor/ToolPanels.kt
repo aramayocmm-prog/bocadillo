@@ -151,21 +151,8 @@ private val SWATCHES = listOf(
 
 @Composable
 fun ColorRow(label: String, selected: Int, onPick: (Int) -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
-        Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (c in SWATCHES) {
-                val isSel = c == selected
-                Box(
-                    Modifier.size(32.dp).clip(CircleShape)
-                        .background(if (c == 0) Color.LightGray else Color(c))
-                        .border(if (isSel) 3.dp else 1.dp, if (isSel) MaterialTheme.colorScheme.primary else Color.Gray, CircleShape)
-                        .clickable { onPick(c) },
-                    contentAlignment = Alignment.Center,
-                ) { if (c == 0) Text("∅", color = Color.DarkGray) }
-            }
-        }
-    }
+    // 1.2.0, decision 5: the unified colour picker everywhere (effects, backgrounds, export, new image)
+    ColorPicker(label, selected, onPick)
 }
 
 @Composable

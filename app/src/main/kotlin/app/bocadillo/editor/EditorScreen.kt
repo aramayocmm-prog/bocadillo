@@ -104,8 +104,27 @@ fun UiMessage.text(context: Context): String = when (this) {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The editor, with the eyedropper of the unified colour picker (1.2.0, decision 5): any colour
+ * picker inside can open the picture as it is seen (image and all visible objects) to pick a colour.
+ */
 @Composable
 fun EditorScreen(projectId: String, onBack: () -> Unit) {
+    val app = LocalContext.current.applicationContext as BocadilloApp
+    val vm: EditorViewModel = viewModel(factory = EditorViewModel.factory(app, projectId))
+    var pickTo by remember { mutableStateOf<((Int) -> Unit)?>(null) }
+    var pickImage by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val open = remember { { f: (Int) -> Unit -> pickTo = f; pickImage = null; scope.launch { pickImage = vm.eyedropperImage() }; Unit } }
+    Box(Modifier.fillMaxSize()) {
+        androidx.compose.runtime.CompositionLocalProvider(LocalEyedropper provides open) { EditorScreenBody(projectId, onBack) }
+        val to = pickTo
+        if (to != null) EyedropperOverlay(pickImage, onPick = { c -> pickTo = null; pickImage = null; to(c) }, onCancel = { pickTo = null; pickImage = null })
+    }
+}
+
+@Composable
+private fun EditorScreenBody(projectId: String, onBack: () -> Unit) {
     val context = LocalContext.current
     val app = context.applicationContext as BocadilloApp
     val vm: EditorViewModel = viewModel(factory = EditorViewModel.factory(app, projectId))

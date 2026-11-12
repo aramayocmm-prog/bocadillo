@@ -385,6 +385,29 @@ class Mac11Test {
         desc(s(R.string.ins_tip_round) + " 8% · 100%"); desc(s(R.string.collapse))
         val area = boundsOf(s(R.string.ins_cut_area))
         val ctr = area.center
+        // 0. picture edge (before zooming, the picture does not fill the screen): find the picture's left edge on the screen (cyan background of the picture)
+        val e0 = screenshot(); val loc = screenLoc()
+        val row = (ctr.y + loc[1]).toInt()
+        var edgeX = -1
+        for (x in max(0, (area.left + loc[0]).toInt()) until (ctr.x + loc[0]).toInt()) {
+            val c = e0.getPixel(x, row)
+            if (abs(Color.red(c) - 20) < 30 && abs(Color.green(c) - 190) < 30 && abs(Color.blue(c) - 210) < 30) { edgeX = x - loc[0]; break }
+        }
+        log("CUT12 picture left edge on screen at x=$edgeX (row ${ctr.y})")
+        assertTrue("picture edge found on the screen", edgeX > 0)
+        run {
+            val e = Offset(edgeX.toFloat(), ctr.y)
+            val s6a = screenshot()
+            rule.onRoot().performTouchInput { down(e - Offset(40f, 0f)); for (i in 1..10) moveTo(e + Offset(i * 6f - 40f, 0f)) }
+            settleLive()
+            val s6 = screenshot(); keep(s6, "136_silueta_borde_dedo_abajo")
+            val d6 = diffAt(s6a, s6, e + Offset(12f, 0f))
+            log("CUT12 edge stroke from outside, finger down: diff inside edge=$d6")
+            assertTrue("edge erased during the gesture ($d6)", d6 > 40)
+            rule.onRoot().performTouchInput { up() }
+            settleLive()
+        }
+
         // zoom ×2 first: the test runs on a zoomed, panned canvas
         rule.onRoot().performTouchInput { pinch(ctr - Offset(60f, 0f), ctr - Offset(220f, 0f), ctr + Offset(60f, 0f), ctr + Offset(220f, 0f), 500) }
         rule.waitForIdle(); Thread.sleep(1200)
@@ -392,6 +415,7 @@ class Mac11Test {
         val p = ctr
         val far = p + Offset(0f, -260f)
         val s0 = screenshot(); keep(s0, "130_silueta_antes")
+        val n0 = strokes()
 
         // 1. slow eraser stroke, finger still down
         rule.onRoot().performTouchInput { down(p); for (i in 1..12) moveTo(p + Offset(i * 5f, 0f)) }
@@ -399,7 +423,7 @@ class Mac11Test {
         val s1 = screenshot(); keep(s1, "131_silueta_borrando_dedo_abajo")
         val d1a = diffAt(s0, s1, p); val d1b = diffAt(s0, s1, p + Offset(55f, 0f)); val d1far = diffAt(s0, s1, far)
         log("CUT12 slow erase, finger down: diff start=$d1a end=$d1b far=$d1far strokes committed=${strokes()}")
-        assertEquals("finger still down: nothing committed yet", 0, strokes())
+        assertEquals("finger still down: nothing committed yet", n0, strokes())
         assertTrue("erased area visible under the finger during the gesture (start $d1a)", d1a > 60)
         assertTrue("erased area visible at the current finger position (end $d1b)", d1b > 60)
         assertTrue("far area untouched ($d1far)", d1far < 15)
@@ -413,7 +437,7 @@ class Mac11Test {
         assertTrue("fast segment visible during the gesture ($d2)", d2 > 60)
         rule.onRoot().performTouchInput { up() }
         settleLive()
-        assertEquals(1, strokes())
+        assertEquals(n0 + 1, strokes())
         val s3 = screenshot(); keep(s3, "133_silueta_tras_levantar")
         log("CUT12 after lifting: still erased at start=${diffAt(s0, s3, p)} (no jump back)")
         assertTrue("still erased after lifting", diffAt(s0, s3, p) > 60)
@@ -442,28 +466,6 @@ class Mac11Test {
         assertTrue("short stroke visible during the gesture ($d5)", d5 > 60)
         rule.onRoot().performTouchInput { up() }
         settleLive()
-
-        // 5. picture edge: find the picture's left edge on the screen (cyan background of the picture)
-        val loc = screenLoc()
-        val row = (p.y + loc[1]).toInt()
-        var edgeX = -1
-        for (x in max(0, (area.left + loc[0]).toInt()) until (p.x + loc[0]).toInt()) {
-            val c = s0.getPixel(x, row)
-            if (abs(Color.red(c) - 20) < 30 && abs(Color.green(c) - 190) < 30 && abs(Color.blue(c) - 210) < 30) { edgeX = x - loc[0]; break }
-        }
-        log("CUT12 picture left edge on screen at x=$edgeX (row ${p.y})")
-        if (edgeX > 0) {
-            val e = Offset(edgeX.toFloat(), p.y)
-            val s6a = screenshot()
-            rule.onRoot().performTouchInput { down(e - Offset(40f, 0f)); for (i in 1..10) moveTo(e + Offset(i * 6f - 40f, 0f)) }
-            settleLive()
-            val s6 = screenshot(); keep(s6, "136_silueta_borde_dedo_abajo")
-            val d6 = diffAt(s6a, s6, e + Offset(12f, 0f))
-            log("CUT12 edge stroke from outside, finger down: diff inside edge=$d6")
-            assertTrue("edge erased during the gesture ($d6)", d6 > 40)
-            rule.onRoot().performTouchInput { up() }
-            settleLive()
-        }
 
         // 6. what is seen is what is exported (same as 1.1 check, after the new drawing path)
         val d = insertTool().draft
@@ -642,21 +644,35 @@ class Mac11Test {
 
     // ------------------------------------------------------------------ 6. home thumbnail
 
-    @Test fun homeThumbnailAboutTwiceAsBig() {
-        val id = newProject("Miniatura", 1200, 900)
-        dismissRecovery()
-        // the most recent project is shown: make this one the most recent
-        runBlocking { val b = app.projects.load(id); app.projects.save(ProjectBundle(b.document.copy(modifiedAt = System.currentTimeMillis()), b.sourceBytes, b.masks, b.thumbnailJpeg, b.assets)) }
-        ui { ctx.recreate() }; Thread.sleep(2500)
-        dismissRecovery()
-        rule.waitUntil(10_000) { hasDesc("Miniatura") }
-        val r = boundsOf("Miniatura")
+    /** 1.2.0, decision 3: a ~140 × 100 dp box at the top right, the whole picture fitted inside it. */
+    @Test fun homeThumbnailFitsHorizontalBox() {
         val dp = ctx.resources.displayMetrics.density
-        val long = max(r.width, r.height) / dp; val short = minOf(r.width, r.height) / dp
-        log("THUMB ${r.width / dp} × ${r.height / dp} dp (1.0: 44 × 58 dp)")
-        shot("150_inicio_miniatura")
-        assertTrue("long side about 116 dp (twice 58): $long", long in 100f..120f)
-        assertTrue("photo proportions 4:3 kept: ${long / short}", abs(long / short - 4f / 3f) < 0.06f)
-        assertTrue("top right (${r.right / dp}, ${r.top / dp} dp)", r.right > ctx.resources.displayMetrics.widthPixels - 40 * dp && r.top < 110 * dp)
+        val cases = listOf("Mini916" to (1080 to 1920), "Mini11" to (1000 to 1000), "Mini169" to (1920 to 1080), "MiniTransp" to (800 to 600), "MiniGrande" to (4000 to 3000))
+        for ((title, size) in cases) {
+            val (w, h) = size
+            dismissRecovery()
+            val id = if (title == "MiniTransp") {
+                // transparent picture: a red disc on nothing
+                val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                Canvas(b).drawCircle(w / 2f, h / 2f, h / 3f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.RED })
+                val png = ByteArrayOutputStream().also { b.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+                val doc = runBlocking { app.projects.create(ImageIo.Imported(png, "image/png", title), w, h, true, title, ImageIo.thumbnail(b.copy(Bitmap.Config.ARGB_8888, false))) }
+                app.projects.clearDraft(doc.id); doc.id
+            } else newProject(title, w, h)
+            runBlocking { val b = app.projects.load(id); app.projects.save(ProjectBundle(b.document.copy(modifiedAt = System.currentTimeMillis()), b.sourceBytes, b.masks, b.thumbnailJpeg, b.assets)) }
+            ui { ctx.recreate() }; Thread.sleep(2500)
+            dismissRecovery()
+            rule.waitUntil(10_000) { hasDesc(title) }
+            val r = boundsOf(title); val box = boundsOf("home_thumb_box")
+            val open = rule.onAllNodesWithText(s(R.string.open_image), substring = true, useUnmergedTree = true).fetchSemanticsNodes().first().boundsInRoot
+            log("THUMB $title ${w}x$h: picture ${r.width / dp} × ${r.height / dp} dp in box ${box.width / dp} × ${box.height / dp} dp; open button top ${open.top / dp} dp")
+            shot("150_inicio_miniatura_$title")
+            assertTrue("box about 140 × 100 dp", box.width / dp in 100f..141f && box.height / dp in 70f..101f && box.width > box.height)
+            assertTrue("picture inside the box", r.left >= box.left - 1 && r.right <= box.right + 1 && r.top >= box.top - 1 && r.bottom <= box.bottom + 1)
+            assertTrue("fills the box on one side (Fit)", abs(r.width - box.width) < 2 * dp || abs(r.height - box.height) < 2 * dp)
+            assertTrue("proportions kept ${r.width / r.height} vs ${w.toFloat() / h}", abs(r.width / r.height - w.toFloat() / h) < 0.05f * (w.toFloat() / h) + 0.02f)
+            assertTrue("top right", box.right > ctx.resources.displayMetrics.widthPixels - 20 * dp && box.top < 110 * dp)
+            assertTrue("open button below the thumbnail", open.top > box.bottom)
+        }
     }
 }

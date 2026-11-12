@@ -589,4 +589,22 @@ Note: some fonts may be too large or too complex for Android; those are listed w
     <string name="fonts_library">My font library</string>
     <string name="fonts_styles_count">%1$d styles</string>
     <string name="draw_area">Drawing area</string>
+    <!-- 1.2.0 unified colour picker -->
+    <string name="color_presets">Colours</string>
+    <string name="color_recent">Recent</string>
+    <string name="color_favorites">Favourites</string>
+    <string name="color_favorite_toggle">Favourite colour</string>
+    <string name="color_hex">HEX colour code</string>
+    <string name="color_square">Saturation and brightness</string>
+    <string name="eyedropper_overlay_hint">Touch and slide over the picture; lift to use the colour. Two fingers: zoom and move.</string>
+    <string name="eyedropper_loupe">Eyedropper loupe</string>
+    <string name="eyedropper_picture">Picture to pick a colour from</string>
+    <string name="blank_format">Format</string>
+    <string name="blank_custom">Custom</string>
+    <string name="blank_swap">Swap width and height</string>
+    <string name="blank_size_info">%1$d × %2$d px</string>
+    <string name="blank_error_invalid">Enter the width and the height.</string>
+    <string name="blank_error_small">Each side must be at least %1$d px.</string>
+    <string name="blank_error_large">Each side can be at most %1$d px.</string>
+    <string name="blank_error_memory">Too big for the memory of this device (at most %1$s million pixels).</string>
 </resources>

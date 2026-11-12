@@ -119,7 +119,9 @@ class HomeViewModel(private val app: BocadilloApp) : ViewModel() {
                 val (w, h) = ImageIo.workingSize(width, height)
                 val hasAlpha = (argb ushr 24) != 0xFF
                 val thumb = withContext(Dispatchers.Default) {
-                    ImageIo.thumbnail(PixelBuffer.filled(minOf(w, 360), minOf(h, 360), argb))
+                    // the thumbnail keeps the canvas proportions (1.2.0)
+                    val k = minOf(1f, 360f / maxOf(w, h))
+                    ImageIo.thumbnail(PixelBuffer.filled(maxOf(1, (w * k).toInt()), maxOf(1, (h * k).toInt()), argb))
                 }
                 _openProject.send(repo.create(imported, w, h, hasAlpha, title, thumb).id)
             } catch (e: Exception) {

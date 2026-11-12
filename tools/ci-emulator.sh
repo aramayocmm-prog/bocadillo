@@ -59,8 +59,8 @@ if [ -s tools/ci-quick.txt ]; then
   T=180 a install -r app/build/outputs/apk/debug/app-debug.apk >> $R 2>&1
   T=180 a install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >> $R 2>&1
   a shell cmd locale set-app-locales app.bocadillo.debug --locales es-ES >> $R 2>&1 || true
-  while read -r name test; do [ -n "$name" ] && rec "$name" "$test" 600 -e class "$test"; done < tools/ci-quick.txt
-  a logcat -d -s Mac11:I Mac12:I >> $R 2>/dev/null || true
+  while read -r name test; do [ -n "$name" ] && rec "$name" "$test" 600 -e class "$test" < /dev/null; done < tools/ci-quick.txt
+  a logcat -d -s Mac11:I Mac12:I MacFlows:I >> $R 2>/dev/null || true
   pull_screens
   ! grep -q 'TIMEOUT_OR_ERROR\|FAILURES!!!\|INSTRUMENTATION_FAILED\|Process crashed\|DEVICE_LOST' $R
   exit $?
@@ -99,7 +99,7 @@ log "--- frame statistics during the Cut Out test (dumpsys gfxinfo)"
 a shell dumpsys gfxinfo app.bocadillo.debug | grep -E 'Total frames|Janky|percentile|Number Missed|Number High input|Number Slow' >> $R 2>&1 || true
 rec navegacion_guardado "$M11#finishSaveAndBackNavigation" 420 -e class "$M11#finishSaveAndBackNavigation"
 rec catalogo_fuentes "$M11#fontCatalogueSearchPickPersist" 420 -e class "$M11#fontCatalogueSearchPickPersist"
-inst "$M11#homeThumbnailAboutTwiceAsBig" 300 -e class "$M11#homeThumbnailAboutTwiceAsBig"
+inst "$M11#homeThumbnailFitsHorizontalBox" 420 -e class "$M11#homeThumbnailFitsHorizontalBox"
 a logcat -d -s Mac11:I Upgrade:I LiveStroke:I >> $R 2>/dev/null || true
 
 for v in 1.0 1.3 2.0; do
