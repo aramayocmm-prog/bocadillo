@@ -180,6 +180,14 @@ class Mac11Test {
                 for (sh in intArrayOf(0, 8, 16, 24)) m = max(m, abs(((px[i] ushr sh) and 0xFF) - ((l.second[i] ushr sh) and 0xFF)))
             }
             log("FIDELITY stroke=$name differing=$d/${px.size} max=$m")
+            if (d > 0) {
+                val i0 = px.indices.first { px[it] != l.second[it] }
+                log("FIDELITY first diff at ${i0 % fin.width},${i0 / fin.width}: final=#%08X live=#%08X tool=%s strokes=%d".format(px[i0], l.second[i0], vm().state.value.tool?.javaClass?.simpleName, (vm().state.value.tool as? ToolState.Draw)?.strokes?.size ?: -1))
+                Thread.sleep(3000)
+                val fin2 = vm().state.value.preview!!.asAndroidBitmap().copy(Bitmap.Config.ARGB_8888, false)
+                val px2 = IntArray(fin2.width * fin2.height).also { fin2.getPixels(it, 0, fin2.width, 0, 0, fin2.width, fin2.height) }
+                log("FIDELITY after 3 s more: differing=${px2.indices.count { px2[it] != l.second[it] }} final=#%08X".format(px2[i0]))
+            }
             diffPx += d; total += px.size; maxDiff = max(maxDiff, m)
         }
         shot("101_trazo_final")

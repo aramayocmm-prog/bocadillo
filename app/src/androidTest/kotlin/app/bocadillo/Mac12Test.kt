@@ -238,13 +238,15 @@ class Mac12Test {
         assertTrue(hasDesc("all Comfortaa Bold")); assertFalse(has("Poppins"))
         desc("all Comfortaa Bold")
         waitFor(s(R.string.alignment), 5_000)
-        assertEquals("bundled:Comfortaa-Bold.ttf", draftFont())
-        assertEquals("bundled:Comfortaa-Bold.ttf", app.settings.fontRecents.first())
+        // (an imported copy of Comfortaa Bold may exist from earlier tests: it is listed first)
+        val picked = draftFont()
+        assertTrue(picked, picked.endsWith("Comfortaa-Bold.ttf"))
+        assertEquals(picked, app.settings.fontRecents.first())
         // recents: listed, no duplicates after picking again
         tap(s(R.string.tab_font)); waitFor(s(R.string.fonts_recent))
         assertTrue(hasDesc("rec Comfortaa Bold"))
         desc("rec Comfortaa Bold"); waitFor(s(R.string.alignment), 5_000)
-        assertEquals(1, app.settings.fontRecents.count { it == "bundled:Comfortaa-Bold.ttf" })
+        assertEquals(1, app.settings.fontRecents.count { it == picked })
         // decision 10: ZIP import with progress and summary
         tap(s(R.string.tab_font)); waitFor(s(R.string.fonts_import_button))
         val before = app.fonts.importedFonts().size
