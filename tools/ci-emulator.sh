@@ -94,13 +94,21 @@ log "--- frame statistics during the live-stroke test (dumpsys gfxinfo)"
 a shell dumpsys gfxinfo app.bocadillo.debug | grep -E 'Total frames|Janky|percentile|Number Missed|Number High input|Number Slow' >> $R 2>&1 || true
 rec asa_tamano_perspectiva "$M11#handleTapTogglesSizeAndPerspective" 420 -e class "$M11#handleTapTogglesSizeAndPerspective"
 a shell dumpsys gfxinfo app.bocadillo.debug reset > /dev/null 2>&1 || true
+rec silueta_en_vivo "$M11#cutOutVisibleWhileFingerMoves" 420 -e class "$M11#cutOutVisibleWhileFingerMoves"
 rec silueta_borrador "$M11#cutOutUnderTheFinger" 420 -e class "$M11#cutOutUnderTheFinger"
 log "--- frame statistics during the Cut Out test (dumpsys gfxinfo)"
 a shell dumpsys gfxinfo app.bocadillo.debug | grep -E 'Total frames|Janky|percentile|Number Missed|Number High input|Number Slow' >> $R 2>&1 || true
 rec navegacion_guardado "$M11#finishSaveAndBackNavigation" 420 -e class "$M11#finishSaveAndBackNavigation"
 rec catalogo_fuentes "$M11#fontCatalogueSearchPickPersist" 420 -e class "$M11#fontCatalogueSearchPickPersist"
 inst "$M11#homeThumbnailFitsHorizontalBox" 420 -e class "$M11#homeThumbnailFitsHorizontalBox"
-a logcat -d -s Mac11:I Upgrade:I LiveStroke:I >> $R 2>/dev/null || true
+# 1.2.0 decisions
+M12=app.bocadillo.Mac12Test
+rec nueva_imagen "$M12#newBlankImageFormatsAndLimits" 420 -e class "$M12#newBlankImageFormatsAndLimits"
+rec selector_color "$M12#colorPickerHexFavouritesRecentsEyedropper" 420 -e class "$M12#colorPickerHexFavouritesRecentsEyedropper"
+rec fuentes "$M12#fontsCompactHeaderFavouritesRecentsImportDelete" 600 -e class "$M12#fontsCompactHeaderFavouritesRecentsImportDelete"
+rec atras "$M12#backHierarchyAndFilePickerCancel" 420 -e class "$M12#backHierarchyAndFilePickerCancel"
+rec iconos "$M12#stickerCategoryIllustrations" 420 -e class "$M12#stickerCategoryIllustrations"
+a logcat -d -s Mac11:I Mac12:I Upgrade:I LiveStroke:I >> $R 2>/dev/null || true
 
 for v in 1.0 1.3 2.0; do
   a shell settings put system font_scale $v; sleep 2

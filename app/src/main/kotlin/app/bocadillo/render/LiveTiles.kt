@@ -88,8 +88,9 @@ class LiveTiles(val width: Int, val height: Int) {
      * Draws [base] (the picture under the tiles, any size, scaled to [dstW]×[dstH]) and the tiles
      * over it, with the tiles' cells cut out of [base] (1.2.0, decision 1). The tiles replace the
      * picture there instead of being blended over it: a pixel that became more transparent
-     * (Cut Out eraser, mask eraser, transparent pictures) shows at once what lies underneath,
-     * not the old opaque pixel through it.
+     * (Cut Out eraser, mask eraser) shows at once what lies underneath, not the old opaque pixel
+     * through it. Used where the result can be more transparent than the picture under it; the
+     * Paint tool keeps drawing its tiles over the photo, exactly as in 1.1.
      */
     fun drawOver(canvas: Canvas, base: Bitmap, dstW: Float, dstH: Float, basePaint: Paint) {
         val sx = dstW / width; val sy = dstH / height
