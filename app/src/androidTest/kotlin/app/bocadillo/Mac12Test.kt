@@ -191,9 +191,9 @@ class Mac12Test {
             put("Fuentes/Bebas12.ttf", assetBytes("fonts/BebasNeue-Regular.ttf") + ByteArray(16) { 9 })
             put("Fuentes/Comfortaa-Bold.ttf", assetBytes("fonts/Comfortaa-Bold.ttf"))      // duplicate of a font inside the app
             put("Fuentes/broken.ttf", ByteArray(500) { 1 })                                // not a font
-            put("../evil.ttf", assetBytes("fonts/Poppins-Bold.ttf") + ByteArray(16) { 3 })  // unsafe path
             put("huge.ttf", ByteArray(26 * 1024 * 1024))                                   // larger than 25 MB unpacked
             put("leeme.txt", "hola".toByteArray())                                         // ignored
+            put("../evil.ttf", assetBytes("fonts/Poppins-Bold.ttf") + ByteArray(16) { 3 })  // unsafe path (last: Android 14 stops reading there)
         }
         return f
     }
@@ -366,7 +366,9 @@ class Mac12Test {
         // an empty category: the large illustration and the pending text, no invented stickers
         val empty = StickerCategories.all.firstOrNull { app.stickerPacks.index.inCategory(it.id).isEmpty() }
         if (empty != null) {
-            tap(empty.name(java.util.Locale.getDefault().language)); Thread.sleep(800)
+            val label = empty.name(java.util.Locale.getDefault().language)
+            rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasContentDescription("icon_${empty.id}"))
+            rule.waitForIdle(); tap(label); Thread.sleep(800)
             shot("242_categoria_vacia")
             assertTrue(has(s(R.string.sticker_pending_long).substringBefore("\n")))
         }

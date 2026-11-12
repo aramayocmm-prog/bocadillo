@@ -192,6 +192,7 @@ fun FontList(fonts: List<FontOption>, selected: String, typeface: (String) -> Ty
     // light list of the classic Font screen: grey group headers, white rows with the name drawn
     // in its own font, the selected row highlighted, "More Fonts ›" (import) at the end
     val light = app.bocadillo.ui.theme.Classic
+    val ctxApp = androidx.compose.ui.platform.LocalContext.current.applicationContext
     Column(Modifier.background(light.LightRow)) {
         extra()
         var lastKind: FontOption.Kind? = null
@@ -208,7 +209,7 @@ fun FontList(fonts: List<FontOption>, selected: String, typeface: (String) -> Ty
             Text(
                 f.displayName, fontFamily = FontFamily(typeface(f.ref)), fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = androidx.compose.ui.graphics.Color(0xFF111111),
-                modifier = Modifier.fillMaxWidth().background(if (sel) light.LightMore else light.LightRow).clickable { onPick(f.ref); app.bocadillo.data.AppSettings.current?.addFontRecent(f.ref) }.padding(horizontal = 8.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().background(if (sel) light.LightMore else light.LightRow).clickable { onPick(f.ref); (ctxApp as? app.bocadillo.BocadilloApp)?.settings?.addFontRecent(f.ref) }.padding(horizontal = 8.dp, vertical = 8.dp),
             )
             HorizontalDivider(color = light.LightDivider)
         }

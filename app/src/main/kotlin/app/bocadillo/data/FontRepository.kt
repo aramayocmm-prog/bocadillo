@@ -213,7 +213,10 @@ class FontRepository(private val context: Context) {
                 runCatching {
                     java.util.zip.ZipInputStream(src.open().buffered()).use { z ->
                         while (true) {
-                            val en = z.nextEntry ?: break
+                            // Android 14+ refuses entries with ".." itself (the ZIP cannot be read past them)
+                            val en = try { z.nextEntry } catch (e: java.util.zip.ZipException) {
+                                if (e.message?.contains("path", true) == true) { errors += (e.message?.substringAfterLast(": ") ?: name) to "unsafe path"; break } else throw e
+                            } ?: break
                             val n = en.name.replace('\\', '/')
                             if (en.isDirectory || n.contains("__MACOSX") || n.substringAfterLast('/').startsWith(".")) continue
                             if (!isFontName(n)) continue

@@ -91,11 +91,12 @@ fun ColorPicker(label: String, color: Int, onColor: (Int) -> Unit, allowAlpha: B
     var custom by remember { mutableStateOf(false) }
     val eyedropper = LocalEyedropper.current
     val emit by rememberUpdatedState(onColor)
+    val settings = (androidx.compose.ui.platform.LocalContext.current.applicationContext as? app.bocadillo.BocadilloApp)?.settings
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             Swatch(color, selected = true, size = 24) {}
-            if (eyedropper != null) IconButton(onClick = { eyedropper { c -> emit(if (allowAlpha) c else c or 0xFF000000.toInt()) } }) {
+            if (eyedropper != null) IconButton(onClick = { eyedropper { c -> val f = if (allowAlpha) c else c or 0xFF000000.toInt(); emit(f); settings?.addRecentColor(f) } }) {
                 Icon(Icons.Filled.Colorize, stringResource(R.string.eyedropper))
             }
             TextButton(onClick = { custom = !custom }) { Text(stringResource(if (custom) R.string.color_less else R.string.color_custom)) }
@@ -110,7 +111,7 @@ fun ColorPicker(label: String, color: Int, onColor: (Int) -> Unit, allowAlpha: B
  */
 @Composable
 fun ColorEditor(color: Int, onColor: (Int) -> Unit, allowAlpha: Boolean = true, advanced: Boolean = true, minAlpha: Int = 0) {
-    val settings = AppSettings.current
+    val settings = (androidx.compose.ui.platform.LocalContext.current.applicationContext as? app.bocadillo.BocadilloApp)?.settings ?: AppSettings.current
     val current by rememberUpdatedState(color)
     val start = remember { color }
     fun fix(c: Int): Int = if (!allowAlpha) c or 0xFF000000.toInt() else if (ColorMath.alpha(c) < minAlpha) (c and 0xFFFFFF) or (minAlpha shl 24) else c
